@@ -1,0 +1,2 @@
+192.168.0.123:/volume1/Databases /mnt/nas_databases	nfs4	noauto,x-systemd.automount,x-systemd.device-timeout=30,_netdev	0	0
+

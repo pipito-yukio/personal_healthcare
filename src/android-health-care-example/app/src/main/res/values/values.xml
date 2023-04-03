@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <integer name="ems_body_temper">3</integer>
+    <integer name="ems_walking_count">4</integer>
+    <!-- 最大入力桁数 -->
+    <!-- 体温: 小数点第1位で整数部2桁 -->
+    <integer name="max_body_temper">4</integer>
+    <!-- 歩数: 0-99999 -->
+    <integer name="max_walking_count">5</integer>
+    <!-- 天候: [DB定義] VARCHAR(60)/3 =20文字 -->
+    <integer name="max_weather_cond">20</integer>
+    <!-- 健康状態メモ: [DB定義] VARCHAR(255)/3 =85文字 -->
+    <integer name="max_health_cond_memo">85</integer>
+</resources>

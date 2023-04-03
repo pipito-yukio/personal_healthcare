@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- ADD -->
+    <drawable name="red">#7f00</drawable>
+    <drawable name="blue">#770000ff</drawable>
+    <drawable name="green">#7700ff00</drawable>
+    <drawable name="yellow">#77ffff00</drawable>
+    <drawable name="screen_background_black">#ff000000</drawable>
+    <drawable name="translucent_background">#e0000000</drawable>
+    <drawable name="transparent_background">#00000000</drawable>
+
+    <color name="solid_red">#ffff0000</color>
+    <color name="solid_blue">#0000ff</color>
+    <color name="solid_green">#f0f0</color>
+    <color name="solid_yellow">#ffffff00</color>
+    <color name="purply">#ff884488</color>
+    <!-- Textcolor for dark mode -->
+    <color name="auqamarine">#ff7fffd4</color>
+    <!-- WarningView text color(mediumvioletred) at Dark mode -->
+    <color name="warning_bg_color_dark">#fff5f5f5</color>
+    <!-- opacity: 30%, safe color: lightgray for drawable color for Theme Lite -->
+    <color name="inp_text_frame_bg_color">#4dd3d3d3</color>
+    <!-- opacity: 20%, safe color: whitesmode for drawable color for Theme Dark -->
+    <color name="inp_text_frame_bg_color_dark">#33f5f5f5</color>
+    <!-- TextView for title frame -->
+    <!-- safe color: darkgray -->
+    <color name="title_frame_bg_color">#4d808080</color>
+    <!-- safe color: darkgray -->
+    <color name="title_frame_bg_color_dark">#33d3d3d3</color>
+
+</resources>

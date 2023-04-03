@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="@dimen/alertdialog_padding_start_end"
+    android:paddingEnd="@dimen/alertdialog_padding_start_end"
+    >
+
+    <!-- 歩数は正の整数 -->
+    <EditText
+        android:id="@+id/editWalkingCount"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:ems="@integer/ems_walking_count"
+        android:maxLength="@integer/max_walking_count"
+        style="@style/StyleEditNumbered"
+        android:singleLine="true"
+        android:textAppearance="?android:textAppearanceMedium"
+        />
+</LinearLayout>

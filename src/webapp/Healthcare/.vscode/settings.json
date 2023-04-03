@@ -1,0 +1,5 @@
+{
+  "python.defaultInterpreterPath": "/home/yourename/py_venv/raspi4_apps/bin/python",
+  "python.linting.pylintEnabled": true,
+  "python.linting.enabled": true
+}

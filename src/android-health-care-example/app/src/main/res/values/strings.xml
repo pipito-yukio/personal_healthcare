@@ -1,0 +1,145 @@
+<resources>
+    <string name="app_name">健康管理アプリ</string>
+    <string name="action_settings">健康管理アプリ設定</string>
+
+    <string name="lbl_measurement_date">測定日付</string>
+    <string name="lbl_year">年</string>
+    <string name="lbl_month">月</string>
+    <string name="lbl_wakeup_time">起床時刻</string>
+    <string name="lbl_day">日</string>
+    <string name="lbl_morning">午前</string>
+    <string name="lbl_evening">午後</string>
+    <string name="lbl_measurement_time">測定時刻</string>
+    <string name="lbl_blood_pressure_max">最高血圧</string>
+    <string name="lbl_blood_pressure_min">最低血圧</string>
+    <string name="lbl_hour">時</string>
+    <string name="lbl_hour_range">時間</string>
+    <string name="lbl_minute">分</string>
+    <string name="lbl_pulse_rate">脈拍</string>
+    <string name="unit_pressure">mmHg</string>
+    <string name="unit_pulse">拍/分</string>
+    <string name="lbl_walking_count">歩数</string>
+    <string name="unit_walking_count">歩</string>
+    <string name="lbl_body_temper_time">体温測定時刻</string>
+    <string name="lbl_body_temper">体温</string>
+    <string name="unit_temper">℃</string>
+    <string name="lbl_btn_ble_import">BLE</string>
+    <string name="lbl_weather">天候</string>
+    <string name="lbl_sleep_score">睡眠スコア</string>
+    <string name="lbl_sleeping_time">睡眠時間</string>
+    <string name="lbl_deep_sleeping_time">深い睡眠</string>
+    <string name="lbl_midnight_toilet_visits">夜間トイレ回数</string>
+    <string name="unit_count">回</string>
+    <string name="lbl_drinks">飲料</string>
+    <string name="chklbl_coffee">コーヒー</string>
+    <string name="chklbl_tea">お茶</string>
+    <string name="chklbl_diuretic_drink">その他(利尿作用有り)</string>
+    <string name="chklbl_alcoho">アルコール</string>
+    <string name="chklbl_nutrition_drink">栄養ドリンク</string>
+    <string name="chklbl_sports_drink">スポーツドリンク(入浴後)</string>
+    <string name="edit_hint_body_condition">健康状態メモ</string>
+    <string name="chklbl_take_medicine">服薬有無</string>
+    <string name="chklbl_bathing">入浴</string>
+    <string name="chk_condition_memo_editable">編集可能にする</string>
+
+    <string name="lbl_btn_save">保存</string>
+    <string name="lbl_btn_registered">登録済み</string>
+
+    <string name="alertdialogtitle_toiletvisits">回数入力</string>
+    <string name="alertdialogtitle_sleepscore">スコア入力</string>
+    <string name="alertdialogtitle_bloodpressure">血圧測定</string>
+    <string name="alert_dialog_ok">OK</string>
+    <string name="alert_dialog_cancel">取消し</string>
+
+    <!-- 測定日付のテキスト幅設定目的 -->
+    <string name="init_show_date_value">2023 年 01 月 01 日</string>
+    <string name="init_tag_date_value">2023-01-01</string>
+    <!-- TextViweの初期値 -->
+    <string name="init_show_time_value">00 時 00 分</string>
+    <string name="init_show_range_time_value">00 時間 00 分</string>
+    <string name="init_tag_time_value">00:00</string>
+    <string name="init_midnight_toilet_visits">1</string>
+    <string name="init_sleep_score">80</string>
+    <string name="init_bloodpressure_max">130</string>
+    <string name="init_bloodpressure_min">85</string>
+    <string name="init_pulse_rate">75</string>
+    <!-- AM / PM 初期値 -->
+    <string name="time_class_am">06:00</string>
+    <string name="time_class_pm">22:00</string>
+
+    <!-- 表示用の日付・時刻用フォーマット -->
+    <string name="format_show_date">%04d 年 %02d 月 %02d 日</string>
+    <string name="format_show_time">%02d 時 %02d 分</string>
+    <string name="format_show_range_time">%02d 時間 %02d 分</string>
+    <!-- 日付のTag用フォーマット -->
+    <string name="format_tag_date">%04d-%02d-%02d</string>
+    <!-- 時刻のTag用フォーマット: hour + ":" + minute -->
+    <string name="format_tag_time">%02d:%02d</string>
+    <!-- Edit系フォーマット -->
+    <string name="format_input_title">%sの入力</string>
+
+
+    <!-- NumberPickerに与える初期値と数値の範囲 -->
+    <string name="range_midnight_toiletvisits">0,10</string>
+    <string name="range_sleep_score">20,200</string>
+    <string name="range_bloodpressure_max">70,200</string>
+    <string name="range_bloodpressure_min">50,150</string>
+    <string name="range_pluse_rate">30,150</string>
+
+    <!-- ステータス表示 -->
+    <string name="message_save_success">保存しました</string>
+    <string name="warning_save_with_2reason">%sのJSONファイル保存失敗(%s)</string>
+    <string name="message_register_success">登録しました</string>
+    <string name="message_get_current_ok">取得しました</string>
+    <string name="status_onchange_with_item">(*) %s (変更)</string>
+    <string name="status_saved_datefmt">保存中(%04d年%02d月%02d日)</string>
+    <string name="status_registered_datefmt">登録済み(%04d年%02d月%02d日)</string>
+    <string name="status_last_registered_datefmt">最新登録日(%04d年%02d月%02d日)</string>
+    <!-- SharedPreference 保存キー -->
+    <string name="sharedpref_app_top_fragment">appTopFragment</string>
+    <!-- 最終保存日 -->
+    <string name="sharedpref_saved_key">last_saved_date</string>
+    <!-- 最新登録日 -->
+    <string name="sharedpref_registered_key">last_registered_date</string>
+    <!-- データ取得日付 -->
+    <string name="sharedpref_get_current_key">get_current_date</string>
+    <!-- 保存JSONファイル名フォーマット(日付) -->
+    <string name="last_saved_json_file">last_saved.json</string>
+    <!-- 登録済みJSONファイル名 -->
+    <string name="latest_registered_json_file">latest_resitered.json</string>
+
+    <!-- ウォーニングメッセージ -->
+    <string name="warning_need_email_address">ユーザ設定でメールアドレスを入力してください</string>
+    <string name="warning_not_allow_future">未来日は保存・登録不可</string>
+    <string name="init_responsestatus_value">Warning</string>
+    <string name="warning_code_message">[%d] %s</string>
+    <string name="warning_network_not_available">ネットワークが利用できません！</string>
+    <string name="warning_register_with_2_reason">データ%sエラー (%s)</string>
+    <string name="warning_currentdata_with_reason">データ取得エラー (%s)</string>
+    <string name="exception_with_reason">サーバーエラー (%s)</string>
+    <!-- ダイアログフラグメント -->
+    <string name="confirm_dialog_title">送信確認</string>
+    <string name="confirm_message_with_send">%sデータを送信しても宜しいですか？</string>
+    <string name="warning_required_dialog_title">入力必須項目</string>
+    <string name="error_response_dialog_title">健康管理データリクエスト</string>
+    <string name="warning_required_time">%sを設定してください</string>
+    <string name="warning_required_edit">%sを入力してください</string>
+    <!-- 正常メッセージ -->
+    <string name="msg_post_ok_with_type">データを%sしました</string>
+    <string name="msg_request_canceled_with_type">%sリクエスト取消し</string>
+    <string name="msg_gettting_data">データ取得中&#8230;</string>
+    <string name="msg_gettting_graph">画像取得中&#8230;</string>
+    <!-- ウォーニングメッセージ -->
+    <string name="warning_not_up_to_date">変更ありません</string>
+    <string name="warning_data_not_found">データ未登録</string>
+    <string name="warning_data_already_resistered">データ登録済み</string>
+    <string name="warning_unkown_with_reason">不明なエラー: %s</string>
+
+    <!-- Preference Titles -->
+    <string name="pref_app_top_frag_title">健康管理リクエスト用ユーザー設定</string>
+    <string name="pref_app_top_frag_edit_mail_title">メール設定</string>
+    <string name="pref_app_top_frag_dialog_title">メールアドレスの入力</string>
+    <string name="pref_app_top_frag_edit_main_summary">サーバーリクエストのためのメールアドレス設定</string>
+    <string name="pref_emailaddress_key">healthcare_user_email</string>
+    <string name="title_activity_app_top_settings">健康管理アプリ設定画面</string>
+</resources>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="@dimen/alertdialog_padding_start_end"
+    android:paddingEnd="@dimen/alertdialog_padding_start_end"
+    >
+
+    <!-- 体温は正浮動小数点数 -->
+    <EditText
+        android:id="@+id/editBodyTemper"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:ems="@integer/ems_body_temper"
+        android:maxLength="@integer/max_body_temper"
+        style="@style/StyleEditNumberDecimal"
+        android:singleLine="true"
+        android:textAppearance="?android:textAppearanceMedium"
+        />
+</LinearLayout>

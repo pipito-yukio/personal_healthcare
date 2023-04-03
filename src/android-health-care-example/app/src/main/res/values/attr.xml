@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<!--https://stackoverflow.com/questions/35235703/theme-a-single-textview-background-color-in-styles-xml-->
+<!--https://stackoverflow.com/questions/31174354/setting-drawable-with-colors-to-a-textview-for-supporting-multiple-themes-->
+    <!-- reference: background drawable for PickerDialog of TextView -->
+    <attr name="inpTextFrameBgDrawable" format="reference"/>
+    <!-- color: text color for PickerDialog of TextView -->
+    <attr name="inpTextFrameFgColor" format="color"/>
+    <!-- reference: background drawable for title TextView -->
+    <attr name="titleFrameBgDrawable" format="reference"/>
+    <!-- color: text color for title TextView -->
+    <attr name="titleFrameFgColor" format="color"/>
+    <!-- reference: drawable for EditText area border -->
+    <attr name="editBorderDrawable" format="reference"/>
+    <!-- ウォーニングビュー用 -->
+    <attr name="warningBgDrawable" format="reference"/>
+    <attr name="warningFgColor" format="color"/>
+</resources>

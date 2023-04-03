@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="warning_map">
+        <!-- レスポンスマップ用 -->
+        <item>450,ContentTypeエラー</item>
+        <item>451,【HealthcareData】未設定</item>
+        <item>460,JSONキー項目未設定</item>
+        <item>461,メールアドレスのユーザが未登録</item>
+        <item>462,メールアドレス未設定</item>
+        <item>463,測定日付未設定</item>
+        <item>559,データベースエラー</item>
+    </string-array>
+</resources>

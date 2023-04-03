@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="@dimen/alertdialog_padding_start_end"
+    android:paddingEnd="@dimen/alertdialog_padding_start_end"
+    >
+
+    <EditText
+        android:id="@+id/editWeatherCond"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:maxLength="@integer/max_walking_count"
+        android:singleLine="true"
+        android:textAppearance="?android:textAppearanceMedium"
+        android:autofillHints="" />
+</LinearLayout>

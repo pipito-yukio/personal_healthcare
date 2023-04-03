@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/alertdialog_padding_start_end"
+    android:paddingEnd="@dimen/alertdialog_padding_start_end"
+    android:paddingTop="@dimen/alertdialog_padding_top"
+    >
+    <TextView
+        android:id="@+id/label"
+        android:text="タイトル"
+        style="@style/TextViewOfAlertDialog"
+        />
+    <NumberPicker
+        android:id="@+id/numPicker"
+        android:layout_width="@dimen/alertdialog_numberpicker_width"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/alertdialog_numberpicker_margin_start"
+        android:layout_gravity="center_vertical"
+        />
+    <TextView
+        android:id="@+id/unitView"
+        android:layout_marginStart="@dimen/unit_margin_start"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:text="単位"
+        style="@style/TextViewOfAlertDialog"
+        />
+</LinearLayout>

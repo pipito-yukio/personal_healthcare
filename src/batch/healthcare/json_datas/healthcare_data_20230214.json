@@ -1,0 +1,46 @@
+{
+  "emailAddress": "sapporo@health-examples.com",
+  "measurementDay":"2023-02-14",
+  "healthcareData":{
+    "bloodPressure":{
+      "morningMeasurementTime":"06:50",
+      "morningMax":118,
+      "morningMin":67,
+      "morningPulseRate":63,
+      "eveningMeasurementTime":"22:45",
+      "eveningMax":111,
+      "eveningMin":65,
+      "eveningPulseRate":66
+    },
+    "bodyTemperature":{
+      "measurementTime":null,"temperature":null
+    },
+    "nocturiaFactors":{
+      "hasCoffee":true,
+      "hasTea":false,
+      "hasAlcohol":false,
+      "hasNutritionDrink":false,
+      "hasSportsDrink":false,
+      "hasDiuretic":false,
+      "takeMedicine":false,
+      "takeBathing":false,
+      "midnightToiletVisits":2,
+      "conditionMemo":null
+    },
+    "sleepManagement":{
+      "wakeupTime":"05:30",
+      "sleepScore":82,
+      "sleepingTime":"06:20",
+      "deepSleepingTime":"01:00"
+    },
+    "walkingCount":{
+      "counts":8704
+    }
+  },
+  "weatherData": {
+    "weatherCondition":{
+    "condition":"晴れのち雪"
+    }
+  }
+}
+

@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="ViewSizeWrapContent">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+    </style>
+    <style name="StyleEditMarginStart" parent="ViewSizeWrapContent">
+        <item name="android:layout_marginStart">@dimen/text_margin_start</item>
+        <!-- 入力ボックスの右端の余白 -->
+        <item name="android:paddingEnd">@dimen/edit_padding_end</item>
+    </style>
+    <style name="StyleEditSingle" parent="StyleEditMarginStart">
+        <item name="android:maxLines">1</item>
+    </style>
+    <style name="StyleEditNumbered" parent="StyleEditSingle">
+        <item name="android:gravity">end</item>
+        <item name="android:inputType">number</item>
+    </style>
+    <style name="StyleEditNumberDecimal" parent="StyleEditNumbered">
+        <item name="android:inputType">number|numberDecimal</item>
+    </style>
+    <!-- Material.Titleを適用したTextView -->
+    <style name="BaseTextViewTitle" parent="@android:style/TextAppearance.Material.Title">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+    </style>
+    <!-- タイトル用のTextView -->
+    <style name="StyledTextViewTitle" parent="BaseTextViewTitle">
+    </style>
+    <!-- 単位用のTextView -->
+    <style name="StyleTextViewAfterLabel" parent="BaseTextViewTitle">
+        <item name="android:layout_marginStart">@dimen/unit_margin_start</item>
+    </style>
+    <!-- PaddingのあるTextView -->
+    <style name="SpacingTitleView" parent="BaseTextViewTitle">
+        <item name="android:paddingTop">@dimen/padding_frame_top_bottom</item>
+        <item name="android:paddingBottom">@dimen/padding_frame_top_bottom</item>
+        <item name="android:paddingLeft">@dimen/padding_frame_left_right</item>
+        <item name="android:paddingRight">@dimen/padding_frame_left_right</item>
+    </style>
+    <!-- 情報のみの表示用TextView: フレーム付き -->
+    <style name="FramedTextView" parent="SpacingTitleView">
+        <item name="android:textColor">?attr/titleFrameFgColor</item>
+        <item name="android:background">?attr/titleFrameBgDrawable</item>
+    </style>
+    <!-- ステータスビューのテキストサイズ(中) -->
+    <style name="StatusView" parent="FramedTextView">
+        <item name="android:textSize">16sp</item>
+        <item name="android:layout_marginStart">@dimen/unit_margin_start</item>
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_gravity">center_vertical</item>
+    </style>
+    <!-- ウォーニングステータスビュー: Darkモードのとき文字色は明るい赤, 背景もやや明るめ灰色 -->
+    <style name="WarningStatusView" parent="StatusView">
+        <item name="android:textColor">?attr/warningFgColor</item>
+        <item name="android:background">?attr/warningBgDrawable</item>
+    </style>
+
+    <!-- ピッカー系TextView(時刻表示、数値入力): 色付きフレーム付き -->
+    <style name="FramedPickerView" parent="SpacingTitleView">
+        <item name="android:layout_marginStart">@dimen/unit_margin_start</item>
+        <item name="android:textColor">?attr/inpTextFrameFgColor</item>
+        <item name="android:background">?attr/inpTextFrameBgDrawable</item>
+    </style>
+    <!-- テキストエリアスタイル -->
+    <style name="EditAreaStyle" parent="Widget.AppCompat.EditText">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">@dimen/edit_area_height</item>
+        <item name="android:layout_marginTop">@dimen/edit_margin</item>
+        <item name="android:layout_marginStart">@dimen/edit_margin</item>
+        <item name="android:padding">@dimen/edit_padding</item>
+        <item name="android:gravity">start|top</item>
+        <item name="android:background">?attr/editBorderDrawable</item>
+    </style>
+
+    <!-- AlartDialog系TextViewスタイル -->
+    <style name="TextViewOfAlertDialog">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_gravity">center_vertical</item>
+        <item name="android:textAppearance">?android:attr/textAppearanceMedium</item>
+    </style>
+
+    <!-- コンテナーのベーススタイル: カードスタイル -->
+    <style name="StyleCardContainer">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:background">@drawable/card_background</item>
+        <item name="android:elevation">@dimen/card_elevation</item>
+        <item name="android:paddingTop">@dimen/padding_scrollview_top_bottom</item>
+    </style>
+    <!-- ConstraintLayout用のカードスタイル -->
+    <style name="StyleConstraintLayout" parent="StyleCardContainer">
+        <item name="android:orientation">vertical</item>
+    </style>
+    <!-- LinearLayoutt用のカードスタイル -->
+    <style name="StyleLinearLayout" parent="StyleCardContainer">
+    </style>
+    <!-- 区切り線スタイル -->
+    <style name="StyleDivider">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">2dp</item>
+        <item name="android:layout_marginTop">3dp</item>
+        <item name="android:background">?android:attr/listDivider</item>
+    </style>
+</resources>
