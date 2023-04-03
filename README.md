@@ -16,6 +16,8 @@
 </div>
 <br/>
 
+既存システムについての詳細は下記リポジトリをご覧くださいへ  
+https://github.com/pipito-yukio/raspi4_apps
 
 ## 2. 開発環境
 
