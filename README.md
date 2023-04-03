@@ -16,8 +16,12 @@
 </div>
 <br/>
 
-既存システムについての詳細は下記リポジトリをご覧くださいへ  
+既存システムについてのWebアプリケーシについては下記リポジトリをご覧くださいへ  
 https://github.com/pipito-yukio/raspi4_apps
+
+気象データビューワーと公開サーバーについては下記リポジトリをご覧くださいへ  
+https://github.com/pipito-yukio/weather_data_viewer
+
 
 ## 2. 開発環境
 
