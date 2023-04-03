@@ -50,7 +50,7 @@ WebアプリケーシにSQLAlchemyを使ったデータベース処理(処理ク
 | 開発言語 | ライブラリ | version  | 用　途 |
 |----------|-----------|--|--|
 | Python | python 仮想環境 | py_healthcare_tool |
-|  | SQLAlchemy | 2.0以上 | ORマッパー ※Flask-SQLAlchemyは利用しない |
+|  | SQLAlchemy | 2.0以上 | ORマッパー |
 |  | psycopg2-binary | 2.9. | PostgreSQL用driver | 
 |  | openpyxl | 3.1.2| Excelシートからcsvファイルを生成 |
   
