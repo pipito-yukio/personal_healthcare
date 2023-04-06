@@ -20,10 +20,15 @@ import com.examples.android.healthcare.R;
 import java.util.Calendar;
 
 /*
-Reference
-https://developer.android.com/guide/topics/ui/dialogs?hl=ja
-*/
+カスタム選択系フラグメントダイアログクラスの定義
+(1)日付選択ダイアログ (2)時刻選択ダイアログ (3)数値選択ダイアログ
 
+[Offical Reference]
+https://developer.android.com/guide/topics/ui/controls/pickers?hl=ja
+  選択ツール
+https://developer.android.com/guide/topics/ui/dialogs?hl=ja
+  ダイアログ
+*/
 public class PickerDialogs {
 
     public static class TimePickerFragment extends DialogFragment {
@@ -84,13 +89,13 @@ public class PickerDialogs {
     public static class DatePickerFragment extends DialogFragment {
         private final Context mContext;
         private final DatePickerDialog.OnDateSetListener mListener;
-        private Calendar mCalender;
+        private Calendar mCalendar;
 
         public DatePickerFragment(@NonNull Context context,
                                   Calendar cal,
                                   @NonNull DatePickerDialog.OnDateSetListener listener) {
             mContext = context;
-            mCalender = cal;
+            mCalendar = cal;
             mListener = listener;
         }
 
@@ -100,18 +105,17 @@ public class PickerDialogs {
         }
 
         public Dialog onCreateDialog(Bundle savedInstanceState) {
-            if (mCalender == null) {
-                mCalender = Calendar.getInstance();
+            if (mCalendar == null) {
+                mCalendar = Calendar.getInstance();
             }
-            int year = mCalender.get(Calendar.YEAR);
-            int month = mCalender.get(Calendar.MONTH); // 0-11
-            int day = mCalender.get(Calendar.DAY_OF_MONTH);
+            int year = mCalendar.get(Calendar.YEAR);
+            int month = mCalendar.get(Calendar.MONTH); // 0-11
+            int day = mCalendar.get(Calendar.DAY_OF_MONTH);
             return new DatePickerDialog(mContext, mListener, year, month, day);
         }
     }
 
 
-    // https://developer.android.com/guide/topics/ui/controls/pickers?hl=ja#TimePicker
     public static class NumberPickerDialog {
         public interface ValueListener {
             void onDecideValue(int number);
@@ -172,7 +176,6 @@ public class PickerDialogs {
             mListener = listener;
         }
 
-        // https://developer.android.com/guide/topics/ui/dialogs?hl=ja
         public AlertDialog createNumberPickerDialog() {
             LayoutInflater factory = LayoutInflater.from(mContext);
             final View entryView = factory.inflate(R.layout.dialog_number_picker, null);
