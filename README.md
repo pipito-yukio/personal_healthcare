@@ -16,12 +16,15 @@
 </div>
 <br/>
 
-既存システムについてのWebアプリケーシについては下記リポジトリをご覧くださいへ  
+既存システムについてのWebアプリケーシについては下記リポジトリをご覧ください  
 https://github.com/pipito-yukio/raspi4_apps
 
-気象データビューワーと公開サーバーについては下記リポジトリをご覧くださいへ  
+気象データビューワーと公開サーバーについては下記リポジトリをご覧ください  
 https://github.com/pipito-yukio/weather_data_viewer
 
+
+健康管理登録アプリ実装方法の詳しい解説については下記GithubPagesをご覧ください  
+https://pipito-yukio.github.io/personal_healthcare/
 
 ## 2. 開発環境
 
