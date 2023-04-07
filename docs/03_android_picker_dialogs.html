@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="stylesheet" href="assets/css/bootstrap_custom.css" />
+        <link rel="stylesheet" href="assets/css/bootstrap.min.css" />
+        <link rel="stylesheet" href="assets/highlight/styles/default.min.css" />
+        <title>Picker系DialogFragmentクラスの作成</title>
+    </head>
+
+    <body>
+        <div class="container" style="max-width: 980px">
+            <h4 class="m-2 text-center">Picker系DialogFragmentクラスの作成</h4>
+            <hr />
+            <div class="update-date">【最終更新日】2023-04-07</div>
+            <p class="indent">
+                Androidアプリで使用する日付PickerFragment, 時刻PickerFragment, 数値PickerDialogクラスの作成方法を解説します。
+            </p>
+            <h5 class="v-line-start">1.登録データ入力画面</h5>
+            <p class="indent mt-2">当該画面の入力項目は全部で２３項目有り全てEdit系ウィジェットを使った場合、入力の更新有無の管理が相当の困難が予想されました。今回は時刻の入力にTimePickerFragmentクラス、日付の入力にはDatePickerFragmentクラス、範囲の決まった数値の入力にはNumberPickerDialogクラスを自作して利用することにしました。
+            </p>
+            <div class="row ms-3">
+                <div class="col-8">
+                    <table class="table table-sm small">
+                        <thead>
+                            <tr><th>入力項目</th><th>Picker系ダイアログフラグメント</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>測定日付</td><td>DatePickerFragemt</td></tr>
+                            <tr><td>起床時刻</td><td>TimePickerFragment</td></tr>
+                            <tr><td>夜間トイレ回数</td><td>NumberPickerDialog</td></tr>
+                            <tr><td>睡眠スコア</td><td>NumberPickerDialog</td></tr>
+                            <tr><td>睡眠時間</td><td>TimePickerFragment</td></tr>
+                            <tr><td>深い睡眠</td><td>TimePickerFragment</td></tr>
+                            <tr><td>血圧の測定時刻</td><td>TimePickerFragment</td></tr>
+                            <tr><td>最高血圧</td><td>NumberPickerDialog</td></tr>
+                            <tr><td>最低血圧</td><td>NumberPickerDialog</td></tr>
+                            <tr><td>脈拍</td><td>NumberPickerDialog</td></tr>
+                            <tr><td>体温の測定時刻</td><td>TimePickerFragment</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="row m-2 text-center">
+                <div class="col">
+                    <figure class="figure">
+                        <figcaption class="figure-caption text-center">
+                            【データ登録画面とPicker系ダイアログ】
+                        </figcaption>
+                        <img class="figure-img img-fluid" src="03_android_picker_dialogs/images/AppTopFrag_pickerDialogs.png" width="800"/>
+                    </figure>
+                </div>
+            </div>
+            <h5 class="v-line-start">2.ApiDemosアプリのコードを再利用する</h5>
+            <p class="indent">カスタムのUI部品をいちから作るのは工数がかかります。ApiDemosアプリには有用なコードが豊富なので今回は下記スクリーンショットの実装を再利用することにします。</p>
+            <div class="row m-2 text-center">
+                <div class="col">
+                    <figure class="figure">
+                        <figcaption class="figure-caption text-center">
+                            【ApiDemosアプリのPicker系ダイアログサンプル】
+                        </figcaption>
+                        <img class="figure-img img-fluid" src="03_android_picker_dialogs/images/ApiDemos_1_PickerDialogs.png" width="800" />
+                    </figure>
+                </div>
+            </div>
+            <div class="row m-2">
+                 <p class="mb-1">【利用するソース】ApiDemosアプリ(Android Googlesource リポジトリから取得)</p>
+                 <div class="ms-4 mb-2">
+                     <a href="02_android_apiDemos_build.html" target="_blank">ApiDemosのダウンロードとビルド方法</a>
+                 </div>
+<pre class="ms-4">src/com/example/android/apis/view/
+    DateWidgets1.java         -&gt; DatePickerFragment, TimePickerFragment
+    NumberPickerActivity.java -&gt; NumberPickerDialog
+src/com/example/android/apis/app/
+    FragmentAlertDialog.java  -&gt; NumberPickerDialog
+res/layout/
+    date_widgets_example_1.xml
+    number_picker.xml</pre>
+            </div>
+            <dl class="row m-2">
+                <dt>【公式ドキュメント】</dt>
+                <dd class="indent">選択ツール<br/>
+<a href="https://developer.android.com/guide/topics/ui/controls/pickers?hl=ja" target="_blank">
+https://developer.android.com/guide/topics/ui/controls/pickers?hl=ja</a>
+                </dd>
+                <dd class="indent">ダイアログ<br/>
+<a href="https://developer.android.com/guide/topics/ui/dialogs?hl=ja" target="_blank">
+https://developer.android.com/guide/topics/ui/dialogs?hl=ja</a>
+                </dd>
+            </dl>
+            <h5 class="v-line-start mt-3">3.カスタム選択ダイアログクラス</h6>
+            <p class="indent mx-1 my-1">
+自作のクラスは ApiDemosのコードと上記公式ドキュメントを参考にアプリの要件に合わせて作りました。
+自作クラスを外部クラスとして定義するには呼び出し元のコンテキストとリスナークラスをコンストラクタに引き渡す必要があります。
+            </p>
+            <p class="indent mx-1 my-0">
+※ ApiDemosのサンプル、公式ドキュメントの実装例はともにActivityの中で直接呼びだしする作りになっているので再利用性に問題があります。             
+            </p>
+            <dl class="row m-3">
+              <dt>【ソース】android-health-care-example/app/src/main/</dt>
+              <dd class="ms-4">java/com/example/android/healthcare/dialogs/<b>PickerDialogs.java</b></dd>
+              <dt>【NumberPicker用レイアウト】</dt>
+              <dd class="ms-4">res/layout/<b>dialog_number_picker.xml</b></dd>
+            </dl>
+            <p class="mx-1 my-1">(1) DatePickerFragmentクラス ※説明用にソースにないコメントを追加してます</p>
+            <div class="row m-2">
+                <div class="col">
+<pre><code class="java small">public static class DatePickerFragment extends DialogFragment {
+    private final Context mContext;
+    private final DatePickerDialog.OnDateSetListener mListener;
+    private Calendar mCalendar;
+
+    // このコンストラクタでは呼び出し元のカレンダーを指定することにより当日以外の日付を指定して
+    //  DatePickerDialogを開くことができます。
+    public DatePickerFragment(@NonNull Context context,
+                                Calendar cal,
+                                @NonNull DatePickerDialog.OnDateSetListener listener) {
+        mContext = context;   // 呼び出し元のコンテキスト (getActivity())
+        mCalendar = cal;      // 呼び出し元で保持しているカレンダーインスタンス
+        mListener = listener; // 呼び出し元で保持しているリスナーのインスタンス
+    }
+
+    // このコンストラクタでは常に当日のDatePickerDialogを開くしかできない。
+    //  ※当日しか認めない要件ではこちらのコンストラクタを使用する想定で作りました
+    public DatePickerFragment(@NonNull Context context,
+                                @NonNull DatePickerDialog.OnDateSetListener listener) {
+        this(context, null, listener);
+    }
+
+    // 公式ドキュメント(選択ツール) 「日付選択ツール用の DialogFragment の拡張」の実装をほぼ流用
+    public Dialog onCreateDialog(Bundle savedInstanceState) {
+        // final Calendar c = Calendar.getInstance(); 
+        if (mCalendar == null) {
+            mCalendar = Calendar.getInstance();
+        }
+        int year = mCalendar.get(Calendar.YEAR);
+        int month = mCalendar.get(Calendar.MONTH); // 0-11
+        int day = mCalendar.get(Calendar.DAY_OF_MONTH);
+        return new DatePickerDialog(mContext, mListener, year, month, day);
+    }
+}</code></pre>
+                </div>
+            </div>
+            <p class="mx-1 my-1">(2) TimePickerFragmentクラス ※説明用にソースにないコメントを追加してます</p>
+            <p class="indent">12時間と24時間の切替ができ、前回入力値の保持が可能になるようクラスを実装</p>
+            <div class="row m-2">
+                <figure class="figure mt-2 ms-2">
+                    <figcaption class="figure-caption">
+                    </figcaption>
+                    <img class="figure-img img-fluid" src="03_android_picker_dialogs/images/TimePicker_overview.png" />
+                </figure>
+            </div>
+            <div class="row m-2">
+                <div class="col">
+<pre><code class="java small">public static class TimePickerFragment extends DialogFragment {
+    // 時刻(時:分)を保持するクラス
+    public static class TimeHolder {
+        private final int mHour;
+        private final int mMinute;
+
+        public TimeHolder(int hour, int minute) {
+            mHour = hour;
+            mMinute = minute;
+        }
+
+        public int getHour() {
+            return mHour;
+        }
+
+        public int getMinute() {
+            return mMinute;
+        }
+    }
+
+    private final Context mContext;
+    private final TimeHolder mTimeHolder;
+    private final TimePickerDialog.OnTimeSetListener mListener;
+    private final Boolean mIs24HourView;
+
+    public TimePickerFragment(@NonNull Context context,
+                                TimeHolder timeHolder,
+                                @NonNull TimePickerDialog.OnTimeSetListener listener,
+                                @NonNull boolean is24Hour) {
+        mContext = context;        // 呼び出し元のコンテキスト (getActivity())
+        mTimeHolder = timeHolder;  // 呼び出し元で保持している時刻オブジェクト
+        mListener = listener;      // 呼び出し元で保持しているリスナーのインスタンス
+        mIs24HourView = is24Hour;  // trueなら24時間入力, falseなら12時間入力 
+    }
+
+    public TimePickerFragment(@NonNull Context context,
+                                TimeHolder timeHolder, @NonNull TimePickerDialog.OnTimeSetListener listener) {
+        this(context, timeHolder, listener, DateFormat.is24HourFormat(context));
+    }
+
+    @Override
+    public Dialog onCreateDialog(Bundle savedInstanceState) {
+        int hour;
+        int minute;
+        if (mTimeHolder == null) {
+            // 時刻オブジェクトが未設定ならカレンダーの時刻を利用する
+            // こちらは公式ドキュメントの実装と同じ
+            final Calendar cal = Calendar.getInstance();
+            hour = cal.get(Calendar.HOUR_OF_DAY);
+            minute = cal.get(Calendar.MINUTE);
+        } else {
+            // 呼び出し元の時刻を設定
+            hour = mTimeHolder.getHour();
+            minute = mTimeHolder.getMinute();
+        }
+        return new TimePickerDialog(mContext, mListener, hour, minute, mIs24HourView);
+    }
+}</code></pre>
+                </div>
+            </div>
+            <p class="mx-1 my-1">(3) NumberPickerDialogクラス</p>
+            <p class="indent">タイトル, 見出し, 単位, 初期値・最大値・最小値を指定できるようクラスを実装</p>
+            <div class="row m-2">
+                <figure class="figure mt-2 ms-2">
+                    <figcaption class="figure-caption">
+                    </figcaption>
+                    <img class="figure-img img-fluid" src="03_android_picker_dialogs/images/NumberPicker_overview.png" />
+                </figure>
+            </div>
+            <p class="indent ms-2 mb-1">【レイアウトファイル】res/layout/<b>dialog_number_picker.xml</b></p>
+            <div class="row m-2">
+                <div class="col">
+<pre><code class="xml small">&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/alertdialog_padding_start_end"
+    android:paddingEnd="@dimen/alertdialog_padding_start_end"
+    android:paddingTop="@dimen/alertdialog_padding_top"
+    &gt;
+    &lt;TextView
+        android:id="@+id/label"
+        android:text="タイトル"
+        style="@style/TextViewOfAlertDialog"
+        /&gt;
+    &lt;NumberPicker
+        android:id="@+id/numPicker"
+        android:layout_width="@dimen/alertdialog_numberpicker_width"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/alertdialog_numberpicker_margin_start"
+        android:layout_gravity="center_vertical"
+        /&gt;
+    &lt;TextView
+        android:id="@+id/unitView"
+        android:layout_marginStart="@dimen/unit_margin_start"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:text="単位"
+        style="@style/TextViewOfAlertDialog"
+        /&gt;
+&lt;/LinearLayout&gt;</code></pre>
+</div>
+                <div class="col-12">
+<pre><code class="java small">public static class NumberPickerDialog {
+    // 選択値を呼び出し元に提供するカスタムリスナークラス
+    public interface ValueListener {
+        // OKボタン押下時: 選択値の受取り
+        void onDecideValue(int number);
+        // 取消しボタン押下時 ※ 値を戻すとかの処理は呼び出し元で実装
+        void onCancel();
+    }
+
+    // ダイアログを構成する可変項目のデータクラス
+    public static class DialogItem {
+        private final String mDialogTitle;
+        private final String mTitleLabel;
+        private final String mUnitLabel;
+        private final int mInitValue;
+        private final int mMinValue;
+        private final int mMaxValue;
+
+        public DialogItem(String dialogTitle,
+                            String titleLabel, String unitLabel, int initValue, int minValue, int maxValue) {
+            mDialogTitle = dialogTitle; 
+            mTitleLabel = titleLabel;
+            mUnitLabel = unitLabel;
+            mInitValue = initValue;
+            mMinValue = minValue;
+            mMaxValue = maxValue;
+        }
+
+        public String getDialogTitle() {
+            return mDialogTitle;
+        }
+
+        public String getTitleLabel() {
+            return mTitleLabel;
+        }
+
+        public String getUnitLabel() {
+            return mUnitLabel;
+        }
+
+        public int getMinValue() {
+            return mMinValue;
+        }
+
+        public int getInitValue() {
+            return mInitValue;
+        }
+
+        public int getMaxValue() {
+            return mMaxValue;
+        }
+    }
+
+    private final Context mContext;
+    private final DialogItem mDialogItem;
+    private final ValueListener mListener;
+
+    public NumberPickerDialog(Context context, DialogItem item, ValueListener listener) {
+        mContext = context; // 呼び出し元のコンテキスト (getActivity())
+        mDialogItem = item; // 呼び出し元の可変項目オブジェクト
+        mListener = listener; // 呼び出し元で保持しているリスナーのインスタンス
+    }
+
+    public AlertDialog createNumberPickerDialog() {
+        LayoutInflater factory = LayoutInflater.from(mContext);
+        // ダイアログ内のコンテンツ生成
+        final View entryView = factory.inflate(R.layout.dialog_number_picker, null);
+        // 書き換える見出し、単位ビューを取得する
+        final TextView labelView = entryView.findViewById(R.id.label);
+        final TextView unitView = entryView.findViewById(R.id.unitView);
+        labelView.setText(mDialogItem.getTitleLabel());
+        unitView.setText(mDialogItem.getUnitLabel());
+        // NumberPickerオブジェクトを取得
+        final NumberPicker picker = entryView.findViewById(R.id.numPicker);
+        // 初期値, 最小値, 最大値を設定
+        picker.setMinValue(mDialogItem.getMinValue());
+        picker.setMaxValue(mDialogItem.getMaxValue());
+        picker.setValue(mDialogItem.getInitValue());
+        return new AlertDialog.Builder(mContext)
+                .setTitle(mDialogItem.getDialogTitle())
+                .setView(entryView)
+                .setPositiveButton(R.string.alert_dialog_ok,
+                        (dialog, whichButton) -> mListener.onDecideValue(picker.getValue())
+                )
+                .setNegativeButton(R.string.alert_dialog_cancel, (dialog, whichButton) -> mListener.onCancel()
+                )
+                .create();
+    }
+}</code></pre>
+                </div>
+            </div>
+
+            <h5 class="v-line-start">4.アプリからPicker系ダイアログを使用する</h5>
+            <p class="indent">[ソース] app/src/main/java/com/example/android/healthcare/ui/main/<b>AppTopFragment.java</b></p>
+            <div class="indent">(1) 測定日付をDatePickerFragmentから取得する ※ダイアログの生成と値の取得部分のみ抜粋</div>
+            <div class="row m-2 text-center">
+                <div class="col">
+                    <figure class="figure">
+                        <figcaption class="figure-caption text-center">
+                            【DatePickerFragment】
+                        </figcaption>
+                        <img class="figure-img img-fluid" src="03_android_picker_dialogs/images/AppTopFrag_1_useDatePicker.png" />
+                    </figure>
+                </div>
+            </div>
+            <div class="m-2 small">
+<pre><code class="language-java">import com.examples.android.healthcare.dialogs.PickerDialogs.DatePickerFragment;
+
+public class AppTopFragment extends Fragment {
+    // ...中略...
+    // DatePickerDialogに連動するカレンダーオブジェクト
+    private final Calendar mMeasurementDayCal = Calendar.getInstance();
+    
+    // 日付ピッカーダイアログ起動イベントリスナー
+    private final View.OnClickListener mDatePickerViewClickListener = this::showDatePicker;
+
+    /**
+     * 日付ピッカーダイアログを表示する
+     */
+    private void showDatePicker(View v) {
+        DialogFragment newFragment = new DatePickerFragment(
+                requireActivity(), mMeasurementDayCal, (view, year, month, dayOfMonth) -&gt; {
+            // 測定日付ウィジットを更新するためのタグ値を生成
+            String tagValue = String.format(getString(R.string.format_tag_date),
+                    year, month + 1/*カレンダー月 +1*/, dayOfMonth);
+            DEBUG_OUT.accept(TAG, "showDatePicker:v.id=" + v.getId() + ",tag:" + tagValue);
+            updateDateView((TextView) v, tagValue);
+            // カレンダーオブジェクトを更新
+            mMeasurementDayCal.set(year, month, dayOfMonth);
+            // カレンダーで選択した日によって条件を満たさなければサーバーに問い合わせる
+        });
+        //--------------------------
+        // 選択後の細かい処理は省略 
+        //--------------------------
+        newFragment.show(requireActivity().getSupportFragmentManager(), "DatePickerFragment");
+    }
+</code></pre>
+            </div>
+
+            <div class="indent">(2) 起床時刻をTimePickerFragmentから取得する ※ダイアログの生成と値の取得部分のみ抜粋</div>
+            <div class="row m-2 text-center">
+                <div class="col">
+                    <figure class="figure">
+                        <figcaption class="figure-caption text-center">
+                            【TimePickerFragment】
+                        </figcaption>
+                        <img class="figure-img img-fluid" src="03_android_picker_dialogs/images/AppTopFrag_2_useTimePicker.png" />
+                    </figure>
+                </div>
+            </div>
+            <div class="m-2 small">
+<pre><code class="language-java">    // 時刻ピッカーダイアログ起動イベントリスナー
+    private final View.OnClickListener mTimePickerViewClickListener = v -&gt; {
+        if (v.getId() == R.id.inpMeasurementTime) {
+            // 血圧測定時刻([時間帯] 午前/午後): 各時間帯の入力値はウィジットの時間帯毎のキー付きTAGに設定
+            showBloodPressureTimePicker(v);
+        } else {
+            // 起床時刻, 睡眠時間, 深い睡眠, 体温測定時刻
+            showTimePicker(v);
+        }
+    };
+
+    /**
+     * 時刻ピッカーダイアログ用の時刻データを生成する
+     */
+    private TimePickerFragment.TimeHolder createTimeHolder(String tagTime) {
+        String[] times = tagTime.split(":");
+        int hour = Integer.parseInt(times[0]);
+        int minute = Integer.parseInt(times[1]);
+        return new TimePickerFragment.TimeHolder(hour, minute);
+    }
+
+    /**
+     * 時刻ピッカーダイアログに必要な引数を保持するデータを生成する
+     */
+    private TimePickerFragment.TimeHolder getTimeHoler(View v, int tagId) {
+        String tagValue = (String) v.getTag(tagId);
+        TimePickerFragment.TimeHolder holder;
+        if (!tagValue.equals(getString(R.string.init_tag_time_value))) {
+            holder = createTimeHolder(tagValue);
+        } else {
+            // 午前 / 午後
+            String timeClassValue;
+            if (mSelectedRadioId == mRadioMorning.getId()) {
+                timeClassValue = getString(R.string.time_class_am);
+            } else {
+                timeClassValue = getString(R.string.time_class_pm);
+            }
+            holder = createTimeHolder(timeClassValue);
+        }
+        return holder;
+    }
+
+    /**
+     * 時刻設定ダイアログを表示する
+     */
+    private void showTimePicker(View v) {
+        TimePickerFragment.TimeHolder holder = getTimeHoler(v, v.getId());
+        DialogFragment newFragment = new TimePickerFragment(
+                requireActivity(), holder, (view, hourOfDay, minute) -&gt; {
+            //--------------------------
+            // 選択後の細かい処理は省略  
+            //--------------------------
+            TextView tv = (TextView) v;
+            updateTimeView(tv, tagValue, timeFormat);
+            // 時刻入力ウィジットの変更通知
+            mOnTimeViewChanged.onChanged(tv, tagValue);
+        });
+        newFragment.show(requireActivity().getSupportFragmentManager(), "TimePickerFragment");
+    }</code></pre>
+            </div>
+
+            <div class="indent">(3) 睡眠スコアをNumberPickerDialogから取得する ※ダイアログの生成と値の取得部分のみ抜粋</div>
+            <div class="row m-2 text-center">
+                <div class="col">
+                    <figure class="figure">
+                        <figcaption class="figure-caption text-center">
+                            【NumberPickerDialog】
+                        </figcaption>
+                        <img class="figure-img img-fluid" src="03_android_picker_dialogs/images/AppTopFrag_3_useNumberPicker.png" />
+                    </figure>
+                </div>
+            </div>
+            <div class="m-2 small">
+<pre><code class="language-java">    // NumberPickerDialog起動イベントリスナー
+    private final View.OnClickListener mNumberPickerClickListener = v -&gt; {
+        // デフォルトのTAG値から入力対象のキーを取得する
+        int viewTag = (Integer) v.getTag();
+        String title = mAlertDialogTitles[viewTag];
+        String label = mNumberPickerLabels[viewTag];
+        String unit = mNumberPickerUnits[viewTag];
+        TextView inpView = mNumberPickerViews[viewTag];
+        // 初期値は数値系入力ウィジットから取得
+        Integer initValue = getInitNumberValueOfTextView(inpView);
+        // NumberPickerDialogに引き渡す最小値, 最大値
+        String strRange = mNumberPickerRanges[viewTag];
+        String[] strRanges = strRange.split(",");
+        int minValue = Integer.parseInt(strRanges[0]);
+        int maxValue = Integer.parseInt(strRanges[1]);
+        // NumberPickerDialogを表示する
+        showNumberPickerDialog(title, inpView, label, unit, initValue, minValue, maxValue);
+    };
+
+    /**
+     * 数値ピッカーダイアログを表示する
+     * @param dialogTitle ダイアログタイトル
+     * @param inpView 入力対象のウィジット
+     * @param lbl 入力対象のタイトルラベル
+     * @param unit 入力対象の単位ラベル
+     * @param initValue 入力対象の初期値
+     * @param minValue 入力対象の最小値
+     * @param maxValue 入力対象の最大値
+     */
+    private void showNumberPickerDialog(
+            String dialogTitle,
+            TextView inpView, String lbl, String unit,
+            int initValue, int minValue, int maxValue) {
+        // ダイアログ可変項目情報生成
+        NumberPickerDialog.DialogItem item = new NumberPickerDialog.DialogItem(
+                dialogTitle, lbl, unit, initValue, minValue, maxValue
+        );
+        // 選択値取得リスナー
+        NumberPickerDialog.ValueListener listener = new NumberPickerDialog.ValueListener() {
+            @Override
+            public void onDecideValue(int number) {
+                // 選択肢た数値を文字列に変換してTextViewに設定
+                String sNumber = String.valueOf(number);
+                inpView.setText(sNumber);
+                  //---------------------------
+                  // 選択後の細かい処理は省略  
+                  //---------------------------
+                }
+            }
+            @Override
+            public void onCancel() {/* No ope*/}
+        };
+        // NumberPickerDialog生成
+        NumberPickerDialog picker = new NumberPickerDialog(requireActivity(), item, listener);
+        // NumberPickerDialog表示
+        picker.createNumberPickerDialog().show();
+    }</code></pre>
+            </div>
+
+            <div class="row mb-5">
+                <dl class="ms-3">
+                    <dt class="indent">メニューページへ<dt>
+                    <dd class="indent mt-2">
+                        <a href="index.html">
+                        戻る
+                        </a>
+                    </dd>    
+                    <dt class="indent mt-3">Androidアプリのソースコードはこちら<dt>
+                    <dd class="indent mt-2">
+                        <a href="https://github.com/pipito-yukio/personal_healthcare/src/android-health-care-example" target="_blank">
+                        https://github.com/pipito-yukio/personal_healthcare/src/android-health-care-example
+                        </a>
+                    </dd>    
+                </dl>
+            </div>
+        </div>
+        <script src="assets/highlight/js/highlight.min.js"></script>
+        <script src="assets/highlight/js/java.min.js"></script>
+        <script src="assets/highlight/js/cpp.min.js"></script>
+        <script>
+            hljs.highlightAll();
+        </script>
+        </div>
+    </body>
+</html>

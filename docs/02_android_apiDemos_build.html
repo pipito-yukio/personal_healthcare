@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="stylesheet" href="assets/css/bootstrap_custom.css" />
+        <link rel="stylesheet" href="assets/css/bootstrap.min.css" />
+        <link rel="stylesheet" href="assets/highlight/styles/default.min.css" />
+        <title>ApiDemosアプリのダウンロードとビルド方法</title>
+        <style>
+.std-indent {
+  text-indent: 1.5em;  
+}
+        </style>
+    </head>
+
+    <body>
+        <div class="container" style="max-width: 980px">
+            <h4 class="m-2 text-center">ApiDemosアプリのダウンロードとビルド方法</h4>
+            <hr />
+            <div class="update-date">【最終更新日】2023-04-07</div>
+            <p class="std-indent mb-1">
+                ApiDemosアプリはAndroid Developersのサンプルとしては提供されておらず、別途 Android GoogleSourceリポジトリからダウンロードする必要が有ります。
+            </p>
+            <p class="std-indent">
+                ※もともとEclipseでビルドすることを想定している(README.txt参照)ためそのままでは現在の AndroidStudioでAPKをビルドすることはできません。
+            </p>
+            <p>【ダウンロード先】ApiDemos</p>
+            <div class="row ms-3">
+                <a href="https://android.googlesource.com/platform/development/+/master/samples/ApiDemos" target="_blank">
+                   https://android.googlesource.com/platform/development/+/master/samples/ApiDemos
+                </a>
+            </div>
+            <div class="row m-2">
+                <div class="col">
+                    <figure class="figure">
+                        <figcaption class="figure-caption text-center">
+                            【ApiDemosのTarアーカイブをダウンロード】
+                        </figcaption>
+                        <img class="figure-img img-fluid" src="02_android_apiDemos_build/images/ApiDemosDownloadTar.png" />
+                    </figure>
+                </div>
+            </div>
+            <h5 class="v-line-start">1.解凍したソース</h5>
+            <p class="mx-3 mt-3 mb-1">(1) Android.bp ※ビルドに必要な情報が書かれています</p>
+            <ul class="mx-4">
+                <li>srcs: AIDLファイルへのパス <b>※特に重要</b></li>
+                <li>static_libs: AndroidXライブラリ</li>
+            </ul>
+            <div class="row m-2 small">
+<pre><code>package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["Android-Apache-2.0"],
+}
+
+android_test {
+    name: "ApiDemos",
+    // Only compile source java files in this apk.
+    srcs: [
+        "src/**/*.java",
+        "src/com/example/android/apis/app/IRemoteService.aidl",
+        "src/com/example/android/apis/app/IRemoteServiceCallback.aidl",
+        "src/com/example/android/apis/app/ISecondary.aidl",
+    ],
+    static_libs: [
+        "androidx-constraintlayout_constraintlayout",
+        "androidx.legacy_legacy-support-v4",
+    ],
+    sdk_version: "current",
+    dex_preopt: {
+        enabled: false,
+    },
+    test_suites: ["device-tests"],
+}</code></pre>
+            </div>
+
+            <h5 class="v-line-start">2.Android Studioで空のサンプルプロジェクトを作成する</h5>
+            <dl class="row m-2 mb-4">
+              <dt>プロジェクト名</dt>
+              <dd class="std-indent">ApiDemos</dd>
+              <dt>アプリケーシID(applicationId) ※ダウンロードしたApiDemosのパッケージ名に一致させる</dt>
+              <dd class="std-indent">com.example.android.apis</dd>
+              <dt>SDKバージョン(targetSdk) ※最新</dt>
+              <dd class="std-indent">31</dd>
+              <dt>コンパイルオプション(compileOptions)</dt>
+              <dd class="std-indent">JavaVersion.VERSION_1_8</dd>
+            </dl>
+            <h5 class="v-line-start">3.設定ファイルをApiDemos用に書き換える</h5>
+            <div class="ms-2">
+                <div class="indent">(1) build.gradle</div>
+                <div class="row m-1 small">
+<pre><code>// Top-level build file where you can add configuration options common to all sub-projects/modules.
+plugins {
+    id 'com.android.application' version '7.3.1' apply false
+    id 'com.android.library' version '7.3.1' apply false
+}</code></pre>
+                </div>
+
+                <div class="indent">(2) gradle.properties</div>
+                <div class="row m-1 small">
+<pre><code>org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+android.useAndroidX=true
+android.enableJetifier=true</code></pre>
+                </div>
+
+                <div class="indent">(3) local.properties ※開発環境 Ubuntu</div>
+                <div class="row m-1 small">
+<pre><code>sdk.dir=/home/yourname/Android/Sdk</code></pre>
+                </div>
+        
+                <div class="indent">(4) settings.gradle</div>
+                <div class="row m-1 small">
+<pre><code>pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        google()
+        mavenCentral()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = "ApiDemos"
+include ':app'</code></pre>
+                </div>
+
+                <div class="indent">(5) app/build.gradle: このファイルを編集 <b>aidl.srcDirs と dependencies</b></div>
+                <div class="row m-1 small">
+<pre><code>plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.example.android.apis'
+    compileSdk 31
+
+    defaultConfig {
+        applicationId "com.example.android.apis"
+        minSdk 31
+        targetSdk 31
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    // AIDLファイルのパスを指定する
+    sourceSets {
+        main {
+            aidl.srcDirs = ['src/main/aidl']
+        }
+    }
+}
+
+dependencies {
+    // androidx.constraintlayout, androidx.legacyの2つに置き換える 
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.legacy:legacy-support-v4:1.0.0'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'com.android.support.test:runner:1.0.2'
+    androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
+}</code></pre>
+                </div>
+
+                <div class="indent">(6) app/src/main配下のディレクトリ構成</div>
+                <div class="row m-1 small">
+<pre><code>[src/com/example/android/apis/app配下の全てのAIDLファイル(*.aidl)を下記のパッケージにコピーする]
+aidl/com/example/android/apis/app/ 
+   IRemoteService.aidl
+   IRemoteServiceCallback.aidl
+   ISecondary.aidl
+asstes/
+   [解凍したソースのasstesを全てコピーする]
+java/
+   [プロジェクトのソースを全て削除し、解凍したソースのsrc配下を全てコピーする]
+   com/example/android/
+     apis/
+     mmslib
+res/
+   [プロジェクトのリソースを全て削除し、解凍したソースのres配下を全てコピーする]
+  anim/
+  animator/
+  drawable/
+  drawable-hdpi/
+  layout/
+  ...[省略]...
+  menu/
+  ...[省略]...
+  values/
+  values-hdpi/
+  ...[省略]...
+  values-xlarge/
+  xml/   
+ 
+tests/
+AndroidManifest.xml</code></pre>
+                </div>
+            </div>
+            <h5 class="v-line-start">4.DEBUGビルドする</h5>
+            <div class="indent">上記の設定とコピーしたソースでDEBUGビルドすると大量のエラーログが出力されビルドに失敗します。</div>
+            <div class="m-2 text-center">
+                <figure class="figure">
+                    <figcaption class="figure-caption text-center">
+                        【ApiDemosビルドエラー】
+                    </figcaption>
+                    <img class="figure-img img-fluid" src="02_android_apiDemos_build/images/ApiDemos_1_buildError.png" width="900" />
+                </figure>
+            </div>
+            <div calss="indent">DEBUGビルドしたときに出力されたエラーログの抜粋</div>
+            <div class="row m-1 small">
+<pre><code>Executing tasks: [:app:assembleDebug] in project /mnt/data-2/ApiDemos
+
+&gt;Task :app:createDebugVariantModel
+&gt;Task :app:preBuild UP-TO-DATE
+&gt;Task :app:preDebugBuild UP-TO-DATE
+&gt;Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+&gt;Task :app:compileDebugRenderscript NO-SOURCE
+&gt;Task :app:generateDebugBuildConfig
+&gt;Task :app:javaPreCompileDebug
+&gt;Task :app:generateDebugResValues
+&gt;Task :app:checkDebugAarMetadata
+&gt;Task :app:mapDebugSourceSetPaths
+&gt;Task :app:generateDebugResources
+&gt;Task :app:compileDebugAidl
+&gt;Task :app:createDebugCompatibleScreenManifests
+&gt;Task :app:extractDeepLinksDebug
+&gt;Task :app:mergeDebugResources
+
+&gt;Task :app:processDebugMainManifest FAILED
+package="com.example.android.apis" found in source AndroidManifest.xml: 
+   /mnt/data-2/ApiDemos/app/src/main/AndroidManifest.xml.
+...Warning省略...
+...ここからError (見やすくするため改行をいれています) 363箇所 ...
+/mnt/data-2/ApiDemos/app/src/main/AndroidManifest.xml:70:9-76:20 Error:
+  android:exported needs to be explicitly specified for element 
+   <activity#com.example.android.apis.ApiDemos>. 
+Apps targeting Android 12 and higher are required to specify an explicit value for 
+ `android:exported` when the corresponding component has an intent filter defined. 
+See https://developer.android.com/guide/topics/manifest/activity-element#exported for details.</code></pre>
+            </div>    
+            <div class="indent small">【原因】Android12以降のバージョンでは<b>Activityの属性として`android:export`が必須であることを示しています。</b>
+            </div>
+            <div class="row m-1 small">
+<pre><code>Apps targeting Android 12 and higher are required to specify an explicit value for
+`android:exported` when the corresponding component has an intent filter defined.
+</code></pre>
+            </div>
+            <div class="indent small">【対応方法】Activityの属性として<b>`android:exported="true"`を追記します</b> ※364箇所エディタで一括置換</div>
+            <div class="row m-2 small">
+                <div class="col-5">
+<pre><code>&lt;activity android:name="ApiDemos"&gt;</code></pre>
+                </div>
+                <div class="col-7">
+<pre><code>&lt;activity android:exported="true" android:name="ApiDemos"&gt;</code></pre>
+                </div>
+            </div>
+            <div class="indent small">再度ビルドするとエラーがなくなりDEBUG用のAPKが出力されます。</div>
+
+            <div class="m-2 text-center">
+                <figure class="figure">
+                    <figcaption class="figure-caption text-center">
+                        【ApiDemosビルド成功】
+                    </figcaption>
+                    <img class="figure-img img-fluid" src="02_android_apiDemos_build/images/ApiDemos_2_buildOK.png" width="900" />
+                </figure>
+            </div>
+            <h5 class="v-line-start">5.エミュレータでApiDemosアプリを実行する</h5>
+            <div class="m-2 text-center">
+                <figure class="figure">
+                    <figcaption class="figure-caption text-center">
+                        【Views -&gt; Date Widgets -&gt; 1. Dialog を押下】
+                    </figcaption>
+                    <img class="figure-img img-fluid" src="02_android_apiDemos_build/images/ApiDemos_3_mulator.png"/>
+                </figure>
+            </div>
+
+            <div class="row mb-5">
+                <dl class="ms-3">
+                    <dt class="indent">メニューページへ<dt>
+                    <dd class="indent mt-2">
+                        <a href="index.html">
+                        戻る
+                        </a>
+                    </dd>    
+                </dl>
+            </div>
+        </div>
+        <script src="assets/highlight/js/highlight.min.js"></script>
+        <script src="assets/highlight/js/java.min.js"></script>
+        <script src="assets/highlight/js/cpp.min.js"></script>
+        <script>
+            hljs.highlightAll();
+        </script>
+        </div>
+    </body>
+</html>

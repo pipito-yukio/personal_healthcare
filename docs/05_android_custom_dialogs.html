@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="stylesheet" href="assets/css/bootstrap_custom.css" />
+        <link rel="stylesheet" href="assets/css/bootstrap.min.css" />
+        <link rel="stylesheet" href="assets/highlight/styles/default.min.css" />
+        <title>カスタムDialogFragmentクラスの作成</title>
+    </head>
+
+    <body>
+        <div class="container" style="max-width: 980px">
+            <h4 class="m-2 text-center">カスタムDialogFragmentクラスの作成</h4>
+            <hr />
+            <div class="update-date">【最終更新日】2023-04-07</div>
+            <p>
+                Androidアプリで使用するカスタムDialogFragmentクラス(１行入力ダイアログ, メッセージ表示ダイアログ, 確認ダイアログ)の作成方法を解説します。
+            </p>
+            <h5 class="v-line-start">1.カスタムダイアログの利用</h5>
+            <p class="indent mt-2">本来ならEditTextウィジェットを使うケースでも入力が１行のみの場合はカスタム入力ダイアログクラスを作成します。
+                初回登録時にはそれほど問題ないのですが、入力した値の変更管理が面倒になるという理由からです。※登録後に修正する一番可能性がある
+            </p>
+            <div class="indent">(1) １行入力ダイアログ</div>
+            <div class="row ms-3">
+                <div class="col-8">
+                    <table class="table table-sm small">
+                        <thead>
+                            <tr><th>入力項目</th><th>入力方法</th><th>レイアウトファイル</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>体温</td><td>EditDialogFragement</td><td>edit_body_temper.xml</td></tr>
+                            <tr><td>歩数</td><td>EditDialogFragement</td><td>edit_walking_count.xml</td></tr>
+                            <tr><td>天候</td><td>EditDialogFragement</td><td>edit_weather_cond.xml</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="row m-2">
+                    <figure class="figure">
+                        <figcaption class="figure-caption">
+                            【データ登録画面と１行入力ダイアログ】
+                        </figcaption>
+                        <img class="figure-img img-fluid" src="05_android_custom_dialogs/images/AppTopFrag_entryDialogs.png" />
+                    </figure>
+            </div>
+            <div class="indent">(2) メッセージ・確認ダイアログ</div>
+            <div class="row ms-3">
+                <div class="col-8">
+                    <table class="table table-sm small">
+                        <thead>
+                            <tr><th>表示タイミング</th><th>ダイアログクラス</th><th>リスナー</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>必須入力チェック時</td><td>MessageOkDialogFragment</td><td>無し</td></tr>
+                            <tr><td>エラーレスポンス受信時</td><td>MessageOkDialogFragment</td><td>無し</td></tr>
+                            <tr><td>登録(更新)ボタン押下時</td><td>ConfirmDialogFragment</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="row m-2">
+                    <figure class="figure">
+                        <figcaption class="figure-caption text-center">
+                        </figcaption>
+                        <img class="figure-img img-fluid" src="05_android_custom_dialogs/images/AppTopFrag_confirmDialogs.png" />
+                    </figure>
+            </div>
+            <h5 class="v-line-start">2.ApiDemosアプリのコードを再利用</h5>
+            <p class="indent">ApiDemosアプリのAleart Dialogsと FragmentAlertDialogクラス からの実装を流用します。</p>
+            <div class="row m-2">
+                <figure class="figure">
+                    <figcaption class="figure-caption text-center">
+                        【ApiDemosアプリの Alert Dialogs サンプル】
+                    </figcaption>
+                    <img class="figure-img img-fluid" src="05_android_custom_dialogs/images/ApiDemos_2_alertDialogs.png"/>
+                </figure>
+            </div>
+            <div class="row m-2">
+                 <p class="mb-1">【利用するソース】ApiDemosアプリ(Android Googlesource リポジトリから取得)</p>
+                 <div class="ms-4 mb-2">
+                     <a href="02_android_apiDemos_build.html" target="_blank">ApiDemosのダウンロードとビルド方法</a>
+                 </div>
+<pre class="ms-4">src/com/example/android/apis/app/
+    AlertDialogSamples.java  -&gt; EditDialogFragement
+    FragmentAlertDialog.java -&gt; EditDialogFragement, MessageOkDialogFragment, ConfirmDialogFragment
+res/layout/
+    alert_dialog_text_entry.xml</pre>
+            </div>
+            <dl class="row m-2">
+                <dt>【公式ドキュメント】</dt>
+                <dd class="indent">ダイアログ <br/>
+<a href="https://developer.android.com/guide/topics/ui/dialogs?hl=ja" target="_blank">
+https://developer.android.com/guide/topics/ui/dialogs?hl=ja</a>
+                </dd>
+                <dd class="ms-4">
+                    <ul>
+                        <li>「カスタム レイアウトを作成する」</li>
+                        <li>「全画面で、または埋め込みフラグメントとしてダイアログを表示する」</li>
+                    </ul>
+                </dd>
+            </dl>
+            <h5 class="v-line-start mt-3">3.カスタム入力ダイアログクラス</h6>
+            <p class="indent mx-1 my-1">
+自作のクラスは ApiDemosのコードと上記公式ドキュメントを参考にアプリの要件に合わせて作りました。
+            </p>
+            <dl class="row m-3">
+              <dt>【ソース】android-health-care-example/app/src/main/</dt>
+              <dd class="ms-4">java/com/example/android/healthcare/dialogs/<b>CustomDialogs.java</b></dd>
+              <dt>【EditText用スタイル】res/values/styles.xml ※入力型として数値(右寄せ)属性を設定</dt>
+              <dt>
+<pre><code class="xml small">&lt;resources&gt;
+    &lt;style name="ViewSizeWrapContent"&gt;
+        &lt;item name="android:layout_width"&gt;wrap_content&lt;/item&gt;
+        &lt;item name="android:layout_height"&gt;wrap_content&lt;/item&gt;
+    &lt;/style&gt;
+    &lt;style name="StyleEditMarginStart" parent="ViewSizeWrapContent"&gt;
+        &lt;item name="android:layout_marginStart"&gt;@dimen/text_margin_start&lt;/item&gt;
+        &lt;!-- 入力ボックスの右端の余白 --&gt;
+        &lt;item name="android:paddingEnd"&gt;@dimen/edit_padding_end&lt;/item&gt;
+    &lt;/style&gt;
+    &lt;style name="StyleEditSingle" parent="StyleEditMarginStart"&gt;
+        &lt;item name="android:maxLines"&gt;1&lt;/item&gt;
+    &lt;/style&gt;
+    &lt;style name="StyleEditNumbered" parent="StyleEditSingle"&gt;
+        &lt;item name="android:gravity"&gt;end&lt;/item&gt;
+        &lt;item name="android:inputType"&gt;number&lt;/item&gt;
+    &lt;/style&gt;
+    &lt;style name="StyleEditNumberDecimal" parent="StyleEditNumbered"&gt;
+        &lt;item name="android:inputType"&gt;number|numberDecimal&lt;/item&gt;
+    &lt;/style&gt;
+    &lt;!-- 以下省略 --&gt;
+&lt;/resources&gt;</code></pre>
+              </dt>
+              <dt>【EditDialogFragement用レイアウト】res/layout/</dt>
+              <dd class="ms-4">
+                  <ul>
+                      <li>[体温] edit_body_temper.xml ※実数値入力スタイルを設定
+<pre><code class="xml small">&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="@dimen/alertdialog_padding_start_end"
+    android:paddingEnd="@dimen/alertdialog_padding_start_end"
+    &gt;
+
+    &lt;!-- 体温は正浮動小数点数 --&gt;
+    &lt;EditText
+        android:id="@+id/editBodyTemper"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:ems="@integer/ems_body_temper"
+        android:maxLength="@integer/max_body_temper"
+        style="@style/StyleEditNumberDecimal"
+        android:singleLine="true"
+        android:textAppearance="?android:textAppearanceMedium"
+        /&gt;
+&lt;/LinearLayout&gt;</code></pre>
+                      </li>
+                      <li>[歩数] edit_walking_count.xml ※整数値入力スタイルを設定
+<pre><code class="xml small">&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="@dimen/alertdialog_padding_start_end"
+    android:paddingEnd="@dimen/alertdialog_padding_start_end"
+    &gt;
+
+    &lt;!-- 歩数は正の整数 --&gt;
+    &lt;EditText
+        android:id="@+id/editWalkingCount"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:ems="@integer/ems_walking_count"
+        android:maxLength="@integer/max_walking_count"
+        style="@style/StyleEditNumbered"
+        android:singleLine="true"
+        android:textAppearance="?android:textAppearanceMedium"
+        /&gt;
+&lt;/LinearLayout&gt;</code></pre>
+                      </li>
+                      <li>[天候] edit_weather_cond.xml ※EditTextデフォルト
+<pre><code class="xml small">&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="@dimen/alertdialog_padding_start_end"
+    android:paddingEnd="@dimen/alertdialog_padding_start_end"
+    &gt;
+
+    &lt;EditText
+        android:id="@+id/editWeatherCond"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:maxLength="@integer/max_walking_count"
+        android:singleLine="true"
+        android:textAppearance="?android:textAppearanceMedium"
+        android:autofillHints="" /&gt;
+&lt;/LinearLayout&gt;</code></pre>
+                      </li>
+                  </ul>
+              </dd>
+            </dl>
+
+            <p class="mx-1 my-1">(1) EditDialogFragementクラス ※説明用にソースにないコメントを追加してます</p>
+            <div class="row m-2">
+                <div class="col">
+<pre><code class="java small">public class CustomDialogs {
+    //...一部省略...
+
+    public static class EditDialogFragement extends DialogFragment {
+        // 入力型
+        public enum EditInputType {
+            BODY_TEMPER/*体温(numberDecimal)*/, WALKING_COUNT/*歩数(nuberSigned)*/, NONE
+        }
+        // OK時に編集値を受け取るリスナー
+        public interface EditOkCancelListener {
+            void onOk(String editValue);
+            void onCancel();
+        }
+
+        private final EditInputType mEditInputType;
+        private final EditOkCancelListener mListener;
+        public EditDialogFragement(EditInputType type,
+                                   EditOkCancelListener listener) {
+            mEditInputType = type; // 呼び出し元から入力型を受け取る
+            mListener = listener;  // 呼び出し元からリスナーインスタンスを受け取る
+        }
+
+        public static EditDialogFragement newInstance(String title, String editValue,
+                                 EditInputType type, EditOkCancelListener listener) {
+            EditDialogFragement frag = new EditDialogFragement(type, listener);
+            Bundle args = new Bundle();
+            // タイトルは文字列
+            args.putString("title", title);
+            // メッセージは文字列指定
+            args.putString("editValue", editValue);
+            frag.setArguments(args);
+            return frag;
+        }
+
+        @NonNull
+        public Dialog onCreateDialog(Bundle savedInstanceState) {
+            assert getArguments() != null;
+            String title = getArguments().getString("title");
+            String editValue = getArguments().getString("editValue");
+            LayoutInflater factory = getLayoutInflater();
+            View entryView;
+            EditText mEditText;
+            // 入力型に応じて生成するレイアウトを切り替える
+            if (mEditInputType == EditInputType.BODY_TEMPER) {
+                // 体温入力用レイアウト
+                entryView = factory.inflate(R.layout.edit_body_temper, null);
+                mEditText = entryView.findViewById(R.id.editBodyTemper);
+            } else if (mEditInputType == EditInputType.WALKING_COUNT){
+                // 歩数入力用レイアウト
+                entryView = factory.inflate(R.layout.edit_walking_count, null);
+                mEditText = entryView.findViewById(R.id.editWalkingCount);
+            } else {
+                // 天候入力用レイアウト
+                entryView = factory.inflate(R.layout.edit_weather_cond, null);
+                mEditText = entryView.findViewById(R.id.editWeatherCond);
+            }
+            if (!TextUtils.isEmpty(editValue)) {
+                // 入力値があれば全テキストを選択状態にする
+                mEditText.setSelectAllOnFocus(true);
+                mEditText.setText(editValue);
+            } else {
+                mEditText.setText("");
+            }
+            // OKボタン押下時にリスナーに入力値を設定する
+            return new AlertDialog.Builder(getActivity())
+                    .setTitle(title)
+                    .setView(entryView)
+                    .setPositiveButton(R.string.alert_dialog_ok,
+                            (dialog, whichButton) -&gt; mListener.onOk(mEditText.getText().toString()))
+                    .setNegativeButton(R.string.alert_dialog_cancel,
+                            (dialog, whichButton) -&gt; mListener.onCancel())
+                    .create();
+        }
+    }
+}</code></pre>
+                </div>
+            </div>
+
+            <p class="mx-1 my-1">(2) MessageOkDialogFragmentクラス ※ほぼApiDemosからの流用なので説明用のコメントはありません</p>
+            <div class="row m-2">
+                <div class="col">
+<pre><code class="java small">public static class MessageOkDialogFragment extends DialogFragment {
+    public static MessageOkDialogFragment newInstance(String title, String message) {
+        MessageOkDialogFragment frag = new MessageOkDialogFragment();
+        Bundle args = new Bundle();
+        // タイトルは任意
+        if (!TextUtils.isEmpty(title)) {
+            args.putString("title", title);
+        }
+        // メッセージは文字列指定
+        args.putString("message", message);
+        frag.setArguments(args);
+        return frag;
+    }
+
+    @NonNull
+    public Dialog onCreateDialog(Bundle savedInstanceState) {
+        assert getArguments() != null;
+        String title = getArguments().getString("title");
+        String message = getArguments().getString("message");
+        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+        if (!TextUtils.isEmpty(title)) {
+            builder.setTitle(title);
+        }
+        return builder
+                .setMessage(message)
+                .setPositiveButton(R.string.alert_dialog_ok,
+                        (dialog, whichButton) -&gt; {
+                        })
+                .create();
+    }
+}</code></pre>
+                </div>
+            </div>
+
+            <p class="mx-1 my-1">(3) ConfirmDialogFragmentクラス ※説明用にソースにないコメントを追加してます</p>
+            <div class="row m-2">
+                <div class="col">
+<pre><code class="java small">public static class ConfirmDialogFragment extends DialogFragment {
+    // 呼び出し元にボタン押下の結果を通知するリスナーインターフェイス
+    public interface ConfirmOkCancelListener {
+        // OKボタン押下されたことがわかれば良いので呼び出し元に渡す値は無し
+        void onOk();
+        void onCancel();
+    }
+
+    private final ConfirmOkCancelListener mListener;
+    public ConfirmDialogFragment(ConfirmOkCancelListener listener) {
+        mListener = listener;
+    }
+
+    public static ConfirmDialogFragment newInstance(String title, String message,
+                                                        ConfirmOkCancelListener listener) {
+        ConfirmDialogFragment frag = new ConfirmDialogFragment(listener);
+        Bundle args = new Bundle();
+        // タイトルは任意
+        if (!TextUtils.isEmpty(title)) {
+            args.putString("title", title);
+        }
+        // メッセージは文字列指定
+        args.putString("message", message);
+        frag.setArguments(args);
+        return frag;
+    }
+
+    @NonNull
+    public Dialog onCreateDialog(Bundle savedInstanceState) {
+        assert getArguments() != null;
+        String  title = getArguments().getString("title");
+        String message = getArguments().getString("message");
+        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+        if (!TextUtils.isEmpty(title)) {
+            builder.setTitle(title);
+        }
+        return builder
+                .setMessage(message)
+                .setPositiveButton(R.string.alert_dialog_ok,
+                        (dialog, whichButton) -&gt; mListener.onOk())
+                .setNegativeButton(R.string.alert_dialog_cancel,
+                        (dialog, whichButton) -&gt; mListener.onCancel())
+                .create();
+    }
+}</code></pre>
+                </div>
+            </div>
+
+            <h5 class="v-line-start">4.アプリからカスタムダイアログを使用する</h5>
+            <p class="indent">[ソース] app/src/main/java/com/example/android/healthcare/ui/main/<b>AppTopFragment.java</b></p>
+            <div class="indent">(1) 体温入力, 歩数入力ダイアログ ※ダイアログの生成と値の取得部分のみ抜粋</div>
+            <div class="m-2 small">
+<pre><code class="language-java">// 数値系EditText入力ダイアログ起動イベントリスナー[体温入力(実数), 歩数入力(整数)]
+private final View.OnClickListener mNumberInputClickListener = v -&gt; {
+    EditDialogFragement.EditOkCancelListener listener =
+            new EditDialogFragement.EditOkCancelListener() {
+                @Override
+                public void onOk(String editValue) {
+                    // ダイアログの入力値を受け取る
+                    if (v.getId() == mInpBodyTemper.getId()) {
+                        // 体温入力
+                        if (!TextUtils.isEmpty(editValue)) {
+                            // 実数値は小数点第1位で表示
+                            String showValue = String.format(Locale.JAPANESE,
+                                    AppTopUtil.FMT_BODY_TEMPER, Double.valueOf(editValue));
+                            mInpBodyTemper.setText(showValue);
+                        } else {
+                            mInpBodyTemper.setText("");
+                        }
+                        // 入力ビューと入力値をonChangeリスナーに設定
+                        mOnNumberChangedOnEditDialog.onChanged((TextView) v, editValue);
+                    } else {
+                        // 歩数入力なら加工無しで設定
+                        mInpWalkingCount.setText(editValue);
+                        mOnNumberChangedOnEditDialog.onChanged((TextView) v, editValue);
+                    }
+                }
+                @Override
+                public void onCancel() {
+                }
+            };
+    // EditTextの引数
+    EditDialogFragement.EditInputType editInputType;
+    String title;
+    String value;
+    if (v.getId() == mInpBodyTemper.getId()) {
+        // 体温入力
+        editInputType = EditDialogFragement.EditInputType.BODY_TEMPER;
+        // タイトル
+        title = String.format(getString(R.string.format_input_title),
+                getString(R.string.lbl_body_temper));
+        // 前回入力値
+        value = mInpBodyTemper.getText().toString();
+    } else {
+        // 歩数入力
+        editInputType = EditDialogFragement.EditInputType.WALKING_COUNT;
+        title = String.format(getString(R.string.format_input_title),
+                getString(R.string.lbl_walking_count));
+        value = mInpWalkingCount.getText().toString();
+    }
+    // ダイアログフラグメント生成
+    DialogFragment fragment = EditDialogFragement.newInstance(title, value,
+            editInputType, listener);
+    // ダイアログフラグメント表示
+    fragment.show(requireActivity().getSupportFragmentManager(), "EditDialogFragment");
+};</code></pre>
+            </div>
+
+            <div class="indent">(2) 入力チェックダイアログ表示</div>
+            <div class="m-2 small">
+<pre><code class="language-java">// OKボタンのみのダイアログ生成メソッド
+    private void showMessageDialog(String title, String message, String tagName) {
+        DialogFragment fragment = MessageOkDialogFragment.newInstance(title, message);
+        fragment.show(requireActivity().getSupportFragmentManager(), tagName);
+    }
+
+    // 必須入力項目チェック処理のみ抜粋
+    List<String> warnings = checkRequiredInputs(false);
+    if (!warnings.isEmpty()) {
+        // メッセージダイアログ表示
+        String warning = String.join("\n", warnings);
+        showMessageDialog(getString(R.string.warning_required_dialog_title), warning,
+                "RequiredDialogFragment");
+        return;
+   }
+
+   // チェックOK時の後続処理</code></pre>  
+            </div>
+
+            <div class="indent">(3) メールアドレス必須ダイアログ  ※ダイアログの生成とOKボタン押下時の処理、説明用コメントを追加しています</div>
+            <div class="m-2 small">
+<pre><code class="language-java">// メールアドレス必須ダイアログ
+private void showConfirmDialogWithEmailAddress() {
+    // ダイアログからボタン押下結果を受け取るリスナーのインスタンス生成
+    ConfirmOkCancelListener listener = new ConfirmOkCancelListener() {
+        @Override
+        public void onOk() {
+            // OKボタン押下ならメールアドレス設定画面に遷移する
+            Intent settingsIntent = new Intent(requireActivity(), SettingsActivity.class);
+            startActivity(settingsIntent);
+        }
+
+        @Override
+        public void onCancel() {
+            // No operation.
+        }
+    };
+    ConfirmDialogFragment fragment = ConfirmDialogFragment.newInstance(
+            getString(R.string.warning_required_dialog_title)/*タイトル*/,
+            getString(R.string.warning_need_email_address)/*メッセージ*/,
+            listener/*結果を受け取るリスナー*/);
+    fragment.show(requireActivity().getSupportFragmentManager(), "ConfirmDialogFragment");
+}</code></pre>
+            </div>
+
+            <div class="row mb-5">
+                <dl class="ms-3">
+                    <dt class="indent">メニューページへ<dt>
+                    <dd class="indent mt-2">
+                        <a href="index.html">
+                        戻る
+                        </a>
+                    </dd>    
+                    <dt class="indent mt-3">Androidアプリのソースコードはこちら<dt>
+                    <dd class="indent mt-2">
+                        <a href="https://github.com/pipito-yukio/personal_healthcare/src/android-health-care-example" target="_blank">
+                        https://github.com/pipito-yukio/personal_healthcare/src/android-health-care-example
+                        </a>
+                    </dd>    
+                </dl>
+            </div>
+        </div>
+        <script src="assets/highlight/js/highlight.min.js"></script>
+        <script src="assets/highlight/js/java.min.js"></script>
+        <script src="assets/highlight/js/cpp.min.js"></script>
+        <script>
+            hljs.highlightAll();
+        </script>
+        </div>
+    </body>
+</html>
