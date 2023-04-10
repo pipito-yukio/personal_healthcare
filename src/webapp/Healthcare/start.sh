@@ -22,7 +22,7 @@ EXEC_PATH=
 if [ -n "$PATH_HEALTHCARE" ]; then
    EXEC_PATH=$PATH_HEALTHCARE
 else
-   EXEC_PATH="$HOME/healthcare"
+   EXEC_PATH="$HOME/Healthcare"
 fi
 
 . $HOME/py_venv/raspi4_apps/bin/activate
