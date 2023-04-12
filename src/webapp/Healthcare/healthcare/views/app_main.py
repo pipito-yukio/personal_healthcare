@@ -60,8 +60,6 @@ def close_sessions(exception=None) -> None:
     app_logger.debug(f"healthcare_session:{sess}")
     if sess is not None:
         try:
-            # インスタンスのクローズ
-            sess.close()
             # クラスのremoveメソッド呼び出し
             Cls_sess_healthcare.remove()
         except Exception as err:    
@@ -72,7 +70,6 @@ def close_sessions(exception=None) -> None:
     app_logger.debug(f"sensors_session:{sess}")
     if sess is not None:
         try:
-            sess.close()
             Cls_sess_sensors.remove()
         except Exception as err:    
             app_logger.warning(f"Error removed Cls_sess_sensors :{err}")
@@ -238,6 +235,9 @@ def _insert_healthdata(person_id: int, measurement_day: str, data: Dict) -> None
         app_logger.warning(err.args)
         sess.rollback()
         abort(InternalServerError.code, _set_errormessage(f"559,{err}"))
+    finally:
+        sess.close()
+    
 
 
 def _update_healthdata(person_id: int, measurement_day: str, data: Dict) -> None:
@@ -343,6 +343,9 @@ def _update_healthdata(person_id: int, measurement_day: str, data: Dict) -> None
         sess.rollback()
         app_logger.warning(err.args)
         abort(InternalServerError.code, _set_errormessage(f"559,{err}"))
+    finally:    
+        sess.close()
+
 
 
 def _insert_weather(measurement_day: str, data: Dict) -> None:
@@ -375,6 +378,9 @@ def _insert_weather(measurement_day: str, data: Dict) -> None:
     except sqlalchemy.exc.SQLAlchemyError as err:
         app_logger.warning(err.args)
         sess.rollback()
+    finally:
+        sess.close()
+    
 
 
 def _update_weather(measurement_day: str, data: Dict) -> None:
@@ -416,6 +422,9 @@ def _update_weather(measurement_day: str, data: Dict) -> None:
     except sqlalchemy.exc.SQLAlchemyError as err:
         app_logger.warning(err.args)
         sess.rollback()
+    finally:
+        sess.close()
+    
 
 
 def _check_postdata(request):
