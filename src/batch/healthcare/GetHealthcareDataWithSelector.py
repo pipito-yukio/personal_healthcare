@@ -73,7 +73,7 @@ if __name__ == '__main__':
     )
     logger.info(f"Cls_sess_sensors: {Cls_sess_sensors}")
 
-    emailAddress: str = "yoshida@webriverside.com"
+    emailAddress: str = "user1@examples.com"
     measurementDay: str = "2023-03-01"
     selector = Selector(Cls_sess_healthcare, Cls_sess_sensors, logger=logger)
     healthcare_dict: Dict = selector.get_healthcare_asdict(emailAddress, measurementDay)

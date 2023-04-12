@@ -42,7 +42,7 @@ if __name__ == '__main__':
     engine_healthcare: sqlalchemy.Engine = create_engine(conn_url, echo=True)
 
     # Perssonテーブル
-    email: str = "yoshida@webriverside.com"
+    email: str = "user1@examples.com"
     try:
         # https://docs.sqlalchemy.org/en/20/orm/session_basics.html#
         #   opening-and-closing-a-session
