@@ -6,20 +6,19 @@ from flask import Response, abort, g, jsonify, make_response, request
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session, scoped_session
 from sqlalchemy.orm.exc import NoResultFound
-from werkzeug.exceptions import (BadRequest, Forbidden, HTTPException, Conflict,
-                                 InternalServerError, NotFound)
+from werkzeug.exceptions import (BadRequest, Conflict, Forbidden,
+                                 HTTPException, InternalServerError, NotFound)
 
 from healthcare import (Cls_sess_healthcare, Cls_sess_sensors, app, app_logger,
                         app_logger_debug, engine_healthcare)
 from healthcare.dao.blood_pressure import BloodPressure
+from healthcare.dao.body_temperature import BodyTemperature
 from healthcare.dao.nocturia_factors import NocturiaFactors
 from healthcare.dao.person import Person
+from healthcare.dao.queries import Selector
 from healthcare.dao.sleep_management import SleepManagement
 from healthcare.dao.walking_count import WalkingCount
 from healthcare.dao.weather_condition import WeatherCondition
-from healthcare.dao.body_temperature import BodyTemperature
-from healthcare.dao.queries import Selector
-
 
 MSG_DESCRIPTION: str = "error_message"
 ABORT_DICT_BLANK_MESSAGE: Dict[str, str] = {MSG_DESCRIPTION: ""}
@@ -83,7 +82,7 @@ def close_sessions(exception=None) -> None:
 def getcurrentdata():
     """メールアドレスと測定日付から健康管理データを取得するリクエスト
 
-    :param: request parameter: ?emailAddress=yoshida@webriverside.com&measurementDay=2023-0-03
+    :param: request parameter: ?emailAddress=user1@examples.com&measurementDay=2023-0-03
     :return: JSON形式(健康管理DBから取得したデータ + 気象センサーDBから取得した天候)
     """
     if app_logger_debug:
@@ -463,6 +462,9 @@ def _get_personid(email_address: str) -> Optional[int]:
     except NoResultFound as notFound:
         app_logger.warning(f"NoResultFound: {notFound}")
         return None
+    except Exception as error:
+        app_logger.warning(f"Error: {error}")
+        raise error
 
 
 def _has_dict_in_data(dict_key: str, data:Dict) -> Optional[Dict]:
