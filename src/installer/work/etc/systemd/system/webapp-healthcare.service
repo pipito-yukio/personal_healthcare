@@ -1,0 +1,14 @@
+[Unit]
+Description=Flask webapp Healthcare service
+After=postgres-12-docker.service
+
+[Service]
+Type=idle
+# FLASK_PROD_PORT
+EnvironmentFile=/etc/default/webapp-healthcare
+ExecStart=/home/pi/Healthcare/start.sh prod >/dev/null
+User=pi
+
+[Install]
+WantedBy=multi-user.target
+
