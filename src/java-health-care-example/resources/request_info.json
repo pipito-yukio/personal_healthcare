@@ -1,0 +1,10 @@
+{
+  "urls": {
+    "wifi": "http://dell-t7500.local:5000/healthcare",
+    "mobile": "http://raspi.examples.com:12920/healthcare"
+  },
+  "headers": {
+    "X-Request-Phone-Token": "DweSj6H5UhqT1U25hpBEEeF3UirKr0BMSsxblyJDYtU",
+    "X-Request-Network-Type": "wifi"
+  }
+}
