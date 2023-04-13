@@ -1438,10 +1438,10 @@ public class AppTopFragment extends Fragment {
             if (selectedLocal.isBefore(mNowLocalDate)) {
                 // 過去日の場合はプリファレンスから登録済み日付を取得する (未登録ならnull)
                 String regDate = getLatestRegisteredDateInPref();
-                DEBUG_OUT.accept(TAG, String.format("Compare: %s < %s", selectedLocal, regDate));
-                // カレンダー選択日が最新の登録済み日付未満ならリクエストする
+                DEBUG_OUT.accept(TAG, String.format("Compare: %s =< %s", selectedLocal, regDate));
+                // カレンダー選択日が最新の登録済み日付以下ならリクエストする
                 // 過去日で登録済み日付を超える選択日は未登録日付なのでリクエストしない
-                if (AppTopUtil.isUnderRegisteredDate(selectedLocal, regDate)) {
+                if (AppTopUtil.isLessRegisteredDate(selectedLocal, regDate)) {
                     String emailAddress = getUserEmailWithThisSettings();
                     if (!TextUtils.isEmpty(emailAddress)) {
                         // 過去日は保存不可

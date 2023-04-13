@@ -126,20 +126,21 @@ public class AppTopUtil {
     }
 
     /**
-     * カレンダー選択日が登録済み日付未満か判定する
+     * カレンダー選択日が登録済み以下か判定する
      * @param selectedLocal カレンダー選択日 (必須)
      * @param registeredDate 登録済み日付 (任意)
-     * @return 登録済み日付がnullならtrue, 先以外は下記条件を満たした場合true<br/>
-     *   カレンダー選択日 < 登録済み日付
+     * @return 登録済み日付がnullならtrue, それ以外は下記条件を満たした場合true<br/>
+     *   カレンダー選択日 <= 登録済み日付 == not (カレンダー選択日 > 登録済み日付)
      */
-    public static boolean isUnderRegisteredDate(LocalDate selectedLocal, String registeredDate) {
+    public static boolean isLessRegisteredDate(LocalDate selectedLocal, String registeredDate) {
         if (registeredDate == null) {
             return true;
         }
 
         int[] regArray = splitDateValue(registeredDate);
         LocalDate registeredLocal = LocalDate.of(regArray[0], regArray[1], regArray[2]);
-        return selectedLocal.isBefore(registeredLocal);
+        // selectedLocal.isAfter(registeredLocal) || selectedLocal.isEqual(registeredLocal);
+        return !selectedLocal.isAfter(registeredLocal);
     }
 
     /**
