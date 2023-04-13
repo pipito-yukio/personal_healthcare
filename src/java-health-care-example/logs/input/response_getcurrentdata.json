@@ -1,0 +1,53 @@
+{
+  "data": {
+    "emailAddress": "user1@examples.com", 
+    "healthcareData": {
+      "bloodPressure": {
+        "eveningMax": 132, 
+        "eveningMeasurementTime": "22:55", 
+        "eveningMin": 82, 
+        "eveningPulseRate": 61, 
+        "morningMax": 119, 
+        "morningMeasurementTime": "06:40", 
+        "morningMin": 70, 
+        "morningPulseRate": 69
+      }, 
+      "bodyTemperature": {
+        "measurementTime": null, 
+        "temperature": null
+      }, 
+      "nocturiaFactors": {
+        "conditionMemo": "ちょっと風邪気味", 
+        "hasAlcohol": false, 
+        "hasCoffee": true, 
+        "hasDiuretic": false, 
+        "hasNutritionDrink": false, 
+        "hasSportsDrink": false, 
+        "hasTea": false, 
+        "midnightToiletVisits": 0, 
+        "takeBathing": false, 
+        "takeMedicine": false
+      }, 
+      "sleepManagement": {
+        "deepSleepingTime": null, 
+        "sleepScore": 83, 
+        "sleepingTime": "06:40", 
+        "wakeupTime": "05:30"
+      }, 
+      "walkingCount": {
+        "counts": 7870
+      }
+    }, 
+    "measurementDay": "2023-03-01", 
+    "weatherData": {
+      "weatherCondition": {
+        "condition": "曇り"
+      }
+    }
+  }, 
+  "status": {
+    "code": 0, 
+    "message": "OK"
+  }
+}
+
