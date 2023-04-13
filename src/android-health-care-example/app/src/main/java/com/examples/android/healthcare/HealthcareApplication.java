@@ -26,7 +26,7 @@ public class HealthcareApplication extends Application {
     private Map<String, String> mRequestUrls;
     private Map<String, String> mRequestHeaders;
     public ExecutorService mEexecutor = Executors.newFixedThreadPool(1);
-    public Handler mdHandler = HandlerCompat.createAsync(Looper.getMainLooper());
+    public Handler mHandler = HandlerCompat.createAsync(Looper.getMainLooper());
 
     @Override
     public void onCreate() {

@@ -1971,7 +1971,7 @@ public class AppTopFragment extends Fragment {
                 String requestUrlWithPath = requestUrl + repository.getRequestPath(urlNum);
                 DEBUG_OUT.accept(TAG, "requestUrlWithPath: " + requestUrlWithPath);
                 repository.makeRegisterRequest(urlNum, requestUrl, jsonText, headers,
-                        app.mEexecutor, app.mdHandler, (result) -> {
+                        app.mEexecutor, app.mHandler, (result) -> {
                             // ボタン状態を戻す
                             mBtnSend.setEnabled(true);
                             // リクエストURLをAppBarに表示
@@ -2071,7 +2071,7 @@ public class AppTopFragment extends Fragment {
         // リクエストパラメータ: 主キー項目(メールアドレス, 測定日付)
         String requestParams = AppTopUtil.getRequestParams(emailAddress, pastDay);
         repository.makeGetRequest(0, requestUrl, requestParams, headers,
-                app.mEexecutor, app.mdHandler, (result) -> {
+                app.mEexecutor, app.mHandler, (result) -> {
                     // リクエストURLをAppBarに表示
                     showActionBarResult(requestUrlWithPath);
 
