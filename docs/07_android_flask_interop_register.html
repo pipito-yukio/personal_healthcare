@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="stylesheet" href="assets/css/bootstrap_custom.css" />
+        <link rel="stylesheet" href="assets/css/bootstrap.min.css" />
+        <link rel="stylesheet" href="assets/highlight/styles/default.min.css" />
+        <title>AndroidアプリとFlaskアプリ間JSONデータ交換</title>
+    </head>
+
+    <body>
+        <div class="container" style="max-width: 980px">
+            <h4 class="m-2 text-center">AndroidアプリとFlaskアプリ間JSONデータ交換</h4>
+            <hr />
+            <div class="update-date">【最終更新日】2023-04-15</div>
+            <p class="indent">
+                Androidアプリ(Java)で生成した登録用JSON文字列をFlaskアプリで受け取る方法について解説します。
+            </p>
+            <p class="indent">
+                Androidライブラリに依存しないPureなJavaクラスの開発とテストはAndroid Studioではなく通常のJavaIDEで開発したほうが効率的です。
+プロジェクトを作成する時にJavaクラス群のパッケージをAndroidアプリのパッケージに合わせるだけで動作確認が終わったものはAndroid側プロジェクトにそのままコピーするだけですみます。
+            </p>
+            <h5 class="v-line-start">1.開発・テスト用のプロジェクト</h5>
+            <div class="m-3">
+                <div>(1)このページの説明で使われているJavaプロジェクトのクラス構成</div>
+<pre class="m-2 small"><code>java-health-care-example/
+├── com
+│   └── examples
+│       └── android
+│           └── healthcare
+│               ├── Constants.java               (*) 入出力先定義
+│               ├── OutputRegisterJson.java      (*) 登録用JSON出力メインクラス
+│               ├── data                         (*) JSON出力を
+│               │   ├── BloodPressure.java
+│               │   ├── BodyTemperature.java
+│               │   ├── HealthcareData.java
+│               │   ├── NocturiaFactors.java
+│               │   ├── RegisterData.java
+│               │   ├── SleepManagement.java
+│               │   ├── WalkingCount.java
+│               │   ├── WeatherCondition.java
+│               │   └── WeatherData.java
+│               └── util
+│                   └── FileUtil.java            (*) ファイル入出力クラス
+└── lib
+    └── gson-2.9.0.jar    (*) Mavenリポジトリからダウンロードしlibディレクトリに配置</code></pre>
+                <dl class="m-3">
+                    <dt class="indent mt-3">Javaプロジェクトのソースコードはこちら<dt>
+                    <dd class="indent mt-2">
+                        <a href="https://github.com/pipito-yukio/personal_healthcare/tree/main/src/java-health-care-example">
+                        https://github.com/pipito-yukio/personal_healthcare/tree/main/src/java-health-care-example
+                        </a>
+                    </dd>    
+                </dl>
+                <div>(2)このページの説明で使われているFlaskプロジェクトのpythonファイル</div>
+<pre class="m-2 small"><code>Healthcare/
+└── healthcare
+    ├── __init__.py
+    └── views
+        ├── __init__.py
+        └── app_main.py (*) アプリメイン (リクエスト処理)</code></pre>
+                <dl class="m-3 mb-5">
+                    <dt class="indent mt-3">Flaskアプリのソースコードはこちら<dt>
+                    <dd class="indent mt-2">
+                        <a href="https://github.com/pipito-yukio/personal_healthcare/tree/main/src/webapp">
+                        https://github.com/pipito-yukio/personal_healthcare/tree/main/src/webapp
+                        </a>
+                    </dd>    
+                </dl>
+            </div>
+
+            <h5 class="v-line-start">2.JavaクラスとFlaskアプリ側辞書オブジェクト対応表</h5>
+            <div class="m-2 text-center">
+                <figure class="figure">
+                    <figcaption class="figure-caption text-center">
+                        【登録データ用JSONを構成するJavaクラスと対応するFlaskアプリの辞書オブジェクト】
+                    </figcaption>
+                    <img class="figure-img img-fluid" src="07_android_flask_interop_register/images/Json_java_python.png" width="900" />
+                </figure>
+            </div>
+            <div class="ms-3">
+                <table class="table table-sm table-striped table-bordered small">
+                    <thead>
+                        <tr><th>項　目</th><th>プロパティ名</th><th>Javaクラス</th><th>Flaskアプリ側データ抽出方法</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>1.登録用データ</td>
+                            <td><b></b></td>
+                            <td>RegisterData.java</td>
+                            <td><b>data</b> = json.loads(request.<b>data</b>)</td>
+                        </tr>
+                        <tr>
+                            <td>2.健康管理データ</td>
+                            <td><b>healthcareData</b></td>
+                            <td>HealthcareData.java</td>
+                            <td><span class="text-red-bold">healthcare_data</span> = <b>data</b>[<b>"healthcareData"</b>]</td>
+                        </tr>
+                        <tr>
+                            <td>　(1) 睡眠管理データ</td>
+                            <td><b>sleepManagement</b></td>
+                            <td>SleepManagement.java</td>
+                            <td>sleep_man = <span class="text-red-bold">healthcare_data</span>[<b>"sleepManagement"</b>]</td>
+                        </tr>
+                        <tr>
+                            <td>　(2) 血圧測定データ</td>
+                            <td><b>bloodPressure</b></td>
+                            <td>BloodPressure.java</td>
+                            <td>blood_press_man = <span class="text-red-bold">healthcare_data</span>[<b>"bloodPressure"</b>]</td>
+                        </tr>
+                        <tr>
+                            <td>　(3) 体温測定データ</td>
+                            <td><b>bodyTemperature</b></td>
+                            <td>BodyTemperature.java</td>
+                            <td>body_temper = <span class="text-red-bold">healthcare_data</span>[<b>"bodyTemperature"</b>]</td>
+                        </tr>
+                        <tr>
+                            <td>　(4) 夜間頻尿要因データ</td>
+                            <td><b>nocturiaFactors</b></td>
+                            <td>NocturiaFactors.java</td>
+                            <td>nocturia_factors = <span class="text-red-bold">healthcare_data</span>[<b>"nocturiaFactors"</b>]</td>
+                        </tr>
+                        <tr>
+                            <td>　(5) 歩数データ</td>
+                            <td><b>walkingCount</b></td>
+                            <td>WalkingCount.java</td>
+                            <td>walking_count = <span class="text-red-bold">healthcare_data</span>[<b>"walkingCount"</b>]</td>
+                        </tr>
+                        <tr>
+                            <td>3.気象データ</td>
+                            <td><b>weatherData</b></td>
+                            <td>WeatherData.java</td>
+                            <td><span class="text-blue-bold">weather_data</span> = data[<b>"weatherData"</b>]</td>
+                        </tr>
+                        <tr>
+                            <td>　(1) 天候状態データ</td>
+                            <td><b>weatherCondition</b></td>
+                            <td>WeatherCondition.java</td>
+                            <td>weather_condition = <span class="text-blue-bold">weather_data</span>[<b>"weatherCondition"]</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h5 class="v-line-start">3.JavaでJSON文字列を生成する</h5>
+            <p class="ms-2 indent">Javaクラスで定義するフィールド名をJSONのプロパティ名に合わせることで <b>gson</b>ライブラリがJSONプロパティとして出力してくれます。</p>
+            <!--START Java source blocks -->
+            <div class="m-2 mb-4">
+                <div class="ms-2 small">1.登録用データ(健康管理データベース ＋ 気象センサーデータベース) ※toString()メソッドは省略</div>
+<pre class="ms-3"><code class="java small">package com.examples.android.healthcare.data;
+
+public class RegisterData {
+    // 登録用主キー: emailAddress -> persion.id
+    private final String emailAddress;
+    // 登録用主キー: 測定日付
+    private final String measurementDay;
+    private final HealthcareData healthcareData; // 健康管理データベース
+    private final WeatherData weatherData;       // 気象センサーデータベース
+
+    public RegisterData(String emailAddress, String measurementDay,
+                        HealthcareData healthcareData, WeatherData weatherData) {
+        this.emailAddress = emailAddress;
+        this.measurementDay = measurementDay;
+        this.healthcareData = healthcareData;
+        this.weatherData = weatherData;
+    }
+
+    public String getEmailAddress() { return emailAddress; }
+    public String getMeasurementDay() { return measurementDay; }
+    public HealthcareData getHealthcareData() { return healthcareData; }
+    public WeatherData getWeatherData() { return weatherData; }
+    //...省略...
+}</code></pre>
+                <div class="ms-2 small">2.健康管理データ(データベース用): 下記2 (1)〜(5)までのクラスを定義 ※toString()メソッドは省略</div>
+<pre class="ms-3"><code class="java small">package com.examples.android.healthcare.data;
+
+public class HealthcareData {
+    private final SleepManagement sleepManagement;
+    private final BloodPressure bloodPressure;
+    private final BodyTemperature bodyTemperature;
+    private final NocturiaFactors nocturiaFactors;
+    private final WalkingCount walkingCount;
+
+    public HealthcareData(SleepManagement sleepManagement,
+                          BloodPressure bloodPressure,
+                          BodyTemperature bodyTemperature,
+                          NocturiaFactors nocturiaFactors,
+                          WalkingCount walkingCount) {
+        this.sleepManagement = sleepManagement;
+        this.bloodPressure = bloodPressure;
+        this.bodyTemperature = bodyTemperature;
+        this.nocturiaFactors = nocturiaFactors;
+        this.walkingCount = walkingCount;
+    }
+
+    public SleepManagement getSleepManagement() { return sleepManagement; }
+    public BloodPressure getBloodPressure() { return bloodPressure; }
+    public BodyTemperature getBodyTemperature() { return bodyTemperature; }
+    public NocturiaFactors getNocturiaFactors() { return nocturiaFactors; }
+    public WalkingCount getWalkingCount() { return walkingCount; }
+    //...省略...
+}</code></pre>
+
+                <div class="ms-2 small">2 (1)睡眠管理データ(テーブル用) ※toString()メソッドは省略</div>
+<pre class="ms-3"><code class="java small">package com.examples.android.healthcare.data;
+
+public class SleepManagement {
+    private final String wakeupTime;
+    private final Integer sleepScore;
+    private final String sleepingTime;
+    private final String deepSleepingTime;
+
+    public SleepManagement(String wakeupTime, Integer sleepScore,
+                           String sleepingTime, String deepSleepingTime) {
+        this.wakeupTime = wakeupTime;
+        this.sleepScore = sleepScore;
+        this.sleepingTime = sleepingTime;
+        this.deepSleepingTime = deepSleepingTime;
+    }
+
+    public String getWakeupTime() { return wakeupTime; }
+    public Integer getSleepScore() { return sleepScore; }
+    public String getSleepingTime() { return sleepingTime; }
+    public String getDeepSleepingTime() { return deepSleepingTime; }
+    //...省略...
+}</code></pre>
+                <div class="ms-2 small">2 (2)血圧測定データ(テーブル用) ※toString()メソッドは省略</div>
+<pre class="ms-3"><code class="java small">package com.examples.android.healthcare.data;
+
+public class BloodPressure {
+    private final String morningMeasurementTime;
+    private final Integer morningMax;
+    private final Integer morningMin;
+    private final Integer morningPulseRate;
+    private final String eveningMeasurementTime;
+    private final Integer eveningMax;
+    private final Integer eveningMin;
+    private final Integer eveningPulseRate;
+
+    public BloodPressure(String morningMeasurementTime,
+                         Integer morningMax,
+                         Integer morningMin,
+                         Integer morningPulseRate,
+                         String eveningMeasurementTime,
+                         Integer eveningMax,
+                         Integer eveningMin,
+                         Integer eveningPulseRate) {
+        this.morningMeasurementTime = morningMeasurementTime;
+        this.morningMax = morningMax;
+        this.morningMin = morningMin;
+        this.morningPulseRate = morningPulseRate;
+        this.eveningMeasurementTime = eveningMeasurementTime;
+        this.eveningMax = eveningMax;
+        this.eveningMin = eveningMin;
+        this.eveningPulseRate = eveningPulseRate;
+    }
+
+    public String getMorningMeasurementTime() { return morningMeasurementTime; }
+    public Integer getMorningMax() { return morningMax; }
+    public Integer getMorningMin() { return morningMin; }
+    public Integer getMorningPulseRate() { return morningPulseRate; }
+    public String getEveningMeasurementTime() { return eveningMeasurementTime; }
+    public Integer getEveningMax() { return eveningMax; }
+    public Integer getEveningMin() { return eveningMin; }
+    public Integer getEveningPulseRate() { return eveningPulseRate; }
+    //...省略...
+}</code></pre>
+                <div class="ms-2 small">2 (3)体温測定データ(テーブル用) ※toString()メソッドは省略</div>
+<pre class="ms-3"><code class="java small">package com.examples.android.healthcare.data;
+
+import com.google.gson.annotations.SerializedName;
+
+public class BodyTemperature {
+    private final String measurementTime;
+    private final Double temperature;
+
+    public BodyTemperature(String measurementTime, Double temperature) {
+        this.measurementTime = measurementTime;
+        this.temperature = temperature;
+    }
+
+    public String getMeasurementTime() { return measurementTime; }
+    public Double getTemperature() { return temperature; }
+    //...省略...
+}</code></pre>
+                <div class="ms-2 small">2 (4)夜間頻尿要因データ(テーブル用) ※toString()メソッドは省略</div>
+<pre class="ms-3"><code class="java small">package com.examples.android.healthcare.data;
+
+public class NocturiaFactors {
+    private final int midnightToiletVisits;
+    private final boolean hasCoffee;
+    private final boolean hasTea;
+    private final boolean hasAlcohol;
+    private final boolean hasNutritionDrink;
+    private final boolean hasSportsDrink;
+    private final boolean hasDiuretic;
+    private final boolean takeMedicine;
+    private final boolean takeBathing;
+    private final String conditionMemo;
+
+    public NocturiaFactors(int midnightToiletVisits,
+           boolean hasCoffee, boolean hasTea, boolean hasAlcohol, boolean hasNutritionDrink,
+           boolean hasSportsDrink, boolean hasDiuretic, boolean takeMedicine, boolean takeBathing,
+           String conditionMemo) {
+        this.midnightToiletVisits = midnightToiletVisits;
+        this.hasCoffee = hasCoffee;
+        this.hasTea = hasTea;
+        this.hasAlcohol = hasAlcohol;
+        this.hasNutritionDrink = hasNutritionDrink;
+        this.hasSportsDrink = hasSportsDrink;
+        this.hasDiuretic = hasDiuretic;
+        this.takeMedicine = takeMedicine;
+        this.takeBathing = takeBathing;
+        this.conditionMemo = conditionMemo;
+    }
+
+    public int getMidnightToiletVisits() { return midnightToiletVisits; }
+    public boolean hasCoffee() { return hasCoffee; }
+    public boolean hasTea() { return hasTea; }
+    public boolean hasAlcohol() { return hasAlcohol; }
+    public boolean hasNutritionDrink() { return hasNutritionDrink; }
+    public boolean hasSportsDrink() { return hasSportsDrink; }
+    public boolean hasDiuretic() { return hasDiuretic; }
+    public boolean isTakeMedicine() { return takeMedicine; }
+    public boolean isTakeBathing() { return takeBathing; }
+    public String getConditionMemo() { return conditionMemo; }
+    //...省略...
+}</code></pre>
+                <div class="ms-2 small">2 (5)歩数データ(テーブル用) ※toString()メソッドは省略</div>
+<pre class="ms-3"><code class="java small">package com.examples.android.healthcare.data;
+
+public class WalkingCount {
+    private final Integer counts;
+
+    public WalkingCount(Integer counts) {
+        this.counts = counts;
+    }
+
+    public Integer getCounts() { return counts; }
+    //...省略...
+}</code></pre>
+                <div class="ms-2 small">3.気象データ(気象センサーデータベース用) ※toString()メソッドは省略</div>
+<pre class="ms-3"><code class="java small">package com.examples.android.healthcare.data;
+
+public class WeatherData {
+    private final WeatherCondition weatherCondition;
+
+    public WeatherData(WeatherCondition wc) {
+        this.weatherCondition = wc;
+    }
+
+    public WeatherCondition getWeatherCondition() {return weatherCondition; }
+
+    //...省略...
+}</code></pre>
+                <div class="ms-2 small">3 (1)天候状態データ(テーブル用) ※toString()メソッドは省略</div>
+<pre class="ms-3"><code class="java small">package com.examples.android.healthcare.data;
+
+public class WeatherCondition {
+    private final String condition;
+
+    public WeatherCondition(String condition) {
+        this.condition = condition;
+    }
+
+    public String getCondition() { return condition; }
+    //...省略...
+}</code></pre>
+                <div class="ms-2 small">4 (1).Javaプロジェットのメインクラスで使用する入出力パス定義クラス</div>
+<pre class="ms-3"><code class="java small">package com.examples.android.healthcare;
+
+import java.nio.file.Paths;
+
+/**
+ * ユーザDocumentsディレクトリの入出力先 for linux: ~/Documents
+ */
+public class Constants {
+    public static final String USER_HOME = System.getProperty("user.home");
+    public static final String DOCUMENTS = Paths.get(USER_HOME, "Documents").toString();
+    // 出力先パス: ~/Documents/java/output
+    public static final String OUTPUT_DATA_PATH = Paths.get(DOCUMENTS, "java", "output").toString();
+    // 入力データパス: ~/Documents/java/input
+    public static final String INPUT_DATA_PATH =  Paths.get(DOCUMENTS, "java", "input").toString();
+}</code></pre>
+                <div class="ms-2 small">4 (2).ファイル入出力クラス</div>
+<pre class="ms-3"><code class="java small">package com.examples.android.healthcare.util;
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+
+public class FileUtil {
+    // テキストファイル保存
+    public static void saveText(String fileName, String data) throws IOException {
+        FileOutputStream fos = new FileOutputStream(fileName);
+        try (BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(fos, StandardCharsets.UTF_8))) {
+            writer.write(data);
+            writer.newLine();
+        }
+    }
+    //...省略...
+}</code></pre>
+                <div class="ms-2 small">4 (3).メインクラスで登録用JSONを出力する</div>
+<pre class="ms-3"><code class="java small">package com.examples.android.healthcare;
+
+import com.examples.android.healthcare.data.*;
+import com.examples.android.healthcare.util.FileUtil;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+
+/**
+ * 健康管理Flaskアプリへの登録用データの出力テスト
+ * 出力したJSONファイルを用いてcurlコマンドで健康管理Flaskアプリに登録リクエストを実行する
+ * (使用例) cd ~/Documents/java/output
+ *  $ curl -X POST -H "Content-type: application/json" -d @register_data.json "dell-t7500.local:5000/healthcare/register"
+ */
+public class OutputRegisterJson {
+    static final String JSON_NAME = "register_data.json";
+
+    public static void main(String[] args) {
+        // 出力ファイル名
+        // ~/Documents/java/output/register_data.json
+        String saveFile = Paths.get(Constants.OUTPUT_DATA_PATH, JSON_NAME).toString();
+        // Gson gson = new GsonBuilder().serializeNulls().create();
+        // 整形して出力
+        Gson gson = new GsonBuilder().serializeNulls().setPrettyPrinting().create();
+
+        // 睡眠管理データ
+        SleepManagement sleepManagement = new SleepManagement(
+           "05:30", 83, "06:40", "0:50"
+        );
+        // 血圧管理データ
+        BloodPressure bloodPressure = new BloodPressure(
+           "06:50", 124, 76, 73,
+           "22:15", 137, 80, 57
+        );
+        // 体温測定データ
+        BodyTemperature bodyTemperature = new BodyTemperature(
+           null, null
+        );
+        // 夜間頻尿要因データ
+        NocturiaFactors factors = new NocturiaFactors(
+           1,true, false, false, false, false,
+            false,false, true, "今日は疲れた"
+        );
+        // 歩数データ
+        WalkingCount count = new WalkingCount(8250);
+        // 健康管理データ (健康管理データベース用)
+        HealthcareData healthcareData = new HealthcareData(
+             sleepManagement,
+             bloodPressure,
+             bodyTemperature,
+             factors,
+             count
+        );
+        // 天気情報 (気象センサーデータベース用)
+        WeatherCondition wc = new WeatherCondition("晴れのち曇り");
+        WeatherData weatherData = new WeatherData(wc);
+        // 登録データ
+        RegisterData regsterData = new RegisterData(
+                "user1@examples.com",
+                "2023-03-10",
+                healthcareData,
+                weatherData
+        );
+        // JavaオブジェクトをJSON文字列に変換
+        String jsonText = gson.toJson(regsterData);
+        try {
+            // 出力先に保存
+            FileUtil.saveText(saveFile, jsonText);
+        } catch (IOException e) {
+            System.out.println(e);
+        }
+    };
+}</code></pre>
+                <div class="ms-2 small">5.出力された登録用JSONファイル (register_data.json)</div>
+<pre class="ms-3"><code class="small">{
+  "emailAddress": "user1@examples.com",
+  "measurementDay": "2023-03-10",
+  "healthcareData": {
+    "sleepManagement": {
+      "wakeupTime": "05:30",
+      "sleepScore": 83,
+      "sleepingTime": "06:40",
+      "deepSleepingTime": "0:50"
+    },
+    "bloodPressure": {
+      "morningMeasurementTime": "06:50",
+      "morningMax": 124,
+      "morningMin": 76,
+      "morningPulseRate": 73,
+      "eveningMeasurementTime": "22:15",
+      "eveningMax": 137,
+      "eveningMin": 80,
+      "eveningPulseRate": 57
+    },
+    "bodyTemperature": {
+      "measurementTime": null,
+      "temperature": null
+    },
+    "nocturiaFactors": {
+      "midnightToiletVisits": 1,
+      "hasCoffee": true,
+      "hasTea": false,
+      "hasAlcohol": false,
+      "hasNutritionDrink": false,
+      "hasSportsDrink": false,
+      "hasDiuretic": false,
+      "takeMedicine": false,
+      "takeBathing": true,
+      "conditionMemo": "今日は疲れた"
+    },
+    "walkingCount": {
+      "counts": 8250
+    }
+  },
+  "weatherData": {
+    "weatherCondition": {
+      "condition": "晴れのち曇り"
+    }
+  }
+}</code></pre>
+            </div><!--END java source blocks -->
+
+            <!-- Flaskアプリ側コード断片 -->
+            <h5 class="v-line-start">4.Flaskアプリで登録データ(JSON)を受信し各テーブル用のデータを取得する</h5>
+            <p class="m-2 indent">コードの一部のみ示します(テーブル登録処理は省略) <b>■■部分(9箇所)</b>がデータを取り出す処理となります</p>
+            <div class="m-2 mb-4">
+                <div class="small">(1)登録データPOST処理</div>
+<pre class="ms-3"><code class="python small">@app.route(APP_ROOT + "/register", methods=["POST"])
+def register():
+    """
+    健康管理データ(必須)と天候データ(必須)の登録
+    """
+    if app_logger_debug:
+        app_logger.debug(request.path)
+
+    # 登録データチェック
+    personId, emailAddress, measurementDay, data = _check_postdata(request)
+    
+    # 健康管理データ登録 (必須)
+    _insert_healthdata(personId, measurementDay, data)
+    # 気象データ登録 (必須) ※気象センサーデータベース
+    _insert_weather(measurementDay, data)
+
+    # ここまでエラーがなければOKレスポンス
+    return make_register_success(emailAddress, measurementDay)
+    #...一部省略...
+
+def _check_postdata(request):
+    # リクエストヘッダーチェック
+    if "application/json" not in request.headers["Content-Type"]:
+        abort(BadRequest.code, _set_errormessage("450,Bad request Content-Type."))
+
+    # 登録用データ取得 
+    data: dict = json.loads(request.data) # ■■ リクエストのPOSTデータをJSON化 ■■ 
+    if app_logger_debug:
+        app_logger.debug(data)
+
+    # メールアドレスチェック
+    emailAddress = data.get("emailAddress", None)
+    if emailAddress is None:
+        abort(BadRequest.code, _set_errormessage("462,Required EmailAddress."))
+
+    # 測定日付チェック
+    measurementDay = data.get("measurementDay", None)
+    if measurementDay is None:
+        abort(BadRequest.code, _set_errormessage("463,Required MeasurementDay."))
+
+    # PersonテーブルにemailAddressが存在するか
+    personId = _get_personid(emailAddress)
+    if personId is None:
+        abort(BadRequest.code, _set_errormessage("461,User is not found."))
+
+    return personId, emailAddress, measurementDay, data # 結果をタプルで返却
+
+def _insert_healthdata(person_id: int, measurement_day: str, data: Dict) -> None:
+    """
+    健康管理データの登録処理
+    :param person_id メールアドレスから取得したPersion.id
+    :param measurement_day: 測定日
+    :data 登録用データ
+    """
+    # JSONキーチェック: 登録データは全てのデータ項目が必須 ※(1)〜(5)のいずれかが掛けていた場合はエラー
+    try:
+        # 健康管理データコンテナ
+        healthcare_data: Dict = data["healthcareData"]              # ■■
+        # (1) 睡眠管理
+        sleep_man: Dict = healthcare_data["sleepManagement"]        # ■■
+        # (2) 血圧測定
+        blood_press: Dict = healthcare_data["bloodPressure"]        # ■■
+        # (3) 夜中トイレ回数要因
+        nocturia_factors: Dict = healthcare_data["nocturiaFactors"] # ■■
+        # (4) 歩数
+        walking_count: Dict = healthcare_data["walkingCount"]       # ■■
+        # (5) 体温データ
+        body_temper: Dict = healthcare_data["bodyTemperature"]      # ■■
+    except KeyError as err:
+        app_logger.warning(err)
+        abort(BadRequest.code, _set_errormessage("460,{err}"))
+
+    #...テーブルへの登録処理は省略...
+
+
+def _insert_weather(measurement_day: str, data: Dict) -> None:
+    """
+    天候状態の登録処理
+    :param measurement_day: 測定日
+    :data 登録用データ (必須)
+    """
+    try:
+        # 天候データコンテナは必ずある
+        weather_data: Dict = data["weatherData"]                   # ■■
+        # 天候状態は必須項目
+        weather_condition: Dict = weather_data["weatherCondition"] # ■■
+    except KeyError as err:
+        app_logger.warning(err)
+        return
+
+    #...テーブルへの登録処理は省略...
+</code></pre>
+            </div>
+
+            <div class="row mb-5">
+                <dl class="ms-3">
+                    <dt class="indent">メニューページへ<dt>
+                    <dd class="indent mt-2">
+                        <a href="index.html">
+                        戻る
+                        </a>
+                    </dd>    
+                </dl>
+            </div>
+        </div>
+        <script src="assets/highlight/js/highlight.min.js"></script>
+        <script src="assets/highlight/js/java.min.js"></script>
+        <script src="assets/highlight/js/cpp.min.js"></script>
+        <script>
+            hljs.highlightAll();
+        </script>
+        </div>
+    </body>
+</html>

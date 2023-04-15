@@ -85,3 +85,20 @@ fs-small-sm, .fs-small-small {
     font-size: 0.75em;
 }
 
+.text-red {
+    color: red;    
+}
+
+.text-blue {
+    color: blue;    
+}
+
+.text-red-bold {
+    color: red;
+    font-weight:bold;
+}
+
+.text-blue-bold {
+    color: blue;
+    font-weight:bold;
+}
