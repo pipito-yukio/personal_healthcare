@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="stylesheet" href="assets/css/bootstrap_custom.css" />
+        <link rel="stylesheet" href="assets/css/bootstrap.min.css" />
+        <link rel="stylesheet" href="assets/highlight/styles/default.min.css" />
+        <title>Androidアプリで更新用JSONを生成</title>
+    </head>
+
+    <body>
+        <div class="container" style="max-width: 980px">
+            <h4 class="m-2 text-center">Androidアプリで更新用JSONを生成</h4>
+            <hr />
+            <div class="update-date">【最終更新日】2023-04-15</div>
+            <p class="indent">
+                Androidアプリで変更のあった項目のテーブル単位の更新用JSON文字列を作成する方法について解説します。
+            </p>
+            <p class="indent">
+                Javaで変更のあったテーブル単位の更新用JSONデータを作ることはかなり大変です。
+                そこで今回は下記のようなテンプレートを定義し、変更のあったテーブル単位のJSONをテンプレートのフォーマット文字に埋め込む方法を採用しました。
+            </p>
+            <div class="m-2 text-center">
+                <figure class="figure">
+                    <figcaption class="figure-caption text-center">
+                        【更新データ用JSON作成用テンプレートとテーブル単位の部分更新イメージ】
+                    </figcaption>
+                    <img class="figure-img img-fluid" src="01_design_interface/images/HealthcareJ_2_updateJSON.png" />
+                </figure>
+            </div>
+
+            <h5 class="v-line-start">1.開発・テスト用のプロジェクト</h5>
+            <div class="m-3">
+                <div>(1)このページの説明で使われているJavaプロジェクトのクラス構成</div>
+<pre class="m-2 small"><code>java-health-care-example/
+├── com
+│   └── examples
+│       └── android
+│           └── healthcare
+│               ├── Constants.java               (*) 入出力先定義
+│               ├── OutputUpdateJson.java        (*) 更新用JSON出力メインクラス
+│               ├── constants
+│               │   ├── JsonTemplate.java        (*) テンプレートとテーブルごとのJSON断片を出力するクラス
+│               ├── data                         (*) JSON出力を構成するデータクラス
+│               │   ├── BloodPressure.java
+│               │   ├── BodyTemperature.java
+│               │   ├── HealthcareData.java
+│               │   ├── NocturiaFactors.java
+│               │   ├── RegisterData.java
+│               │   ├── SleepManagement.java
+│               │   ├── WalkingCount.java
+│               │   ├── WeatherCondition.java
+│               │   └── WeatherData.java
+│               └── util
+│                   └── FileUtil.java            (*) ファイル入出力クラス
+└── lib
+    └── gson-2.9.0.jar    (*) Mavenリポジトリからダウンロードしlibディレクトリに配置</code></pre>
+                <dl class="m-3">
+                    <dt class="indent mt-3">Javaプロジェクトのソースコードはこちら<dt>
+                    <dd class="indent mt-2">
+                        <a href="https://github.com/pipito-yukio/personal_healthcare/tree/main/src/java-health-care-example">
+                        https://github.com/pipito-yukio/personal_healthcare/tree/main/src/java-health-care-example
+                        </a>
+                    </dd>    
+                </dl>
+                <div>(2)このページの説明で使われているFlaskプロジェクトのpythonファイル</div>
+<pre class="m-2 small"><code>Healthcare/
+└── healthcare
+    ├── __init__.py
+    └── views
+        ├── __init__.py
+        └── app_main.py (*) アプリメイン (リクエスト処理)</code></pre>
+                <dl class="m-3 mb-5">
+                    <dt class="indent mt-3">Flaskアプリのソースコードはこちら<dt>
+                    <dd class="indent mt-2">
+                        <a href="https://github.com/pipito-yukio/personal_healthcare/tree/main/src/webapp">
+                        https://github.com/pipito-yukio/personal_healthcare/tree/main/src/webapp
+                        </a>
+                    </dd>    
+                </dl>
+            </div>
+
+            <h5 class="v-line-start">2.Javaで変更のあった項目のテーブル単位の更新用JSON文字列を生成する</h5>
+            <!--START Java source blocks -->
+            <div class="m-2 mb-4">
+                <div class="ms-2 small">(1)テンプレートクラス</div>
+<pre class="ms-3"><code class="java small">package com.examples.android.healthcare.constants;
+
+import com.examples.android.healthcare.data.HealthcareData;
+
+public class JsonTemplate {
+    /**
+     * 更新用JSONメインテンプレート
+     * [必須項目] 更新時の主キー
+     *   emailAddress, measurementDay
+     * [任意項目]
+     *   健康管理データ (healthcareData)
+     *     [sleepManagement|bloodPressure| bodyTemperature | nocturiaFactors| walkingCount]
+     *   天候状態 (weatherCondition)
+     */
+    private static final String TEMPL_MAIN = "{\"emailAddress\":\"%s\",\"measurementDay\":\"%s\"," +
+            "\"healthcareData\":{%s},\"weatherData\":{%s}}";
+    // 1.健康管理データ
+    // 1-1.睡眠管理
+    private static final String HEALTH_SM = "\"sleepManagement\":%s";
+    // 1-2.血圧測定
+    private static final String HEALTH_BP = "\"bloodPressure\":%s";
+    // 1-3.体温測定
+    private static final String HEALTH_BT = "\"bodyTemperature\":%s";
+    // 1-4.夜間頻尿要因
+    private static final String HEALTH_NF = "\"nocturiaFactors\":%s";
+    // 1-5.歩数
+    private static final String HEALTH_WC = "\"walkingCount\":%s";
+    // 2.天候状態
+    private static final String WEATHER = "\"weatherCondition\": %s";
+
+    /**
+     * 更新用JSON文字列を生成する。
+     * &lt;p&gt;健康管理データまたは天候テータのいずれかは必要&lt;/p&gt;
+     * @param eailAddress メールアドレス(必須)
+     * @param messurementDay 測定日付(必須)
+     * @param healthcareData 健康管理データ(任意): nullなら空文字設定
+     * @param weatherData 天候データ(任意): nullなら空文字設定
+     * @return 更新用JSON文字列
+     */
+    public static String createUpdateJson(String eailAddress, String messurementDay,
+                                     String healthcareData, String weatherData) {
+        String healthValue = (healthcareData != null) ? healthcareData : "" ;
+        String weatherValue = (weatherData != null) ? weatherData : "";
+        return String.format(TEMPL_MAIN, eailAddress, messurementDay, healthValue, weatherValue);
+    }
+
+    /**
+     * 更新用の睡眠管理JSON文字列を生成する。
+     * &lt;p&gt; "sleepManagement" プロパティで括った睡眠管理JSON文字列を生成&lt;/p&gt;
+     * @param sleepManJson 睡眠管理データJSON文字列 (必須)
+     * @return 更新用の睡眠管理JSON文字列
+     */
+    public static String getJsonWithSleepManagement(String sleepManJson) {
+        return String.format(HEALTH_SM, sleepManJson);
+    }
+
+    /**
+     * 更新用の血圧測定JSON文字列を生成する。
+     * &lt;p&gt; "bloodPressure" プロパティで括った血圧測定JSON文字列を生成&lt;/p&gt;
+     * @param bloodPressJson 血圧測定データJSON文字列 (必須)
+     * @return 更新用の血圧測定JSON文字列
+     */
+    public static String getJsonWithBloodPressure(String bloodPressJson) {
+        return String.format(HEALTH_BP, bloodPressJson);
+    }
+
+    /**
+     * 更新用の体温測定JSON文字列を生成する。
+     * &lt;p&gt; "bodyTemperature" プロパティで括った体温測定JSON文字列を生成&lt;/p&gt;
+     * @param bodyTemperJson 体温測定データJSON文字列 (必須)
+     * @return 更新用の体温測定JSON文字列
+     */
+    public static String getJsonWithBodyTemperature(String bodyTemperJson) {
+        return String.format(HEALTH_BT, bodyTemperJson);
+    }
+
+    /**
+     * 更新用の夜間頻尿要因JSON文字列を生成する。
+     * &lt;p&gt; "nocturiaFactors" プロパティで括った夜間頻尿要因JSON文字列を生成&lt;/p&gt;
+     * @param noctFactorsJson 夜間頻尿要因データJSON文字列 (必須)
+     * @return 更新用の夜間頻尿要因JSON文字列
+     */
+    public static String getJsonWithNocturiaFactors(String noctFactorsJson) {
+        return String.format(HEALTH_NF, noctFactorsJson);
+    }
+
+    /**
+     * 更新用の歩数JSON文字列を生成する。
+     * &lt;p&gt; "walkingCounte" プロパティで括った歩数JSON文字列を生成&lt;/p&gt;
+     * @param walkingCntJson 歩数データJSON文字列 (必須)
+     * @return 更新用の歩数JSON文字列
+     */
+    public static String getJsonWithWalkingCount(String walkingCntJson) {
+        return String.format(HEALTH_WC, walkingCntJson);
+    }
+
+    /**
+     * 更新用の天候状態JSON文字列を生成する。
+     * &lt;p&gt; "weatherCondition" プロパティで括った天候状態JSON文字列を生成&lt;/p&gt;
+     * @param weatherCondJson 天候データJSON文字列 (必須)
+     * @return 更新用の天候状態JSON文字列
+     */
+    public static String getJsonWithWeatherCondition(String weatherCondJson) {
+        return String.format(WEATHER, weatherCondJson);
+    }
+
+}</code></pre>
+                <div class="ms-2 small">(2) メインクラスで更新用JSONを出力する</div>
+<pre class="ms-3"><code class="java small">import com.examples.android.healthcare.constants.JsonTemplate;
+import com.examples.android.healthcare.data.*;
+import com.examples.android.healthcare.util.FileUtil;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+
+/**
+ * 健康管理Flaskアプリへの更新用用データの出力テスト
+ * 更新データは変更の有るデータのみを出力対象とするため更新用テンプレートに更新データJSON文字列追加するよう実装
+ * 出力したJSONファイルを用いてcurlコマンドで健康管理Flaskアプリに更新リクエストを実行する
+ * (使用例) cd ~/Documents/java/output
+ *  $ curl -X POST -H "Content-type: application/json" -d @update_data.json "dell-t7500.local:5000/healthcare/update"
+ */
+public class OutputUpdateJson {
+    static final String JSON_NAME = "update_data.json";
+
+    public static &lt;List&gt; void main(String[] args) {
+        // 出力ファイル名
+        // ~/Documents/java/output/update_data.json
+        String saveFile = Paths.get(Constants.OUTPUT_DATA_PATH, JSON_NAME).toString();
+        // GSONは部分的にJson文字列を生成するのに使用する
+        Gson gson = new GsonBuilder().serializeNulls().create();
+
+        // Androidアプリで使用する前提で実装
+        String jsonContent;
+        String JsonWithProperty;
+        // 健康管理データ
+        java.util.List&lt;String&gt; healthList = new ArrayList&lt;String&gt;();
+        // 1.睡眠管理データ: sleepScoreを変更
+        SleepManagement sleepManagement = new SleepManagement(
+                "05:30", 70, "06:40", "0:50"
+        );
+        jsonContent = gson.toJson(sleepManagement);
+        JsonWithProperty = JsonTemplate.getJsonWithSleepManagement(jsonContent);
+        healthList.add(JsonWithProperty);
+        // 2.血圧測定データ: 変更なし
+        // 3.体温測定データ: 変更なし
+        // 4.夜間頻尿要因: 変更なし
+        // 5.歩数: 変更
+        WalkingCount walkingCount = new WalkingCount(8300);
+        jsonContent = gson.toJson(walkingCount);
+        JsonWithProperty = JsonTemplate.getJsonWithWalkingCount(jsonContent);
+        healthList.add(JsonWithProperty);
+        // 健康管理データ
+        String healthcareDataJson = String.join(",", healthList);
+        System.out.println(healthcareDataJson);
+
+        // 天気情報
+        WeatherCondition weatherCondition = new WeatherCondition("晴れ時々曇り");
+        jsonContent = gson.toJson(weatherCondition);
+        String weatherDataJson = JsonTemplate.getJsonWithWeatherCondition(jsonContent);
+        System.out.println(weatherDataJson);
+
+        // メールアドレスと測定日が各テーブルの主キー
+        String emailAddress = "user1@examples.com";
+        String measurementDay = "2023-03-10";
+        // 更新用リクエスト用のJSON文字列をテンプレートから生成
+        String updateJson = JsonTemplate.createUpdateJson(emailAddress, measurementDay,
+                healthcareDataJson, weatherDataJson);
+        try {
+            FileUtil.saveText(saveFile, updateJson);
+        } catch (IOException e) {
+            System.out.println(e);
+        }
+    }
+}</code></pre>
+                <div class="ms-2 small">(3) 出力された更新用JSONファイル (update_data.json) ※整形しています(実際は1行です)</div>
+<pre class="ms-3"><code class="small">{
+  "emailAddress":"user1@examples.com",
+  "measurementDay":"2023-03-10",
+  "healthcareData":{
+    "sleepManagement":{
+      "wakeupTime":"05:30",
+       "sleepScore":70,
+       "sleepingTime":"06:40",
+       "deepSleepingTime":"0:50"
+    },
+    "walkingCount":{
+      "counts":8300
+    }
+  },
+  "weatherData":{
+    "weatherCondition": {
+      "condition":"晴れ時々曇り"
+    }
+  }
+}</code></pre>
+
+                <div class="ms-2 small">【参考】Androidアプリで実際に更新用JSONを生成するメソッド</div>
+<pre class="ms-3"><code class="java small">/**
+ * 変更のあった入力ウィジットのグループのデータを含む更新リクエスト用JSON文字列を生成する
+ * @return 更新リクエスト用JSON文字列, 健康管理データと天候データのいずれも変更なしの場合はnull
+ */
+private String generateJsonTextForUpdate() {
+    // メールアドレス(必須)
+    String emailAddress = getUserEmailWithThisSettings();
+    // 測定日付(必須)
+    String iso8601DateValue = toStringOfTextViewBySelfTag(mInpMeasurementDate);
+    // JSON整形なし
+    Gson gson = new GsonBuilder().serializeNulls().create();
+
+    // 変更グループリスト
+    List&lt;String&gt; updateList = new ArrayList&lt;&gt;();
+    // 健康管理
+    HealthcareData beforeData = mRegisterDataForUpdate.getHealthcareData();
+    // 睡眠管理
+    SleepManagement beforeSleepMan = beforeData.getSleepManagement();
+    if (hasTrueInUpdateCheckMap(UPD_KEY_SLEEP_MAN)
+            || hasUpdateOfSleepManagement(beforeSleepMan)) {
+        SleepManagement sleepManagement = newSleepManagement();
+        String jsonContent = gson.toJson(sleepManagement);
+        String JsonWithProperty = JsonTemplate.getJsonWithSleepManagement(jsonContent);
+        updateList.add(JsonWithProperty);
+    }
+    // 血圧測定
+    BloodPressure beforeBloodPress = beforeData.getBloodPressure();
+    if (hasTrueInUpdateCheckMap(UPD_KEY_BLOOD_PRESS)
+            || hasUpdateOfBloodPressure(beforeBloodPress)) {
+        BloodPressure bloodPressure = newBloodPressure();
+        String jsonContent = gson.toJson(bloodPressure);
+        String JsonWithProperty = JsonTemplate.getJsonWithBloodPressure(jsonContent);
+        updateList.add(JsonWithProperty);
+    }
+    // 体温
+    if (hasTrueInUpdateCheckMap(UPD_KEY_BODY_TEMPER)) {
+        BodyTemperature bodyTemperature = newBodyTemperature();
+        String jsonContent = gson.toJson(bodyTemperature);
+        String JsonWithProperty = JsonTemplate.getJsonWithBodyTemperature(jsonContent);
+        updateList.add(JsonWithProperty);
+    }
+    // 夜間頻尿要因
+    NocturiaFactors beforeFactors = beforeData.getNocturiaFactors();
+    if (hasUpdateConditionMemo(beforeFactors.getConditionMemo()) /* 健康状態メモのみ単独判定 */
+            || hasTrueInUpdateCheckMap(UPD_KEY_NOCT_FACT)) {
+        NocturiaFactors nocturiaFactors = newNocturiaFactors();
+        String jsonContent = gson.toJson(nocturiaFactors);
+        String JsonWithProperty = JsonTemplate.getJsonWithNocturiaFactors(jsonContent);
+        updateList.add(JsonWithProperty);
+    }
+    // 歩数
+    WalkingCount beforeWalkingCount = beforeData.getWalkingCount();
+    if (hasUpdateWalkingCount(beforeWalkingCount)) {
+        WalkingCount walking = new WalkingCount(toIntegerOfNumberView(mInpWalkingCount));
+        String jsonContent = gson.toJson(walking);
+        String JsonWithProperty = JsonTemplate.getJsonWithWalkingCount(jsonContent);
+        updateList.add(JsonWithProperty);
+    }
+    // 健康管理データ部分JSON
+    String healthcareDataJson;
+    if (!updateList.isEmpty()) {
+        healthcareDataJson= String.join(",", updateList);
+    } else {
+        healthcareDataJson = null;
+    }
+
+    // 天候データ部分JSON
+    String weatherDataJson;
+    WeatherCondition wc = mRegisterDataForUpdate.getWeatherData().getWeatherCondition();
+    if (hasUpdateWeather(wc)) {
+        WeatherCondition weather = new WeatherCondition(toStringOfTextView(mInpWeatherCond));
+        String jsonContent = gson.toJson(weather);
+        weatherDataJson = JsonTemplate.getJsonWithWeatherCondition(jsonContent);
+    } else {
+        // 変更がない場合は空文字
+        weatherDataJson = null;
+    }
+    // 健康管理データと天候データのいずれも変更がなければ更新なしとしてnullを返却
+    if (healthcareDataJson == null && weatherDataJson == null) {
+        DEBUG_OUT.accept(TAG, "Not Updated!");
+        return null;
+    }
+
+    // 更新用リクエスト用のJSON文字列をテンプレートから生成
+    String result = JsonTemplate.createUpdateJson(emailAddress, iso8601DateValue,
+            healthcareDataJson, weatherDataJson);
+    DEBUG_OUT.accept(TAG, result);
+    return result;
+}</code></pre>
+            </div><!--END java source blocks -->
+
+            <!-- Flaskアプリ側コード断片 -->
+            <h5 class="v-line-start">4.Flaskアプリで更新用データ(JSON)を受信し各テーブル用のデータを取得する</h5>
+            <p class="m-2 indent">コードの一部のみ示します(テーブル更新処理は省略) <b>■■部分</b>がデータを取り出す処理となります</p>
+            <div class="m-2 mb-4">
+                <div class="small">(1)更新データPOST処理</div>
+<pre class="ms-3"><code class="python small">@app.route(APP_ROOT + "/update", methods=["POST"])
+def update():
+    """
+    健康管理データ(任意)または天候データ(任意)の更新
+    """
+    if app_logger_debug:
+        app_logger.debug(request.path)
+
+    # 更新データチェック
+    personId, emailAddress, measurementDay, data = _check_postdata(request)
+
+    # 健康管理データの更新
+    _update_healthdata(personId, measurementDay, data)
+    # 天候状態(気象データベース)の更新
+    _update_weather(measurementDay, data)
+
+    # ここまでエラーがなければOKレスポンス
+    return make_register_success(emailAddress, measurementDay)
+
+
+def _check_postdata(request):
+    # リクエストヘッダーチェック
+    if "application/json" not in request.headers["Content-Type"]:
+        abort(BadRequest.code, _set_errormessage("450,Bad request Content-Type."))
+
+    # 登録用データ取得 
+    data: dict = json.loads(request.data) # ■■ リクエストのPOSTデータをJSON化 ■■ 
+    if app_logger_debug:
+        app_logger.debug(data)
+
+    # メールアドレスチェック
+    emailAddress = data.get("emailAddress", None)
+    if emailAddress is None:
+        abort(BadRequest.code, _set_errormessage("462,Required EmailAddress."))
+
+    # 測定日付チェック
+    measurementDay = data.get("measurementDay", None)
+    if measurementDay is None:
+        abort(BadRequest.code, _set_errormessage("463,Required MeasurementDay."))
+
+    # PersonテーブルにemailAddressが存在するか
+    personId = _get_personid(emailAddress)
+    if personId is None:
+        abort(BadRequest.code, _set_errormessage("461,User is not found."))
+
+    return personId, emailAddress, measurementDay, data # 結果をタプルで返却
+
+
+def _update_healthdata(person_id: int, measurement_day: str, data: Dict) -> None:
+    """
+    健康管理データの更新処理
+    :param person_id メールアドレスから取得したPersion.id
+    :param measurement_day: 測定日
+    :data 更新用データ
+    """
+    # 健康管理データコンテナ: 必須
+    healthcare_data: Optional[Dict] = _has_dict_in_data("healthcareData", data)    # ■■
+    if healthcare_data is None:
+        abort(BadRequest.code, _set_errormessage("451,Required healthcareData!"))
+    
+    # 更新用データは更新されたテーブルのデータのみが存在する
+    update_table_count: int = 0
+    # (1) 睡眠管理
+    sleep_man: Optional[Dict] = _has_dict_in_data("sleepManagement", healthcare_data) # ■■
+    if app_logger_debug:
+        app_logger.debug(f"sleepManagement: {sleep_man}")
+    if sleep_man is not None:
+        update_table_count += 1
+
+    # (2) 血圧測定
+    blood_press: Optional[Dict] = _has_dict_in_data("bloodPressure", healthcare_data) # ■■
+    if app_logger_debug:
+        app_logger.debug(f"bloodPressure: {blood_press}")
+    if blood_press is not None:
+        update_table_count += 1
+
+    # (3) 夜中トイレ回数要因
+    nocturia_factors: Optional[Dict] = _has_dict_in_data("nocturiaFactors", healthcare_data) # ■■
+    if app_logger_debug:
+        app_logger.debug(f"nocturiaFactors: {nocturia_factors}")
+    if nocturia_factors is not None:
+        update_table_count += 1
+
+    # (4) 歩数
+    walking_count: Optional[Dict] = _has_dict_in_data("walkingCount", healthcare_data) # ■■
+    if app_logger_debug:
+        app_logger.debug(f"walkingCount: {walking_count}")
+    if walking_count is not None:
+        update_table_count += 1
+
+    # (5) 体温データ
+    body_temper: Optional[Dict] = _has_dict_in_data("bodyTemperature", healthcare_data) # ■■
+    if app_logger_debug:
+        app_logger.debug(f"bodyTemperature: {body_temper}")
+    if body_temper is not None:
+        update_table_count += 1
+
+    # 更新データ有無
+    if update_table_count == 0:
+        # 健康管理データの更新なし ※天候データのみの修正の場合があり得る
+        return
+
+    #...テーブルへの更新処理は省略...
+
+
+def _update_weather(measurement_day: str, data: Dict) -> None:
+    """
+    天候状態の更新処理
+    :param measurement_day: 測定日
+    :data 更新用データ (任意)
+    """
+    try:
+        # 天候データコンテナは必ずある
+        weather_data: Dict = data["weatherData"]                    # ■■
+        # 天候状態 
+        weather_condition: Dict = weather_data["weatherCondition"]  # ■■
+        if app_logger_debug:
+            app_logger.debug(f"weather_condition: {weather_condition}")
+    except KeyError as err:
+        app_logger.warning(err)
+        return
+    
+    if weather_condition is None:
+        # 更新データ無し
+        return
+
+    #...テーブルへの更新処理は省略...
+
+
+# テーブル単位でキーがなくともエラーとしないための関数
+def _has_dict_in_data(dict_key: str, data:Dict) -> Optional[Dict]:
+    try:
+        result: Dict = data[dict_key]
+        return result
+    except KeyError as err:
+        # データ無し
+        return None</code></pre>
+            </div>
+
+            <div class="row mb-5">
+                <dl class="ms-3">
+                    <dt class="indent">メニューページへ<dt>
+                    <dd class="indent mt-2">
+                        <a href="index.html">
+                        戻る
+                        </a>
+                    </dd>    
+                </dl>
+            </div>
+        </div>
+        <script src="assets/highlight/js/highlight.min.js"></script>
+        <script src="assets/highlight/js/java.min.js"></script>
+        <script src="assets/highlight/js/cpp.min.js"></script>
+        <script>
+            hljs.highlightAll();
+        </script>
+        </div>
+    </body>
+</html>
