@@ -1426,7 +1426,7 @@ public class AppTopFragment extends Fragment {
     private void showDatePicker(View v) {
         DialogFragment newFragment = new DatePickerFragment(
                 requireActivity(), mMeasurementDayCal, (view, year, month, dayOfMonth) -> {
-            // 測定日付ウィジットを更新するためのタグ値を生成(月 = ~
+            // 測定日付ウィジットを更新するためのタグ値を生成
             String tagValue = String.format(getString(R.string.format_tag_date),
                     year, month + 1/*カレンダー月 +1*/, dayOfMonth);
             DEBUG_OUT.accept(TAG, "showDatePicker:v.id=" + v.getId() + ",tag:" + tagValue);
@@ -1435,6 +1435,7 @@ public class AppTopFragment extends Fragment {
             mMeasurementDayCal.set(year, month, dayOfMonth);
             // カレンダーで選択した日によって条件を満たさなければサーバーに問い合わせる
             LocalDate selectedLocal = AppTopUtil.localDateOfCalendar(mMeasurementDayCal);
+            DEBUG_OUT.accept(TAG, "selectedLocal: " + selectedLocal);
             if (selectedLocal.isBefore(mNowLocalDate)) {
                 // 過去日の場合はプリファレンスから登録済み日付を取得する (未登録ならnull)
                 String regDate = getLatestRegisteredDateInPref();
@@ -1460,8 +1461,8 @@ public class AppTopFragment extends Fragment {
             } else {
                 // 過去以外の日付に変わったら新規登録モードにリセット
                 resetToNewRegistrationMode();
-                if(selectedLocal.isAfter(mNowLocalDate)) {
-                    // 未来日なら保存・登録ができない
+                if(mNowLocalDate.isAfter(selectedLocal)) {
+                    // 選択日が本日よりも未来日なら保存・登録ができない
                     showWarning(getString(R.string.warning_not_allow_future));
                     mBtnSave.setEnabled(false);
                     mBtnSend.setEnabled(false);
