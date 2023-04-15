@@ -1,7 +1,5 @@
 package com.examples.android.healthcare.data;
 
-import com.google.gson.annotations.SerializedName;
-
 public class BodyTemperature {
     private final String measurementTime;
     private final Double temperature;
