@@ -46,7 +46,6 @@ public class MainPostData {
         try {
             HealthcareRepository<RegisterResult> repository = new ResisterDataRepository();
             int urlNum = 0; // 登録
-            String requestUrlWithPath = requestUrl + repository.getRequestPath(urlNum/*登録*/);
             repository.makeRegisterRequest(urlNum, requestUrl, jsonText, headers,
                     app.mEexecutor, app.mHandler, (result) -> {
                         if (result instanceof Result.Success) {
