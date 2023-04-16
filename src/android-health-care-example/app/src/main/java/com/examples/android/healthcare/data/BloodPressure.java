@@ -1,7 +1,5 @@
 package com.examples.android.healthcare.data;
 
-import androidx.annotation.Nullable;
-
 /**
  * 血圧測定値は測定忘れなどに対応するため全ての項目をnull可とする
  */
@@ -15,14 +13,14 @@ public class BloodPressure {
     private final Integer eveningMin;
     private final Integer eveningPulseRate;
 
-    public BloodPressure(@Nullable String morningMeasurementTime,
-                         @Nullable Integer morningMax,
-                         @Nullable Integer morningMin,
-                         @Nullable Integer morningPulseRate,
-                         @Nullable String eveningMeasurementTime,
-                         @Nullable Integer eveningMax,
-                         @Nullable Integer eveningMin,
-                         @Nullable Integer eveningPulseRate) {
+    public BloodPressure(String morningMeasurementTime,
+                         Integer morningMax,
+                         Integer morningMin,
+                         Integer morningPulseRate,
+                         String eveningMeasurementTime,
+                         Integer eveningMax,
+                         Integer eveningMin,
+                         Integer eveningPulseRate) {
         this.morningMeasurementTime = morningMeasurementTime;
         this.morningMax = morningMax;
         this.morningMin = morningMin;
