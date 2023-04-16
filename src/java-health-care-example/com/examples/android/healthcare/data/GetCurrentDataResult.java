@@ -1,9 +1,6 @@
 package com.examples.android.healthcare.data;
 
-import com.google.gson.annotations.SerializedName;
-
 public class GetCurrentDataResult {
-    @SerializedName("data")
     private final RegisterData data;
     private final ResponseStatus status;
 
