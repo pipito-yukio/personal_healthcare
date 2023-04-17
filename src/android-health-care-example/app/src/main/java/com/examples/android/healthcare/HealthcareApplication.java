@@ -19,9 +19,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class HealthcareApplication extends Application {
-    private static final String TAG = HealthcareApplication.class.getSimpleName();
     private static final String LOG_TAG = "WeatherApplication";
-    // Json file in assts for request.
+    // Json file in assets for request.
     private static final String REQUEST_INFO_FILE = "request_info.json";
     private Map<String, String> mRequestUrls;
     private Map<String, String> mRequestHeaders;

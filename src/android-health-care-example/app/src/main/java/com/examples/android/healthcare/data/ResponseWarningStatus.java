@@ -9,7 +9,6 @@ public class ResponseWarningStatus {
     public ResponseStatus getStatus() {
         return status;
     }
-
     @Override
     public String toString() {
         return "ResponseWarningStatus{status=" + status + '}';

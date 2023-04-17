@@ -17,17 +17,16 @@ import java.util.concurrent.Executors;
 
 public class HealthcareApplication extends Application {
     private static final String LOG_TAG = "HealthcareApplication";
-    // Json file in assts for request.
+    // Json file in assets for request.
     private static final String REQUEST_INFO_FILE = "request_info.json";
     private Map<String, String> mRequestUrls;
     private Map<String, String> mRequestHeaders;
 
-    public static final String REQUEST_IMAGE_SIZE_KEY = "X-Request-Image-Size";
-
-    // リクエストは10分おきに制限: センサーが10分間隔で測定しているため値が変わらない
     public ExecutorService mEexecutor = Executors.newFixedThreadPool(1);
     // Handerだけは Androidとは異なりダミーのコンストラクタで代用 ※何の処理もしないクラス
     public Handler mHandler = new Handler();
+    // Androidアプリの定義
+    // public Handler mHandler = HandlerCompat.createAsync(Looper.getMainLooper());
 
     @Override
     public void onCreate() {
