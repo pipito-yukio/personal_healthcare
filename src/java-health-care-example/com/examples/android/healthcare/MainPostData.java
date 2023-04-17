@@ -14,6 +14,8 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 
+import static com.examples.android.healthcare.functions.MyLogging.DEBUG_OUT;
+
 /**
  * 健康管理データ登録Androidアプリ用通信部品のテスト用コード
  * データ登録リクエスト: 下記と同じ
@@ -42,7 +44,7 @@ public class MainPostData {
         Map<String, String> urlMap = app.getmRequestUrls();
         Map<String, String> headers = app.getRequestHeaders();
         String requestUrl = urlMap.get(RequestDevice.WIFI.toString());
-        Log.d(TAG, "requestUrl: " + requestUrl);
+        DEBUG_OUT.accept(TAG, "requestUrl: " + requestUrl);
         try {
             HealthcareRepository<RegisterResult> repository = new ResisterDataRepository();
             int urlNum = 0; // 登録
@@ -51,7 +53,7 @@ public class MainPostData {
                         if (result instanceof Result.Success) {
                             RegisterResult respResult =
                                     ((Result.Success<RegisterResult>) result).get();
-                            Log.d(TAG, "responseResult: " + respResult);
+                            DEBUG_OUT.accept(TAG, "responseResult: " + respResult);
                         } else if (result instanceof Result.Warning) {
                             ResponseStatus status =
                                     ((Result.Warning<?>) result).getResponseStatus();
