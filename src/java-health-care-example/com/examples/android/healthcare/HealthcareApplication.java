@@ -1,7 +1,7 @@
 package com.examples.android.healthcare;
 
 import android.app.Application;
-import android.content.AssetManager;
+import android.content.res.AssetManager;
 import android.os.Handler;
 import android.util.Log;
 import com.google.gson.Gson;

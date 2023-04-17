@@ -1,4 +1,4 @@
-package android.content;
+package android.content.res;
 
 import android.util.Log;
 
