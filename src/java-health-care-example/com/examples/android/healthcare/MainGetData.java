@@ -11,10 +11,13 @@ import com.examples.android.healthcare.tasks.HealthcareRepository;
 import com.examples.android.healthcare.tasks.Result;
 import java.util.Map;
 
+import static com.examples.android.healthcare.functions.MyLogging.DEBUG_OUT;
+
 /**
  * 健康管理データ登録Androidアプリ用通信部品のテスト用コード
  * データ取得リクエスト: 下記と同じ
- * $ curl -G -d 'emailAddress=user1@examples.com&measurementDay=2023-03-10' http://dell-t7500.local:5000/healthcare/getcurrentdata
+ * $ curl -G -d 'emailAddress=user1@examples.com&measurementDay=2023-03-10'
+ *    http://dell-t7500.local:5000/healthcare/getcurrentdata
  */
 public class MainGetData {
     static final String TAG = "MainGetData";
@@ -28,7 +31,7 @@ public class MainGetData {
         Map<String, String> urlMap = app.getmRequestUrls();
         Map<String, String> headers = app.getRequestHeaders();
         String requestUrl = urlMap.get(RequestDevice.WIFI.toString());
-        Log.d(TAG, "requestUrl: "+ requestUrl);
+        DEBUG_OUT.accept(TAG, "requestUrl: "+ requestUrl);
         try {
             // GETリクエスト送信: 登録済みデータの取得
             HealthcareRepository<GetCurrentDataResult> repository = new GetCurrentDataRepository();
@@ -40,7 +43,7 @@ public class MainGetData {
                     GetCurrentDataResult dataResult =
                             ((Result.Success<GetCurrentDataResult>) result).get();
                     RegisterData data = dataResult.getData();
-                    Log.d(TAG, "responseResult: " + dataResult);
+                    DEBUG_OUT.accept(TAG, "responseResult: " + dataResult);
                 } else if (result instanceof Result.Warning) {
                     ResponseStatus status =
                             ((Result.Warning<?>) result).getResponseStatus();
