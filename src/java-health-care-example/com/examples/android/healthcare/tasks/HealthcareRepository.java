@@ -1,7 +1,5 @@
 package com.examples.android.healthcare.tasks;
 
-import static com.examples.android.healthcare.functions.MyLogging.DEBUG_OUT;
-
 import android.os.Handler;
 import android.util.Log;
 
@@ -21,6 +19,8 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+
+import static com.examples.android.healthcare.functions.MyLogging.DEBUG_OUT;
 
 /**
  * HTTPリクエスト実行リポジトリクラス
