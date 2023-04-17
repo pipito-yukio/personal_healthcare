@@ -15,6 +15,8 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import static com.examples.android.healthcare.functions.MyLogging.DEBUG_OUT;
+
 public class HealthcareApplication extends Application {
     private static final String LOG_TAG = "HealthcareApplication";
     // Json file in assets for request.
@@ -52,13 +54,13 @@ public class HealthcareApplication extends Application {
         Gson gson = new Gson();
         Type typedMap = new TypeToken<Map<String, Map<String, String>>>() {
         }.getType();
-        Log.d(LOG_TAG, "typedMap: " + typedMap);
+        DEBUG_OUT.accept(LOG_TAG, "typedMap: " + typedMap);
         // gson.fromJson() thorows JsonSyntaxException, JsonIOException
         Map<String, Map<String, String>> map = gson.fromJson(
                 new JsonReader(new InputStreamReader(am.open(REQUEST_INFO_FILE))), typedMap);
         mRequestUrls = map.get("urls");
         mRequestHeaders = map.get("headers");
-        Log.d(LOG_TAG, "RequestUrls: " + mRequestUrls);
-        Log.d(LOG_TAG, "RequestHeaders: " + mRequestHeaders);
+        DEBUG_OUT.accept(LOG_TAG, "RequestUrls: " + mRequestUrls);
+        DEBUG_OUT.accept(LOG_TAG, "RequestHeaders: " + mRequestHeaders);
     }
 }
