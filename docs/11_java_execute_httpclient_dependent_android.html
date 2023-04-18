@@ -1,0 +1,1814 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="stylesheet" href="assets/css/bootstrap_custom.css" />
+        <link rel="stylesheet" href="assets/css/bootstrap.min.css" />
+        <link rel="stylesheet" href="assets/highlight/styles/default.min.css" />
+        <title>Android依存通信クラスをJavaプロジェクトで実行</title>
+    </head>
+
+    <body>
+        <div class="container" style="max-width: 980px">
+            <h4 class="m-2 text-center">Android依存通信クラスをJavaプロジェクトで実行</h4>
+            <hr />
+            <div class="update-date">【最終更新日】2023-04-18</div>
+            <p class="indent">
+                Androidライブラリに依存する通信部品クラスをJavaブジェクトで開発・実行する方法について解説します。
+            </p>
+            <p class="indent">
+                バックグラウンド スレッドで実行する通信部品クラスはレスポンスを受け取った後に、UIスレッドでウィジットを更新するためにHandlerというAndroid固有クラスを使用する必要があります。
+            </p>
+            <div class="m-2 text-center">
+                <figure class="figure">
+                    <figcaption class="figure-caption text-center">
+                        【IntelliJ IDEで開発可能なAndroid通信クラス(tasksパッケージ配下)の比較】
+                    </figcaption>
+                    <img class="figure-img img-fluid" src="11_java_execute_httpclient_dependent_android/images/JavaClassesToAndroidProj.png" width="960" />
+                </figure>
+            </div>
+
+            <h5 class="v-line-start">1.開発・テスト用のプロジェクト</h5>
+                <div>(1)Androidライブラリ代替用スタブクラスの構成</div>
+                    <div class="m-2"> 
+<pre class="m-2"><code class="small">java-health-care-example/
+└── android
+    ├── app
+    │   └── Application.java
+    ├── content
+    │   └── res
+    │       └── AssetManager.java
+    ├── os
+    │   └── Handler.java
+    └── util
+        └── Log.java</code></pre>
+
+                <!-- START 各クラスのソースコード -->
+                <div class="m-2 row row-cols-auto">
+                    <div class="col">
+                        <div class="small">Application.java ※オーバーライドされるメソッドのみ定義し何もしないダミーのクラス</div>
+<pre><code class="java small">package android.app;
+
+public class Application {
+    public Application() {
+        onCreate();
+    }
+
+    public void onCreate() {
+        // No ope
+    }
+}</code></pre>
+                    </div>
+                    <div class="col">
+                        <div class="small">AssetManager.java ※アプリのassets領域にある通信先情報ファイル(request_info.json)を読み込むスタブクラス</div>
+<pre><code class="java small">package android.content.res;
+
+import android.util.Log;
+
+import java.io.*;
+import java.nio.file.Paths;
+
+/**
+ * android.content.AssetManagerの擬似クラス
+ * [res]ディレクトリのリクエスト用JSONファイルを読み込み、
+ */
+public class AssetManager {
+    private static final String TAG = "AssetManager";
+    // Development environ: Ubuntu18.04
+    // ~/project/java-workspaces/java-health-care-example/resources
+    private static final String HOME = System.getenv("HOME");
+    private static final String RESOURCE_PATH = Paths.get(HOME,
+            "project", "java-workspaces", "java-health-care-example", "resources").toString();
+    public AssetManager() {
+    }
+
+    public InputStream open(String filename) throws IOException {
+        File absFile = Paths.get(RESOURCE_PATH, filename).toFile();
+        Log.d(TAG, "file: " + absFile);
+        return new FileInputStream(absFile);
+    }
+
+
+    public void save(byte[] imageData, String filename) throws IOException {
+        File absFile = Paths.get(RESOURCE_PATH, filename).toFile();
+        Log.d(TAG, "saved: " + absFile);
+        try (FileOutputStream out = new FileOutputStream(absFile)) {
+            out.write(imageData);
+        }
+    }}</code></pre>
+                    </div>
+                    <div class="col">
+                        <div class="small">Handler.java ※上記サイトの「ハンドラの使用」参照</div>
+<pre><code class="java small">package android.os;
+
+/**
+ * android.os.Handlerの擬似クラス
+ */
+public class Handler {
+    public void post(Runnable runnable) {
+        // Javaアプリケーシヨンでは何もしない
+        try {
+            runnable.run();
+        } catch (Exception e) {
+            System.out.println(e.getLocalizedMessage());
+        }
+    }
+}</code></pre>
+                    </div>
+                    <div class="col">
+                        <div class="small">Log.java ※Logcat出力クラスのスタブ(コンソール出力)</div>
+<pre><code class="java small">package android.util;
+
+/**
+ * android.util.Logの擬似クラス
+ *
+ * System.out.printlin()でコンソールに出力
+ */
+public class Log {
+    private Log() {}
+    public static void d(String tag, String message) {
+        System.out.println("D/" + tag + ":" + message);
+    }
+    public static void w(String tag, String message) {
+        System.out.println("W/" + tag + ":" + message);
+    }
+    public static void e(String tag, String message) {
+        System.out.println("E/" + tag + ":" + message);
+    }
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="indent">【通信クラス(リポジトリクラス)の作成にあたり参考にした本家サイトのドキュメント】</div>
+                <dl class="m-2 row">
+                    <dt class="ms-2"><b>バックグラウンド スレッドでの Android タスクの実行</b></dt>
+                    <dd class="ms-2 small">
+                        <a href="https://developer.android.com/guide/background/threading?hl=ja#java" target="_blank">
+                            https://developer.android.com/guide/background/threading?hl=ja#java
+                        </a>
+                    </dd>
+                </dl>
+                <p class="indent small">
+                    ほとんど上記本家サイトからコードを流用し作成しましたが、残念ながらこのサイトのコード例は完成形にはなっていません。
+                    オフィシャルのサンプルにもこのサイトの内容に該当するサンプルは確認できませんでした。
+                    ※このサイトの実装は ViewModel を使った例になっていますが、当方はViewModelを使わない通常のJavaクラスで実装しています。
+                </p>
+                <p class="indent small">
+                    実装方法の詳細は上記サイトに日本語で説明されているのでご覧になってください。※JavaDocの無いものはほとんどそのまま上記サイトからの流用です
+                </p>
+
+
+                <div>(2)このページの説明で使われている通信クラスとサブクラスの構成</div>
+<pre class="m-2"><code class="small">java-health-care-example/
+└── com
+    └── examples
+        └── android
+            └── healthcare
+                ├── BuildConfig.java           (*) DEBUG定義 ※Andorid Studioでは自動生成、Javaプロジェクトでは手動で作成
+                ├── HealthcareApplication.java (*) Androidアプリケーションクラス
+                ├── MainPostData.java          (*) データ登録POSTリクエストメインクラス
+                ├── MainGetData.java           (*) 登録済みデータ取得GETリクエストメインクラス
+                ├── functions
+                │   └── MyLogging.java         (*) DEBUGログ出力Functionインターフェース
+                └── tasks
+                    ├── GetCurrentDataRepository.java (*) 登録済みデータ取得用リポジトリクラス(HTTPクライアント)
+                    ├── HealthcareRepository.java     (*) ベースリポジトリクラス(HTTPクライアント)
+                    ├── RepositoryCallback.java       (*) レスポンス結果を画面に表示するためのコールバック
+                    ├── ResisterDataRepository.java   (*) データ登録用リポジトリクラス(HTTPクライアント)
+                    └── Result.java                   (*) ネットワークリクエストのレスポンスをモデル化したクラス
+</code></pre>
+
+                <div class="m-2 row row-cols-auto">
+                    <div class="col">
+                        <div class="small">MyLogging.java: リリース時APK生成でDEBUGログ出力を消すために使うクラス ※Androidアプリと同一コード</div>
+<pre><code class="java small">package com.examples.android.healthcare.functions;
+
+import android.util.Log;
+
+import com.examples.android.healthcare.BuildConfig;
+
+import java.util.function.BiConsumer;
+
+public class MyLogging {
+
+    @FunctionalInterface
+    public interface LogParamsConsumer&lt;S, S1, T&gt; {
+        public void print(String tag, String format, Object... params);
+    }
+
+    // DEBUG Log Function
+    public static BiConsumer&lt;String, String&gt; DEBUG_OUT = (tag, output) -&gt; {
+        if (BuildConfig.DEBUG) { //■■ デバックビルドならDEBUGログを出力 ※リリースビルドなら出力されない ■■
+            Log.d(tag, output);
+        }
+    };
+    // DEBUG Log Function
+    public LogParamsConsumer&lt;String, String, Object[]&gt; DEBUG_OUT_PARAMS = (tag, format, params) -&gt; {
+        if (BuildConfig.DEBUG) {
+            String output = String.format(format, params);
+            Log.d(tag, output);
+        }
+    };
+
+}</code></pre>
+                    </div>
+                    <div class="col">
+                        <div class="small">Result.java ※本家サイトの <b>Result.java</b>に<b>Warning</b>クラスを追加したクラス</div>
+<pre><code class="java small">package com.examples.android.healthcare.tasks;
+
+
+import com.examples.android.healthcare.data.ResponseStatus;
+
+public abstract class Result&lt;T&gt; {
+    private Result() {
+    }
+
+    public static final class Success&lt;T&gt; extends Result&lt;T&gt; {
+        private final T data;
+
+        public Success(T data) {
+            this.data = data;
+        }
+
+        public T get() {return data; }
+    }
+
+    public static final class Warning&lt;T&gt; extends Result&lt;T&gt; {
+        private final ResponseStatus status;
+
+        public Warning(ResponseStatus status) {
+            this.status = status;
+        }
+
+        public ResponseStatus getResponseStatus() { return status; }
+    }
+
+    public static final class Error&lt;T&gt; extends Result&lt;T&gt; {
+        private final Exception exception;
+
+        public Error(Exception exception) {
+            this.exception = exception;
+        }
+
+        public Exception getException() { return exception; }
+    }
+}</code></pre>
+                    </div>
+                    <div class="col">
+                        <div class="small">RepositoryCallback.java ※本家サイトの <b>RepositoryCallback</b>インターフェースと同一</div>
+<pre><code class="java small">package com.examples.android.healthcare.tasks;
+
+public interface RepositoryCallback&lt;T&gt; {
+    void onComplete(Result&lt;T&gt; result);
+}</code></pre>
+                    </div>
+                    <div class="col">
+                        <div class="small">HealthcareRepository.java ※本家サイトの <b>LoginRepository</b>クラスを参考に作成</div>
+<pre><code class="java small">package com.examples.android.healthcare.tasks;
+
+import android.os.Handler; // Android依存クラス ※Java環境ではスタブを参照
+import android.util.Log;   // 同上
+
+import com.google.gson.JsonParseException;
+import com.examples.android.healthcare.data.GetCurrentDataResult;
+import com.examples.android.healthcare.data.RegisterResult;
+import com.examples.android.healthcare.data.ResponseStatus;
+
+import java.io.BufferedOutputStream;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+
+import static com.examples.android.healthcare.functions.MyLogging.DEBUG_OUT;
+
+/**
+ * HTTPリクエスト実行リポジトリクラス
+ * @param &lt;T&gt; レスポンス用Javaクラス
+ */
+public abstract class HealthcareRepository&lt;T&gt; {
+    private static final String TAG = "HealthcareRepository";
+
+    public HealthcareRepository() {}
+
+    /**
+     * GETリクエスト生成メソッド
+     * @param pathIdx パス用インデックス ※サブクラスで複数のGETリクエストパス定義
+     * @param baseUrl パスを含まないURL (Wifi | Mobile)
+     * @param requestParameter リクエストパラメータ
+     * @param headers リクエストヘッダー
+     * @param executor スレッドエクゼキューター
+     * @param handler Android Handlerオブジェクト
+     * @param callback Activity(Fragment)が結果を受け取るコールバック
+     */
+    public void makeGetRequest(
+            int pathIdx,
+            String baseUrl,
+            String requestParameter,
+            Map&lt;String, String&gt; headers,
+            ExecutorService executor,
+            Handler handler,
+            final RepositoryCallback&lt;T&gt; callback) {
+        executor.execute(() -&gt; {
+            try {
+                String requestUrl = baseUrl + getRequestPath(pathIdx) + requestParameter;
+                Result&lt;T&gt; result =
+                        getRequest(requestUrl, headers);
+                // 200, 4xx - 50x系
+                notifyResult(result, callback, handler);
+            } catch (Exception e) {
+                // サーバー側のレスポンスBUGか, Android側のBUG想定
+                Result&lt;T&gt; errorResult = new Result.Error&lt;&gt;(e);
+                notifyResult(errorResult, callback, handler);
+            }
+        });
+    }
+
+    /**
+     * POSTリクエスト(登録・更新)生成メソッド
+     * @param pathIdx パス用インデックス ※サブクラスで複数のGETリクエストパス定義
+     * @param baseUrl パスを含まないURL (Wifi | Mobile)
+     * @param headers リクエストヘッダー
+     * @param executor スレッドエクゼキューター
+     * @param handler Android Handlerオブジェクト
+     * @param callback Activity(Fragment)が結果を受け取るコールバック
+     */
+    public void makeRegisterRequest(
+            int pathIdx,
+            String baseUrl,
+            String jsonData,
+            Map&lt;String, String&gt; headers,
+            ExecutorService executor,
+            Handler handler,
+            final RepositoryCallback&lt;T&gt; callback) {
+        executor.execute(() -&gt; {
+            try {
+                String requestUrl = baseUrl + getRequestPath(pathIdx);
+                Result&lt;T&gt; result =
+                        postRegisterDataRequest(requestUrl, headers, jsonData);
+                notifyResult(result, callback, handler);
+            } catch (Exception e) {
+                Result&lt;T&gt; errorResult = new Result.Error&lt;&gt;(e);
+                notifyResult(errorResult, callback, handler);
+            }
+        });
+    }
+
+    /**
+     * GETリクエスト実行メソッド
+     * @param requestUrl リクエストURL
+     * @param requestHeaders リクエストヘッダー
+     * @return サーバーからのレスポンスを対応するクラスのオブジェクト
+     */
+    private Result&lt;T&gt; getRequest(
+            String requestUrl, Map&lt;String, String&gt; requestHeaders) {
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(requestUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Accept", "application/json;");
+            for (String key : requestHeaders.keySet()) {
+                conn.setRequestProperty(key, requestHeaders.get(key));
+            }
+
+            // Check response code: allow 200 only.
+            int respCode = conn.getResponseCode();
+            DEBUG_OUT.accept(TAG, "ResponseCode:" + respCode);
+            if (respCode == HttpURLConnection.HTTP_OK) {
+                String respText = getResponseText(conn.getInputStream());
+                T result = parseResultJson(respText);
+                return new Result.Success&lt;&gt;(result);
+            } else {
+                // 4xx - 50x
+                // Flaskアプリからはエラーストリームが生成される
+                String respText = getResponseText(conn.getErrorStream());
+                DEBUG_OUT.accept(TAG, "NG: " + respText);
+                // ウォーニング時のJSONはデータ部が存在しないのでウォーニング専用ハースを実行
+                T result = parseWarningJson(respText);
+                // ResponseStatusのみ, GET用Dataクラス == null
+                ResponseStatus status = ((GetCurrentDataResult) result).getStatus();
+                DEBUG_OUT.accept(TAG, "NG.ResponseStatus: " + respText);
+                return new Result.Warning&lt;&gt;(status);
+            }
+        } catch (Exception ie) {
+            Log.w(TAG, ie.getLocalizedMessage());
+            return new Result.Error&lt;&gt;(ie);
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
+    }
+
+    /**
+     * POSTリクエスト(登録・更新)実行メソッド
+     * @param requestUrl リクエストURL
+     * @param requestHeaders リクエストヘッダー
+     * @param jsonData JSONデータ(文字列)
+     * @return サーバーからのレスポンスを対応するクラスのオブジェクト
+     */
+    private Result&lt;T&gt; postRegisterDataRequest(
+            String requestUrl, Map&lt;String, String&gt; requestHeaders, String jsonData) {
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(requestUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Accept", "application/json;");
+            // POSTデータ有り(JSON)
+            conn.setDoOutput(true);
+            // レスポンス有り
+            conn.setDoInput(true);
+            conn.setChunkedStreamingMode(0);
+            // ヘッダー設定
+            for (String key : requestHeaders.keySet()) {
+                conn.setRequestProperty(key, requestHeaders.get(key));
+            }
+            // リクエストデータ用出力ストリーム
+            OutputStream output = new BufferedOutputStream(conn.getOutputStream());
+            BufferedWriter writer = new BufferedWriter(
+                    new OutputStreamWriter(output, StandardCharsets.UTF_8));
+            writer.write(jsonData);
+            writer.flush();
+
+            // Check response code: allow 200 only.
+            int respCode = conn.getResponseCode();
+            DEBUG_OUT.accept(TAG, "ResponseCode:" + respCode);
+            if (respCode == HttpURLConnection.HTTP_OK) {
+                String respText = getResponseText(conn.getInputStream());
+                T result = parseResultJson(respText);
+                return new Result.Success&lt;&gt;(result);
+            } else {
+                // 4xx - 50x: ResultStatus, Dataクラス == null
+                // Flaskアプリからはエラーストリームが生成される
+                String respText = getResponseText(conn.getErrorStream());
+                DEBUG_OUT.accept(TAG, "NG: " + respText);
+                // ウォーニング時のJSONはデータ部が存在しないのでウォーニング専用ハースを実行
+                T result = parseWarningJson(respText);
+                // ResponseStatusのみ, Post用Dataクラス == null
+                ResponseStatus status = ((RegisterResult) result).getStatus();
+                DEBUG_OUT.accept(TAG, "NG.ResponseStatus: " + respText);
+                return new Result.Warning&lt;&gt;(status);
+            }
+        } catch (Exception ie) {
+            // パースエラーまたはIO例外
+            Log.w(TAG, ie.getLocalizedMessage());
+            return new Result.Error&lt;&gt;(ie);
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
+    }
+
+    /**
+     * UI側のコールバックに結果(Javaオブジェクト)をセットする
+     * @param result レスポンスオブジェクト
+     * @param callback UI側コールバック
+     * @param handler Androidハンドラー
+     */
+    private void notifyResult(final Result&lt;T&gt; result,
+                              final RepositoryCallback&lt;T&gt; callback,
+                              final Handler handler) {
+        handler.post(() -&gt; callback.onComplete(result));
+    }
+
+    /**
+     *
+     * @param pathIdx パスインデックス (1 - m)
+     * @return サブクラスが提供するパス
+     */
+    public abstract String getRequestPath(int pathIdx);
+
+    /**
+     * 入力ストリームからJSON文字列を取得
+     * @param is 入力ストリーム
+     * @return JSON文字列
+     * @throws IOException IO例外
+     */
+    public abstract String getResponseText(InputStream is) throws IOException;
+
+    /**
+     * HTTP 200(OK) レスポンス時のJSON文字列をパースしてJavaオブジェクトを生成
+     * @param jsonText JSON文字列を
+     * @return サブグラスが定義するJavaオブジェクトを生成
+     * @throws JsonParseException GSONのパース例外
+     */
+    public abstract T parseResultJson(String jsonText) throws JsonParseException;
+
+    /**
+     * HTTP 4xx, 50x系レスポンス時のJSON文字列をパースしてJavaオブジェクトを生成
+     * @param jsonText ウォーニング用JSON文字列
+     * @return サブグラスが定義するウォーニング用Javaオブジェクトを生成
+     * @throws JsonParseException GSONのパース例外
+     */
+    public abstract T parseWarningJson(String jsonText) throws JsonParseException;
+}</code></pre>
+                    </div>
+                    <div class="col">
+                        <div class="small">【参考】以下が元ネタのコード ※本家サイト「ハンドラの使用」の LoginRepositoryクラスを参照のこと</div>
+<pre><code class="java small">public class LoginRepository {
+    // ...
+
+    public void makeLoginRequest(
+        final String jsonBody,
+        final RepositoryCallback&lt;LoginResponse&gt; callback,
+        final Handler resultHandler,
+    ) {
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Result&lt;LoginResponse&gt; result = makeSynchronousLoginRequest(jsonBody);
+                    notifyResult(result, callback, resultHandler);
+                } catch (Exception e) {
+                    Result&lt;LoginResponse&gt; errorResult = new Result.Error&lt;&gt;(e);
+                    notifyResult(errorResult, callback, resultHandler);
+                }
+            }
+        });
+    }
+
+    private void notifyResult(
+        final Result&lt;LoginResponse&gt; result,
+        final RepositoryCallback&lt;LoginResponse&gt; callback,
+        final Handler resultHandler
+    ) {
+        resultHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                callback.onComplete(result);
+            }
+        });
+    }
+}</code></pre>
+                    </div>
+
+                    <div class="col">
+                        <div class="small">ResisterDataRepository.java: データ登録(更新)リポジトリクラス ※Androidライブラリ依存なしのクラス</div>
+<pre><code class="java small">package com.examples.android.healthcare.tasks;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
+import com.examples.android.healthcare.data.RegisterResult;
+import com.examples.android.healthcare.data.ResponseStatus;
+import com.examples.android.healthcare.data.ResponseWarningStatus;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+
+/**
+ * AppTopFragment用データ登録(更新)リポジトリクラス
+ */
+public class ResisterDataRepository extends HealthcareRepository&lt;RegisterResult&gt; {
+    // パス配列: 登録時, 更新時
+    private static final String[] URL_PATHS = {"/register", "/update"};
+
+    public ResisterDataRepository() {}
+
+    @Override
+    public String getRequestPath(int pathIdx) {
+        return URL_PATHS[pathIdx];
+    }
+
+    @Override
+    public String getResponseText(InputStream is) throws IOException {
+        StringBuilder sb;
+        try (BufferedReader bf = new BufferedReader
+                (new InputStreamReader(is, StandardCharsets.UTF_8))) {
+            String line;
+            sb = new StringBuilder();
+            while ((line = bf.readLine()) != null) {
+                sb.append(line);
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 正常時のレスポンスオブジェクトを取得する
+     * &lt;pre&gt;HTTP OK時にサーバーが返却するレスポンス例
+     {"data": {"emailAddress": "user1@example.com", "measurementDay": "2023-02-13"},
+      "status": {"code": 0, "message": "OK"}}
+     * &lt;/pre&gt;
+     * @param jsonText JSON文字列
+     * @return レスポンスオブジェクト
+     * @throws JsonParseException パース例外
+     */
+    @Override
+    public RegisterResult parseResultJson(String jsonText) throws JsonParseException {
+        Gson gson = new Gson();
+        return gson.fromJson(jsonText, RegisterResult.class);
+    }
+
+    /**
+     * ウォーニング時のレスポンスオブジェクトを取得する
+     * &lt;pre&gt;ウォーニング時にサーバーが返却するレスポンス例
+     {"status": {"code": 400,"message": "461,User is not found."}}
+     * &lt;/pre&gt;
+     * @param jsonText ウォーニング用JSON文字列
+     * @return レスポンスオブジェクト&lt;br/&gt;
+     *   ResponseStatusオブジェクトのみがセットされDataオブジェクトはnullがセットされる
+     * @throws JsonParseException パース例外
+     */
+    @Override
+    public RegisterResult parseWarningJson(String jsonText) throws JsonParseException {
+        Gson gson = new GsonBuilder().serializeNulls().create();
+        // ResponseStatusに"status"タグ含めたResponseStatusのラップクラス
+        // {"status": {"code": 400,"message": "461,User is not found."}}部分を受取るクラス
+        ResponseWarningStatus warningStatus = gson.fromJson(jsonText, ResponseWarningStatus.class);
+        // {"code": 400,"message": "461,User is not found."} 部分を受取るクラス
+        ResponseStatus status = warningStatus.getStatus();
+        return new RegisterResult(null, status);
+    }
+}</code></pre>
+                    </div>
+                    <div class="col">
+                        <div class="small">GetCurrentDataRepository.java: 登録済みデータ取得リポジトリクラス ※Androidライブラリ依存なしのクラス</div>
+<pre><code class="java small">package com.examples.android.healthcare.tasks;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
+import com.examples.android.healthcare.data.GetCurrentDataResult;
+import com.examples.android.healthcare.data.ResponseStatus;
+import com.examples.android.healthcare.data.ResponseWarningStatus;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+
+/**
+ * AppTopFragment用登録済みデータ取得リポジトリクラス
+ */
+public class GetCurrentDataRepository extends HealthcareRepository&lt;GetCurrentDataResult&gt; {
+    // GETリクエストパス
+    private static final String URL_PATH = "/getcurrentdata";
+
+    @Override
+    public String getRequestPath(int pathIdx) {
+        return URL_PATH;
+    }
+
+    @Override
+    public String getResponseText(InputStream is) throws IOException {
+        StringBuilder sb;
+        try (BufferedReader bf = new BufferedReader
+                (new InputStreamReader(is, StandardCharsets.UTF_8))) {
+            String line;
+            sb = new StringBuilder();
+            while ((line = bf.readLine()) != null) {
+                sb.append(line);
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 登録済みデータオブジェクトを取得する
+     * &lt;pre&gt;HTTP OK時にサーバーが返却するレスポンス例 ※一部省略
+     {"data": {"emailAddress": "sapporo@examples.com", "healthcareData": {  "bloodPressure": {
+     "eveningMax": 124, "eveningMeasurementTime": "22:20", "eveningMin": 72, "eveningPulseRate": 59,
+     "morningMax": 112, "morningMeasurementTime": "06:45", "morningMin": 67, "morningPulseRate": 65 },
+     ...一部省略...
+     },"walkingCount": {counts": 8576}},
+     "measurementDay": "2023-02-01",
+     "weatherData": {"weatherCondition": {"condition": "曇りのち雪"}}},
+     "status": {"code": 0, "message": "OK"}}
+     * &lt;/pre&gt;
+     * @param jsonText JSON文字列を
+     * @return 登録済みデータオブジェクト
+     * @throws JsonParseException パース例外
+     */
+    @Override
+    public GetCurrentDataResult parseResultJson(String jsonText) throws JsonParseException {
+        Gson gson = new Gson();
+        return gson.fromJson(jsonText, GetCurrentDataResult.class);
+    }
+
+    /**
+     * ウォーニング時のレスポンスオブジェクトを取得する
+     * &lt;pre&gt;ウォーニング時にサーバーが返却するレスポンス例
+     {"status": {"code": 400,"message": "461,User is not found."}}
+     * &lt;/pre&gt;
+     * @param jsonText ウォーニング用JSON文字列
+     * @return レスポンスオブジェクト&lt;br/&gt;
+     *   ResponseStatusオブジェクトのみがセットされDataオブジェクトはnullがセットされる
+     * @throws JsonParseException パース例外
+     */
+    @Override
+    public GetCurrentDataResult parseWarningJson(String jsonText) throws JsonParseException {
+        Gson gson = new GsonBuilder().serializeNulls().create();
+        ResponseWarningStatus warningStatus = gson.fromJson(jsonText, ResponseWarningStatus.class);
+        ResponseStatus status = warningStatus.getStatus();
+        return new GetCurrentDataResult(null, status);
+    }
+}
+</code></pre>
+                    </div>
+                    <div class="col">
+                        <div class="small">HealthcareApplication.java ※ ■■部分を入れ替えるとそのままAndroidアプリで動くものになります</div>
+<pre><code class="java small">package com.examples.android.healthcare;
+
+import android.app.Application;          // スタブ
+import android.content.res.AssetManager; // スタブ
+import android.os.Handler;               // スタブ
+import android.util.Log;                 // スタブ
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import com.google.gson.stream.JsonReader;
+
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.lang.reflect.Type;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import static com.examples.android.healthcare.functions.MyLogging.DEBUG_OUT;
+
+public class HealthcareApplication extends Application {
+    private static final String LOG_TAG = "HealthcareApplication";
+    // Json file in assets for request.
+    private static final String REQUEST_INFO_FILE = "request_info.json";
+    private Map&lt;String, String&gt; mRequestUrls;
+    private Map&lt;String, String&gt; mRequestHeaders;
+
+    public ExecutorService mEexecutor = Executors.newFixedThreadPool(1);
+    // Handerだけは Androidとは異なりダミーのコンストラクタで代用 ※何の処理もしないクラス
+    public Handler mHandler = new Handler();
+    // ■■ Androidアプリのプロジェクトにコピーするときには下記コードに置き換える必要がある
+    // public Handler mHandler = HandlerCompat.createAsync(Looper.getMainLooper());
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        try {
+            loadRequestConf();
+        } catch (Exception e) {
+            // ここには来ない想定
+            Log.e(LOG_TAG, e.getLocalizedMessage());
+        }
+    }
+
+    public Map&lt;String, String&gt; getmRequestUrls() {
+        return mRequestUrls;
+    }
+
+    public Map&lt;String, String&gt; getRequestHeaders() {
+        return mRequestHeaders;
+    }
+
+    private void loadRequestConf() throws IOException {
+        AssetManager am = new AssetManager();
+        Gson gson = new Gson();
+        Type typedMap = new TypeToken&lt;Map&lt;String, Map&lt;String, String&gt;&gt;&gt;() {
+        }.getType();
+        DEBUG_OUT.accept(LOG_TAG, "typedMap: " + typedMap);
+        // gson.fromJson() thorows JsonSyntaxException, JsonIOException
+        Map&lt;String, Map&lt;String, String&gt;&gt; map = gson.fromJson(
+                new JsonReader(new InputStreamReader(am.open(REQUEST_INFO_FILE))), typedMap);
+        mRequestUrls = map.get("urls");
+        mRequestHeaders = map.get("headers");
+        DEBUG_OUT.accept(LOG_TAG, "RequestUrls: " + mRequestUrls);
+        DEBUG_OUT.accept(LOG_TAG, "RequestHeaders: " + mRequestHeaders);
+    }
+}</code></pre>
+                    </div>
+                    <div class="col">
+                        <div class="small">■ (1) データ登録POSTリクエストのテンプレートコードは以下のようになります</div>
+<pre><code class="java small">private String getJsonText() {
+    // JavaプロジェクトならJSONファイルから取得
+    // Androidプロジェクトなら全ての入力ウィジットから取得
+}
+    
+// 登録データJSONテキスト取得        
+String jsonText = getJsonText(); 
+// アプリケーションオブジェクト生成
+HealthcareApplication app = new HealthcareApplication();
+// アプリケーションオブジェクトからリクエスト情報取得
+Map&lt;String, String&gt; urlMap = app.getmRequestUrls();            // ベースURLパスを保持するマップ
+Map&lt;String, String&gt; headers = app.getRequestHeaders();         // リクエストヘッダー
+String requestUrl = urlMap.get(RequestDevice.WIFI.toString()); // リクエストベースURLパス取得
+
+// データ登録POSTリクエスト用リポジトリ生成
+HealthcareRepository&lt;RegisterResult&gt; repository = new ResisterDataRepository();
+int urlNum = 0; // 0:登録(register), 1:更新(update)
+repository.makeRegisterRequest(urlNum, requestUrl, jsonText, headers,
+    app.mEexecutor/*スレッドプール*/, app.mHandler/*ハンドラー*/, (result) -&gt; {
+        if (result instanceof Result.Success) {
+            // レスポンスOK時の処理
+            // Androidの場合はステータスに登録OKを表示
+        } else if (result instanceof Result.Warning) {
+            // ウォーニングレスポンス時の処理(40x, 501)
+            // ウォーニングステータスオブジェクト取得
+            ResponseStatus status =
+                    ((Result.Warning<?>) result).getResponseStatus();
+            // Androidの場合はステータスにエラー内容を表示
+        } else {
+            // 例外オブジェクト取得
+            Exception exception = ((Result.Error<?>) result).getException();
+            // 例外発生時の処理 (主にサーバーアプリ側のバグかAndroidアプリ側のバグ[JSONパースエラー等])
+            // Androidの場合は例外メッセージをダイアログに表示
+        }
+    });</code></pre>
+                    </div>
+                    <div class="col">
+                        <div class="small">■ (2) 登録済みデータ取得リクエストのテンプレートコードは以下のようになります</div>
+<pre><code class="java small">// 登録済みデータの主キー項目
+String emailAddress = "user1@examples.com";
+String pastDay = "2023-03-10";
+
+// アプリケーションオブジェクト生成
+HealthcareApplication app = new HealthcareApplication();
+// アプリケーションオブジェクトからリクエスト情報取得
+Map&lt;String, String&gt; urlMap = app.getmRequestUrls();
+Map&lt;String, String&gt; headers = app.getRequestHeaders();
+String requestUrl = urlMap.get(RequestDevice.WIFI.toString());
+
+// 登録済みデータ取得GETリクエスト用リポジトリ生成
+HealthcareRepository&lt;GetCurrentDataResult&gt; repository = new GetCurrentDataRepository();
+// リクエストパラメータ取得(URLエンコード)
+String requestParams = AppTopUtil.getRequestParams(emailAddress, pastDay);
+repository.makeGetRequest(0, requestUrl, requestParams, headers,
+    app.mEexecutor, app.mHandler, (result) -&gt; {
+        if (result instanceof Result.Success) {
+            // OKレスポンスオブジェクト取得
+            GetCurrentDataResult dataResult =
+                    ((Result.Success&lt;GetCurrentDataResult&gt;) result).get();
+            // 登録済みデータ取得
+            RegisterData data = dataResult.getData();
+            // Androidの場合は登録済みデータをウィジットに設定
+        } else if (result instanceof Result.Warning) {
+            // ウォーニングステータスオブジェクト取得
+            ResponseStatus status =
+                    ((Result.Warning&lt;?&gt;) result).getResponseStatus();
+            // Androidの場合はステータスにエラー内容を表示
+        } else {
+            // 例外オブジェクト取得
+            Exception exception = ((Result.Error&lt;?&gt;) result).getException();
+            // 例外発生時の処理 (主にサーバーアプリ側のバグかAndroidアプリ側のバグ[JSONパースエラー等])
+            // Androidの場合は例外メッセージをダイアログに表示
+        }
+    });</code></pre>
+                    </div>
+                </div>
+            <!-- END 各クラスのソースコード -->
+
+            <h5 class="v-line-start">2.Javaプロジェクトでリポジトリクラスをテストする</h5>
+            <div class="m-2">
+                <figure class="figure">
+                    <figcaption class="figure-caption text-center">
+                        【IntelliJ IDEでリクエストを実行している画面】
+                    </figcaption>
+                    <img class="figure-img img-fluid" src="11_java_execute_httpclient_dependent_android/images/IntelliJ_execGetData.png" />
+                </figure>
+            </div>
+
+            <div class="m-2">
+                <div class="small">【Javaプロジェクト】GETリクエストのソース: MainGetData.java</div>
+                <div class="ms-3 small">※クリーンアップでエクゼキュータのシャットダウン呼び出しは必須です [<b>mEexecutor.shutdownNow();</b>] </div>
+<pre><code class="java small">package com.examples.android.healthcare;
+
+import android.util.Log;
+import com.examples.android.healthcare.constants.RequestDevice;
+import com.examples.android.healthcare.data.GetCurrentDataResult;
+import com.examples.android.healthcare.data.RegisterData;
+import com.examples.android.healthcare.data.ResponseStatus;
+import com.examples.android.healthcare.functions.AppTopUtil;
+import com.examples.android.healthcare.tasks.GetCurrentDataRepository;
+import com.examples.android.healthcare.tasks.HealthcareRepository;
+import com.examples.android.healthcare.tasks.Result;
+import java.util.Map;
+
+import static com.examples.android.healthcare.functions.MyLogging.DEBUG_OUT;
+
+// 健康管理データ登録Androidアプリ用通信部品のテスト用コード
+public class MainGetData {
+    static final String TAG = "MainGetData";
+    // 登録済みデータの主キー
+    static final String emailAddress = "user1@examples.com";
+    static final String pastDay = "2023-03-10";
+
+    public static void main(String[] args) {
+        HealthcareApplication app = new HealthcareApplication();
+        // ローカルネットワーク
+        Map&lt;String, String&gt; urlMap = app.getmRequestUrls();
+        Map&lt;String, String&gt; headers = app.getRequestHeaders();
+        String requestUrl = urlMap.get(RequestDevice.WIFI.toString());
+        DEBUG_OUT.accept(TAG, "requestUrl: "+ requestUrl);
+        try {
+            // GETリクエスト送信: 登録済みデータの取得
+            HealthcareRepository&lt;GetCurrentDataResult&gt; repository = new GetCurrentDataRepository();
+            // リクエストパラメータ: 主キー項目(メールアドレス, 測定日付)
+            String requestParams = AppTopUtil.getRequestParams(emailAddress, pastDay);
+            repository.makeGetRequest(0, requestUrl, requestParams, headers,
+                    app.mEexecutor, app.mHandler, (result) -&gt; {
+                if (result instanceof Result.Success) {
+                    GetCurrentDataResult dataResult =
+                            ((Result.Success&lt;GetCurrentDataResult&gt;) result).get();
+                    RegisterData data = dataResult.getData();
+                    DEBUG_OUT.accept(TAG, "responseResult: " + dataResult);
+                } else if (result instanceof Result.Warning) {
+                    ResponseStatus status =
+                            ((Result.Warning&lt;?&gt;) result).getResponseStatus();
+                    Log.w(TAG, status.toString());
+                } else if (result instanceof Result.Error) {
+                    // 例外メッセージ
+                    Exception exception = ((Result.Error&lt;?&gt;) result).getException();
+                    Log.w(TAG, "GET error:" + exception.toString());
+                }
+            });
+        } finally {
+            //■■ Javaアプリでは一回きりの実行なのでシャットダウンでプロセスを終了させる ■■
+            app.mEexecutor.shutdownNow();
+        }
+    }
+}</code></pre>
+                <div class="small">【Androidプロジェクト】GETリクエスト処理 <b>sendGetCurrentDataRequestメソッド</b></div>
+                <div class="ms-3 small">android-health-care-example/app/src/main/java/com/examples/android/healthcare/ui/main/<b>AppTopFragment.java</b></div>
+<pre><code class="java small">/**
+* GETリクエストで該当するデータを取得する
+* @param emailAddress メールアドレス
+* @param pastDay 過去の測定日付
+*/
+private void sendGetCurrentDataRequest(String emailAddress, String pastDay) {
+    RequestDevice device =  NetworkUtil.getActiveNetworkDevice(getContext());
+    if (device == RequestDevice.NONE) {
+        showDialogNetworkUnavailable();
+        return;
+    }
+
+    showActionBarGetting(device);
+    HealthcareApplication app = (HealthcareApplication) requireActivity().getApplication();sendGetCurrentDataRequest
+    String requestUrl = app.getmRequestUrls().get(device.toString());
+    Map&lt;String, String&gt; headers = app.getRequestHeaders();
+    // GETリクエスト送信: 登録済みデータの取得
+    HealthcareRepository&lt;GetCurrentDataResult&gt; repository = new GetCurrentDataRepository();
+    String requestUrlWithPath = requestUrl + repository.getRequestPath(0);
+    // リクエストパラメータ: 主キー項目(メールアドレス, 測定日付)
+    String requestParams = AppTopUtil.getRequestParams(emailAddress, pastDay);
+    repository.makeGetRequest(0, requestUrl, requestParams, headers,
+            app.mEexecutor, app.mHandler, (result) -&gt; {
+                // リクエストURLをAppBarに表示
+                showActionBarResult(requestUrlWithPath);
+
+                // 送信ボタンを戻す
+                mBtnSend.setEnabled(true);
+                if (result instanceof Result.Success) {
+                    GetCurrentDataResult dataResult =
+                            ((Result.Success&lt;GetCurrentDataResult&gt;) result).get();
+                    RegisterData data = dataResult.getData();
+                    // 古いオブジェクトを破棄する
+                    if (mRegisterDataForUpdate != null) {
+                        mRegisterDataForUpdate = null;
+                    }
+                    // https://www.baeldung.com/java-deep-copy
+                    //  6.3. JSON Serialization With Jackson
+                    Gson gson = new Gson();
+                    // 各入力フィールドに変更があったかどうかを確認するためのオブジェクト
+                    mRegisterDataForUpdate =
+                            gson.fromJson(gson.toJson(data), RegisterData.class);
+                    // ウィジット更新
+                    updateInputWidgetsFromRegisterData(data);
+                    // ステータス更新
+                    showStatus(getString(R.string.message_get_current_ok));
+                    // 更新用モニター開始
+                    startUpdateMonitor();
+                    // 送信ボタンのラベルを"更新"に変更
+                    changePostRequestWithButton(PostRequest.UPDATE);
+                } else if (result instanceof Result.Warning) {
+                    ResponseStatus status =
+                        ((Result.Warning&lt;?&gt;) result).getResponseStatus();
+                    DEBUG_OUT.accept(TAG, "WarningStatus: " + status);
+                    if (status.getCode() == 404) {
+                        // 未登録(404)なら新規登録モードにリセット
+                        mBtnSave.setEnabled(true);
+                        resetToNewRegistrationMode();
+                    }
+                    showWarning(getResponseWarning(status));
+                } else {
+                    // 例外メッセージをダイアログに表示
+                    Exception exception = ((Result.Error&lt;?&gt;) result).getException();
+                    Log.w(TAG, "GET error:" + exception.toString());
+                    String errorMessage = String.format(
+                            getString(R.string.exception_with_reason),
+                            exception.getLocalizedMessage());
+                    showMessageDialog(getString(R.string.error_response_dialog_title),
+                            errorMessage,"ExceptionFragment");
+                }
+            });
+}</code></pre>
+                <div class="small">【Javaプロジェクト】POSTリクエストのソース: MainGetData.java</div>
+<pre><code class="java small">package com.examples.android.healthcare;
+
+import android.util.Log;
+import com.examples.android.healthcare.constants.RequestDevice;
+import com.examples.android.healthcare.data.RegisterResult;
+import com.examples.android.healthcare.data.ResponseStatus;
+import com.examples.android.healthcare.tasks.HealthcareRepository;
+import com.examples.android.healthcare.tasks.ResisterDataRepository;
+import com.examples.android.healthcare.tasks.Result;
+import com.examples.android.healthcare.util.FileUtil;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.util.List;
+import java.util.Map;
+
+import static com.examples.android.healthcare.functions.MyLogging.DEBUG_OUT;
+
+// 健康管理データ登録Androidアプリ用通信部品のテスト用コード
+public class MainPostData {
+    static final String TAG = "MainPostData";
+    // テスト用登録用JSONファイル
+    static final String JSON_NAME = "register_data_20230311.json";
+
+    public static void main(String[] args) {
+        String jsonFile = Paths.get(Constants.INPUT_DATA_PATH, JSON_NAME).toString();
+        // 登録用データの読み込み
+        String jsonText = null;
+        try {
+            List&lt;String&gt; lines = FileUtil.readLines(jsonFile);
+            jsonText = String.join("", lines);
+        } catch (IOException e) {
+            Log.e(TAG, "Error: "+ e);
+            System.exit(1);
+        }
+
+        HealthcareApplication app = new HealthcareApplication();
+        // ローカルネットワーク
+        Map&lt;String, String&gt; urlMap = app.getmRequestUrls();
+        Map&lt;String, String&gt; headers = app.getRequestHeaders();
+        String requestUrl = urlMap.get(RequestDevice.WIFI.toString());
+        DEBUG_OUT.accept(TAG, "requestUrl: " + requestUrl);
+        try {
+            HealthcareRepository&lt;RegisterResult&gt; repository = new ResisterDataRepository();
+            int urlNum = 0; // 登録
+            repository.makeRegisterRequest(urlNum, requestUrl, jsonText, headers,
+                    app.mEexecutor, app.mHandler, (result) -&gt; {
+                        if (result instanceof Result.Success) {
+                            RegisterResult respResult =
+                                    ((Result.Success&lt;RegisterResult&gt;) result).get();
+                            DEBUG_OUT.accept(TAG, "responseResult: " + respResult);
+                        } else if (result instanceof Result.Warning) {
+                            ResponseStatus status =
+                                    ((Result.Warning&lt;?&gt;) result).getResponseStatus();
+                            Log.w(TAG, status.toString());
+                        } else {
+                            Exception exception = ((Result.Error&lt;?&gt;) result).getException();
+                            Log.w(TAG, "GET error:" + exception.toString());
+                        }
+                    });
+        } finally {
+            // Javaアプリでは一回きりの実行なのでシャットダウンでプロセスを終了させる
+            app.mEexecutor.shutdownNow();
+        }
+    }
+}</code></pre>
+
+                <div class="small">【Androidプロジェクト】POSTリクエストのソース <b>sendRegisterDataメソッド</b></div>
+                <div class="ms-3 small">※Androidではリクエスト処理以外のコードがかなりのボリュームになるので、Javaプロジェクトで通信処理自体のテストできることは相当のメリットになります。</div>
+<pre><code class="java small">/**
+ * 入力ウィジットからJSON文字列を生成し、サーバーに送信する
+ * POSTリクエスト用JSON文字列生成
+ *   登録: 全グループ項目のJSON文字列を生成
+ *   更新: 各グループのうち変更のあった部分を含むJSON文字列を生成
+ */
+private void sendRegisterData() {
+    // ネットワークデバイスが無効なら送信しない
+    RequestDevice device =  NetworkUtil.getActiveNetworkDevice(
+            Objects.requireNonNull(getContext()));
+    if (device == RequestDevice.NONE) {
+        showDialogNetworkUnavailable();
+        return;
+    }
+
+    // メールアドレスチェック
+    if (TextUtils.isEmpty(getUserEmailWithThisSettings())) {
+        showConfirmDialogWithEmailAddress();
+        return;
+    }
+
+    // 必須入力項目チェック
+    List&lt;String&gt; warnings = checkRequiredInputs(false);
+    if (!warnings.isEmpty()) {
+        // メッセージダイアログ表示
+        String warning = String.join("\n", warnings);
+        showMessageDialog(getString(R.string.warning_required_dialog_title), warning,
+                "RequiredDialogFragment");
+        return;
+    }
+
+    // 確認ダイアログのボタン(OK|CANCEL)押下イベント受信リスナー
+    ConfirmOkCancelListener listener = new ConfirmOkCancelListener() {
+        @Override
+        public void onOk() {
+            // 送信ボタン不可
+            mBtnSend.setEnabled(false);
+            // アクションバーにネットワークデバイス状況を設定
+            showActionBarGetting(device);
+            // アプリケーション取得
+            HealthcareApplication app = (HealthcareApplication) requireActivity().getApplication();
+            // アプリケーションに保持しているリクエスト情報からネットワーク種別に応じたリクエストURLを取得
+            String requestUrl = app.getmRequestUrls().get(device.toString());
+            Map&lt;String, String&gt; headers = app.getRequestHeaders();
+            // 入力ウィジットからJsonデータ取得
+            String jsonText;
+            if (PostRequest.REGISTER.getNum() == mCurrentPostRequest.getNum()) {
+                jsonText = generateJsonTextForRegist(); //■■ 全ての入力ウィジットからJSON文字列 ■■ 
+            } else {
+                jsonText = generateJsonTextForUpdate(); //■■ 更新された部分のみのJSON文字列 ■■
+            }
+            // POST 送信: 登録(0), 更新(1)
+            int urlNum = mCurrentPostRequest.getNum();
+            HealthcareRepository&lt;RegisterResult&gt; repository = new ResisterDataRepository();
+            String requestUrlWithPath = requestUrl + repository.getRequestPath(urlNum);
+            DEBUG_OUT.accept(TAG, "requestUrlWithPath: " + requestUrlWithPath);
+            repository.makeRegisterRequest(urlNum, requestUrl, jsonText, headers,
+                    app.mEexecutor, app.mHandler, (result) -&gt; {
+                        // ボタン状態を戻す
+                        mBtnSend.setEnabled(true);
+                        // リクエストURLをAppBarに表示
+                        showActionBarResult(requestUrlWithPath);
+                        if (result instanceof Result.Success) {
+                            String recentJson;
+                            // 登録処理の場合
+                            if (mCurrentPostRequest.equals(PostRequest.REGISTER)) {
+                                // 更新前のプリファレンスから最新登録日付を取得する
+                                String before = getLatestRegisteredDateInPref();
+                                // 測定日付から登録日付を取得
+                                String after = toStringOfTextViewBySelfTag(mInpMeasurementDate);
+                                // 登録日付がプリファレンスの最新登録日付より最新の場合のみ上書き保存
+                                if (AppTopUtil.morelatestInPrefDate(after, before)) {
+                                    // 最新登録日の復元用に登録済みJSONをファイル保存
+                                    saveJsonToFile(JsonFileSaveTiming.REGISTERED);
+                                }
+                                // 送信成功なら一時保存JSONファイルを削除する
+                                deleteSavedFile();
+                                // 登録: リクエストのJSON文字列をそのまま利用
+                                recentJson = jsonText;
+                            } else {
+                                // 更新: 全入力ウィジットからJSON文字列を生成する
+                                recentJson = generateJsonTextForRegist();
+                            }
+                            // 古いオブジェクトを破棄してから最新の更新用オブジェクトを生成する
+                            if (mRegisterDataForUpdate != null) {
+                                mRegisterDataForUpdate = null;
+                            }
+                            Gson gson = new Gson();
+                            mRegisterDataForUpdate =
+                                    gson.fromJson(recentJson, RegisterData.class);
+                            // ステータス更新
+                            String status = String.format(
+                                    getString(R.string.msg_post_ok_with_type),
+                                    mCurrentPostRequest.getName());
+                            showStatus(status);
+                            // 保存ボタン不可
+                            mBtnSave.setEnabled(false);
+                            // ボタンを更新に変更
+                            if (mCurrentPostRequest.equals(PostRequest.REGISTER)) {
+                                // 送信ボタンを更新に変更してそのまま変更可能にする
+                                changePostRequestWithButton(PostRequest.UPDATE);
+                            }
+                        } else if (result instanceof Result.Warning) {
+                            // ウォーニングメッセージをダイアログに表示
+                            ResponseStatus status =
+                                    ((Result.Warning&lt;?&gt;) result).getResponseStatus();
+                            DEBUG_OUT.accept(TAG, "WarningStatus: " + status);
+                            // 引数 (1)POSTリクエスト種別: [登録 | 更新] (2)エラー内容
+                            String warning = String.format(
+                                    getString(R.string.warning_register_with_2_reason),
+                                    mCurrentPostRequest.getName(), status.getMessage());
+                            showMessageDialog(getString(R.string.error_response_dialog_title),
+                                    warning,"WarningDialogFragment");
+                        } else {
+                            // 例外メッセージをダイアログに表示
+                            Exception exception = ((Result.Error&lt;?&gt;) result).getException();
+                            String message = String.format(
+                                    getString(R.string.exception_with_reason), exception.getLocalizedMessage());
+                            showMessageDialog(getString(R.string.error_response_dialog_title),message,
+                                    "ExceptionDialogFragment");
+                        }
+                    });
+        }
+        @Override
+        public void onCancel() {
+            // キャンセルボタン押下ならステータスに表示
+            String cancelMessage = String.format(getString(
+                    R.string.msg_request_canceled_with_type), mCurrentPostRequest.getName());
+            showStatus(cancelMessage);
+        }
+    };
+    // 送信確認ダイアログ表示
+    showConfimOkCancelDialog(listener);
+}</code></pre>
+            </div>
+
+            <h5 class="v-line-start">3.サーバー側Flaskアプリのコンソール出力</h5>
+            <div class="m-2">
+                <figure class="figure">
+                    <figcaption class="figure-caption text-center">
+                    </figcaption>
+                    <img class="figure-img img-fluid" src="11_java_execute_httpclient_dependent_android/images/FlaskHealthConsole.png" />
+                </figure>
+            </div>    
+            <div class="m-2">
+                <div class="small">【Flaskアプリ】リクエスト処理のソース</div>
+                <div class="ms-3 small">webapp/Healthcare/views/app_main.py</div>
+<pre><code class="python small">import json
+from typing import Dict, Optional, Union
+
+import sqlalchemy
+from flask import Response, abort, g, jsonify, make_response, request
+from sqlalchemy import Select, select
+from sqlalchemy.orm import Session, scoped_session
+from sqlalchemy.orm.exc import NoResultFound
+from werkzeug.exceptions import (BadRequest, Conflict, Forbidden,
+                                 HTTPException, InternalServerError, NotFound)
+
+from healthcare import (Cls_sess_healthcare, Cls_sess_sensors, app, app_logger,
+                        app_logger_debug, engine_healthcare)
+from healthcare.dao.blood_pressure import BloodPressure
+from healthcare.dao.body_temperature import BodyTemperature
+from healthcare.dao.nocturia_factors import NocturiaFactors
+from healthcare.dao.person import Person
+from healthcare.dao.queries import Selector
+from healthcare.dao.sleep_management import SleepManagement
+from healthcare.dao.walking_count import WalkingCount
+from healthcare.dao.weather_condition import WeatherCondition
+
+MSG_DESCRIPTION: str = "error_message"
+ABORT_DICT_BLANK_MESSAGE: Dict[str, str] = {MSG_DESCRIPTION: ""}
+# アプリケーションルートパス
+APP_ROOT: str = app.config["APPLICATION_ROOT"]
+
+
+def get_healthcare_session() -&gt; scoped_session:
+    """
+    健康管理DB用セッションオブジェクトを取得する
+    """
+    if 'healthcare_session' not in g:
+        # 健康管理DB用セッションオブジェクト生成
+        g.healthcare_session = Cls_sess_healthcare()
+        if app_logger_debug:
+            app_logger.debug(f"g.healthcare_session:{g.healthcare_session}")
+    return g.healthcare_session
+
+
+def get_sensors_session() -&gt; scoped_session:
+    """
+    気象センサDB用セッションオブジェクトを取得する
+    """
+    if 'sensors_session' not in g:
+        # 気象センサDB用セッションオブジェクト生成
+        g.sensors_session = Cls_sess_sensors()
+        if app_logger_debug:
+            app_logger.debug(f"g.sensors_session:{g.sensors_session}")
+    return g.sensors_session
+
+
+@app.teardown_appcontext
+def close_sessions(exception=None) -&gt; None:
+    """
+    各データベース用セッションのクリーンアップ
+    """
+    # 健康管理DB用セッション
+    sess: scoped_session = g.pop('healthcare_session', None)
+    app_logger.debug(f"healthcare_session:{sess}")
+    if sess is not None:
+        try:
+            # クラスのremoveメソッド呼び出し
+            Cls_sess_healthcare.remove()
+        except Exception as err:    
+            app_logger.warning(f"Error removed Cls_sess_healthcare :{err}")
+
+    # 気象センサDB用セッション
+    sess: scoped_session = g.pop('sensors_session', None)
+    app_logger.debug(f"sensors_session:{sess}")
+    if sess is not None:
+        try:
+            Cls_sess_sensors.remove()
+        except Exception as err:    
+            app_logger.warning(f"Error removed Cls_sess_sensors :{err}")
+        
+
+@app.route(APP_ROOT + "/getcurrentdata", methods=["GET"])
+def getcurrentdata():
+    """メールアドレスと測定日付から健康管理データを取得するリクエスト
+
+    :param: request parameter: ?emailAddress=user1@examples.com&measurementDay=2023-0-03
+    :return: JSON形式(健康管理DBから取得したデータ + 気象センサーDBから取得した天候)
+    """
+    if app_logger_debug:
+        app_logger.debug(request.path)
+        app_logger.debug(request.args.to_dict())
+
+    # 1.リクエストパラメータチェック
+    # 1-1.メールアドレス
+    emailAddress = request.args.get("emailAddress")
+    if emailAddress is None:
+        abort(BadRequest.code, _set_errormessage("462,Required EmailAddress."))
+    # 1-2.測定日付
+    measurementDay = request.args.get("measurementDay")
+    if emailAddress is None:
+        abort(BadRequest.code, _set_errormessage("463,Required MeasurementDay."))
+
+    # PersonテーブルにemailAddressが存在するか
+    personId = _get_personid(emailAddress)
+    if personId is None:
+        abort(BadRequest.code, _set_errormessage("461,User is not found."))
+
+    # 健康管理DBと気象センサーDBからデータ取得する
+    selector = Selector(Cls_sess_healthcare, Cls_sess_sensors, logger=app_logger)
+    # 健康管理データ取得
+    healthcare_dict: Dict = selector.get_healthcare_asdict(emailAddress, measurementDay)
+    if app_logger_debug:
+        app_logger.debug(f"Healthcare: {healthcare_dict}")    
+    if healthcare_dict:
+        healthcare_dict["emailAddress"] = emailAddress
+        healthcare_dict["measurementDay"] = measurementDay
+        # 天気状態取得
+        weather_dict = selector.get_weather_asdict(measurementDay)
+        if app_logger_debug:
+            app_logger.debug(f"Weather: {weather_dict}")    
+        if weather_dict:
+            healthcare_dict["weatherData"] = weather_dict
+        else:
+            # 天候がなければ未設定
+            healthcare_dict["weatherData"] = None
+        
+        return make_getdata_success(healthcare_dict)
+    else:
+        abort(NotFound.code, _set_errormessage("Data is not found."))
+
+
+@app.route(APP_ROOT + "/register", methods=["POST"])
+def register():
+    """
+    健康管理データ(必須)と天候データ(必須)の登録
+    """
+    if app_logger_debug:
+        app_logger.debug(request.path)
+
+    # 登録データチェック
+    personId, emailAddress, measurementDay, data = _check_postdata(request)
+    
+    # 健康管理データ登録 (必須)
+    _insert_healthdata(personId, measurementDay, data)
+    # 気象データ登録 (必須) ※気象センサーデータベース
+    _insert_weather(measurementDay, data)
+
+    # ここまでエラーがなければOKレスポンス
+    return make_register_success(emailAddress, measurementDay)
+
+
+@app.route(APP_ROOT + "/update", methods=["POST"])
+def update():
+    """
+    健康管理データ(任意)または天候データ(任意)の更新
+    """
+    if app_logger_debug:
+        app_logger.debug(request.path)
+
+    # 更新データチェック
+    personId, emailAddress, measurementDay, data = _check_postdata(request)
+
+    # 健康管理データの更新
+    _update_healthdata(personId, measurementDay, data)
+    # 天候状態(気象データベース)の更新
+    _update_weather(measurementDay, data)
+
+    # ここまでエラーがなければOKレスポンス
+    return make_register_success(emailAddress, measurementDay)
+
+
+def _insert_healthdata(person_id: int, measurement_day: str, data: Dict) -&gt; None:
+    """
+    健康管理データの登録処理
+    :param person_id メールアドレスから取得したPersion.id
+    :param measurement_day: 測定日
+    :data 登録用データ
+    """
+    # JSONキーチェック
+    try:
+        # 健康管理データコンテナ
+        healthcare_data: Dict = data["healthcareData"]
+        # (1) 睡眠管理
+        sleep_man: Dict = healthcare_data["sleepManagement"]
+        # (2) 血圧測定
+        blood_press: Dict = healthcare_data["bloodPressure"]
+        # (3) 夜中トイレ回数要因
+        nocturia_factors: Dict = healthcare_data["nocturiaFactors"]
+        # (4) 歩数
+        walking_count: Dict = healthcare_data["walkingCount"]
+        # (5) 体温データ
+        body_temper: Dict = healthcare_data["bodyTemperature"]
+    except KeyError as err:
+        app_logger.warning(err)
+        abort(BadRequest.code, _set_errormessage("460,{err}"))
+
+    # 主キー値を設定
+    sleep_man["pid"] = person_id
+    sleep_man["measurementDay"] = measurement_day
+    blood_press["pid"] = person_id
+    blood_press["measurementDay"] = measurement_day
+    nocturia_factors["pid"] = person_id
+    nocturia_factors["measurementDay"] = measurement_day
+    walking_count["pid"] = person_id
+    walking_count["measurementDay"] = measurement_day
+    body_temper["pid"] = person_id
+    body_temper["measurementDay"] = measurement_day
+    # 登録用の各クラスにデータを設定
+    sleepMan: SleepManagement = SleepManagement(**sleep_man)
+    if app_logger_debug:
+        app_logger.debug(sleepMan)
+    bloodPressure: BloodPressure = BloodPressure(**blood_press)
+    if app_logger_debug:
+        app_logger.debug(bloodPressure)
+    factors: NocturiaFactors = NocturiaFactors(**nocturia_factors)
+    if app_logger_debug:
+        app_logger.debug(factors)
+    walking: WalkingCount = WalkingCount(**walking_count)
+    if app_logger_debug:
+        app_logger.debug(walking)
+    bodyTemper: BodyTemperature = BodyTemperature(**body_temper)
+    if app_logger_debug:
+        app_logger.debug(bodyTemper)
+
+    # 健康管理DB用セッションオブジェクト取得
+    sess = get_healthcare_session()
+    try:
+        sess.begin()
+        sess.add_all(
+            [sleepMan, bloodPressure, factors, walking, bodyTemper]
+        )
+        sess.commit()
+    except sqlalchemy.exc.IntegrityError as err:
+        app_logger.warning(f"IntegrityError: {err.args}")
+        sess.rollback()
+        # IntegrityErrorならConfilict(409)を返却 ※Androidアプリ側で"登録済み"を表示する
+        abort(Conflict.code, _set_errormessage("Already registered."))
+    except sqlalchemy.exc.SQLAlchemyError as err:
+        app_logger.warning(err.args)
+        sess.rollback()
+        abort(InternalServerError.code, _set_errormessage(f"559,{err}"))
+    finally:
+        sess.close()
+    
+
+
+def _update_healthdata(person_id: int, measurement_day: str, data: Dict) -&gt; None:
+    """
+    健康管理データの更新処理
+    :param person_id メールアドレスから取得したPersion.id
+    :param measurement_day: 測定日
+    :data 更新用データ
+    """
+    # 健康管理データコンテナ: 必須
+    healthcare_data: Optional[Dict] = _has_dict_in_data("healthcareData", data)
+    if healthcare_data is None:
+        abort(BadRequest.code, _set_errormessage("451,Required healthcareData!"))
+    
+    # 更新用データは更新されたテーブルのデータのみが存在する
+    update_table_count: int = 0
+    # (1) 睡眠管理
+    sleep_man: Optional[Dict] = _has_dict_in_data("sleepManagement", healthcare_data)
+    if app_logger_debug:
+        app_logger.debug(f"sleepManagement: {sleep_man}")
+    if sleep_man is not None:
+        update_table_count += 1
+
+    # (2) 血圧測定
+    blood_press: Optional[Dict] = _has_dict_in_data("bloodPressure", healthcare_data)
+    if app_logger_debug:
+        app_logger.debug(f"bloodPressure: {blood_press}")
+    if blood_press is not None:
+        update_table_count += 1
+
+    # (3) 夜中トイレ回数要因
+    nocturia_factors: Optional[Dict] = _has_dict_in_data("nocturiaFactors", healthcare_data)
+    if app_logger_debug:
+        app_logger.debug(f"nocturiaFactors: {nocturia_factors}")
+    if nocturia_factors is not None:
+        update_table_count += 1
+
+    # (4) 歩数
+    walking_count: Optional[Dict] = _has_dict_in_data("walkingCount", healthcare_data)
+    if app_logger_debug:
+        app_logger.debug(f"walkingCount: {walking_count}")
+    if walking_count is not None:
+        update_table_count += 1
+
+    # (5) 体温データ
+    body_temper: Optional[Dict] = _has_dict_in_data("bodyTemperature", healthcare_data)
+    if app_logger_debug:
+        app_logger.debug(f"bodyTemperature: {body_temper}")
+    if body_temper is not None:
+        update_table_count += 1
+
+    # 更新データ有無
+    if update_table_count == 0:
+        # 健康管理データの更新なし ※天候データのみの修正の場合があり得る
+        return
+
+    # 健康管理DB用セッションオブジェクト取得
+    sess = get_healthcare_session()
+    # https://docs.sqlalchemy.org/en/20/core/dml.html#sqlalchemy.sql.expression.Update
+    #  Insert, Updates, Deletes
+    # https://www.educba.com/sqlalchemy-update-object/
+    #  SQLAlchemy update object
+    try:
+        sess.begin()
+        if sleep_man is not None:
+            stmt = (
+                sqlalchemy.update(SleepManagement).
+                where(SleepManagement.pid==person_id, SleepManagement.measurementDay==measurement_day).
+                values(**sleep_man)
+            )
+            sess.execute(stmt)
+        if blood_press is not None:
+            stmt = (
+                sqlalchemy.update(BloodPressure).
+                where(BloodPressure.pid==person_id, BloodPressure.measurementDay==measurement_day).
+                values(**blood_press)
+            )
+            sess.execute(stmt)
+        if nocturia_factors is not None:
+            stmt = (
+                sqlalchemy.update(NocturiaFactors).
+                where(NocturiaFactors.pid==person_id, NocturiaFactors.measurementDay==measurement_day).
+                values(**nocturia_factors)
+            )
+            sess.execute(stmt)
+        if walking_count is not None:
+            stmt = (
+                sqlalchemy.update(WalkingCount).
+                where(WalkingCount.pid==person_id, WalkingCount.measurementDay==measurement_day).
+                values(**walking_count)
+            )
+            sess.execute(stmt)
+        if body_temper is not None:
+            stmt = (
+                sqlalchemy.update(BodyTemperature).
+                where(BodyTemperature.pid==person_id, BodyTemperature.measurementDay==measurement_day).
+                values(**body_temper)
+            )
+        sess.commit()
+        if app_logger_debug:
+            app_logger.debug(f"Updated[HealthcareData]: Person.id: {person_id}, MeasuremtDay: {measurement_day}")
+    except sqlalchemy.exc.SQLAlchemyError as err:
+        sess.rollback()
+        app_logger.warning(err.args)
+        abort(InternalServerError.code, _set_errormessage(f"559,{err}"))
+    finally:    
+        sess.close()
+
+
+
+def _insert_weather(measurement_day: str, data: Dict) -&gt; None:
+    """
+    天候状態の登録処理
+    :param measurement_day: 測定日
+    :data 登録用データ (必須)
+    """
+    try:
+        # 天候データコンテナは必ずある
+        weather_data: Dict = data["weatherData"]
+        # 天候状態は必須項目
+        weather_condition: Dict = weather_data["weatherCondition"]
+    except KeyError as err:
+        app_logger.warning(err)
+        return
+
+    # 主キー設定
+    weather_condition["measurementDay"] = measurement_day
+    weather: WeatherCondition = WeatherCondition(**weather_condition)
+    # 気象センサDB用セッションオブジェクト取得
+    sess = get_sensors_session()
+    try:
+        sess.begin()
+        sess.add(weather)
+        sess.commit()
+    except sqlalchemy.exc.IntegrityError as err:
+        app_logger.warning(f"IntegrityError: {err.args}")
+        sess.rollback()
+    except sqlalchemy.exc.SQLAlchemyError as err:
+        app_logger.warning(err.args)
+        sess.rollback()
+    finally:
+        sess.close()
+    
+
+
+def _update_weather(measurement_day: str, data: Dict) -&gt; None:
+    """
+    天候状態の更新処理
+    :param measurement_day: 測定日
+    :data 更新用データ (任意)
+    """
+    try:
+        # 天候データコンテナは必ずある
+        weather_data: Dict = data["weatherData"]
+        # 天候状態 
+        weather_condition: Dict = weather_data["weatherCondition"]
+        if app_logger_debug:
+            app_logger.debug(f"weather_condition: {weather_condition}")
+    except KeyError as err:
+        app_logger.warning(err)
+        return
+    
+    if weather_condition is None:
+        # 更新データ無し
+        return
+
+    # 主キー設定
+    weather_condition["measurementDay"] = measurement_day
+    # 気象センサDB用セッションオブジェクト取得
+    sess = get_sensors_session()
+    try:
+        sess.begin()
+        stmt = (
+            sqlalchemy.update(WeatherCondition).
+            where(WeatherCondition.measurementDay==measurement_day).
+            values(**weather_condition)
+        )
+        sess.execute(stmt)
+        sess.commit()
+        if app_logger_debug:
+            app_logger.debug(f"Updated[WeatherData]: MeasuremtDay: {measurement_day}")
+    except sqlalchemy.exc.SQLAlchemyError as err:
+        app_logger.warning(err.args)
+        sess.rollback()
+    finally:
+        sess.close()
+    
+
+
+def _check_postdata(request):
+    # リクエストヘッダーチェック
+    if "application/json" not in request.headers["Content-Type"]:
+        abort(BadRequest.code, _set_errormessage("450,Bad request Content-Type."))
+
+    # 登録用データ取得
+    data: dict = json.loads(request.data)
+    if app_logger_debug:
+        app_logger.debug(data)
+
+    # メールアドレスチェック
+    emailAddress = data.get("emailAddress", None)
+    if emailAddress is None:
+        abort(BadRequest.code, _set_errormessage("462,Required EmailAddress."))
+
+    # 測定日付チェック
+    measurementDay = data.get("measurementDay", None)
+    if measurementDay is None:
+        abort(BadRequest.code, _set_errormessage("463,Required MeasurementDay."))
+
+    # PersonテーブルにemailAddressが存在するか
+    personId = _get_personid(emailAddress)
+    if personId is None:
+        abort(BadRequest.code, _set_errormessage("461,User is not found."))
+
+    return personId, emailAddress, measurementDay, data    
+
+
+def _get_personid(email_address: str) -&gt; Optional[int]:
+    """
+    メールアドレスに対応するPersion.idを取得する
+    :email_address: メールアドレス
+    """
+    try:
+        session: Session = Session(engine_healthcare)
+        with session.begin():
+            stmt: Select = select(Person).where(Person.email == email_address)
+            person: Person = session.scalars(stmt).one()
+        if app_logger_debug:    
+            app_logger.debug(f"person.id: {person.id}")
+        return person.id
+    except NoResultFound as notFound:
+        app_logger.warning(f"NoResultFound: {notFound}")
+        return None
+    except Exception as error:
+        app_logger.error(f"Error: {error}")
+        abort(InternalServerError.code, _set_errormessage(f"{error}"))
+
+
+def _has_dict_in_data(dict_key: str, data:Dict) -&gt; Optional[Dict]:
+    try:
+        result: Dict = data[dict_key]
+        return result
+    except KeyError as err:
+        # データ無し
+        return None
+
+
+def make_getdata_success(json_dict: Dict) -&gt; Response:
+    """
+    データ取得処理OKレスポンス
+    :param json_dict: JSON出力用辞書
+    :return: Response
+    """
+    resp_obj: Dict = {
+        "status": {
+            "code": 0, "message": "OK"},
+        "data": json_dict
+    }
+    return _make_respose(resp_obj, 200)
+
+
+def make_register_success(email_address: str, measurement_day: str) -&gt; Response:
+    """
+    登録処理OKレスポンス
+    :param email_address: メールアドレス
+    :param measurement_day 測定日付
+    :return: Response
+    """
+    resp_obj: Dict = {
+        "status":
+            {"code": 0, "message": "OK"},
+        "data": {
+            "emailAddress": email_address,
+            "measurementDay": measurement_day
+        }
+    }
+    return _make_respose(resp_obj, 200)
+
+
+def _set_errormessage(message: str) -&gt; Dict:
+    ABORT_DICT_BLANK_MESSAGE[MSG_DESCRIPTION] = message
+    return ABORT_DICT_BLANK_MESSAGE
+
+
+def _make_respose(resp_obj: Dict, resp_code) -&gt; Response:
+    response = make_response(jsonify(resp_obj), resp_code)
+    response.headers["Content-Type"] = "application/json"
+    return response
+
+
+@app.errorhandler(BadRequest.code)
+@app.errorhandler(Forbidden.code)
+@app.errorhandler(NotFound.code)
+@app.errorhandler(Conflict.code) # IntegrityError (登録済み)
+@app.errorhandler(InternalServerError.code)
+def error_handler(error: HTTPException) -&gt; Response:
+    app_logger.warning(f"error_type:{type(error)}, {error}")
+    resp_obj: Dict[str, Dict[str, Union[int, str]]] = {
+        "status": {"code": error.code, "message": error.description["error_message"]}
+    }
+    return _make_respose(resp_obj, error.code)</code></pre>
+                </div>
+            </div>
+
+            <div class="row ms-5 small">
+                <dl class="ms-3">
+                    <dt class="indent">メニューページへ<dt>
+                    <dd class="indent mt-2">
+                        <a href="index.html">戻る</a>
+                    </dd>
+                    <dt class="indent mt-3">Javaプロジェクトのソースコードはこちら<dt>
+                    <dd class="indent mt-2">
+                        <a href="https://github.com/pipito-yukio/personal_healthcare/tree/main/src/java-health-care-example">
+                        https://github.com/pipito-yukio/personal_healthcare/tree/main/src/java-health-care-example
+                        </a>
+                    </dd>    
+                    <dt class="indent mt-3">Androidアプリのソースコードはこちら<dt>
+                    <dd class="indent mt-2">
+                        <a href="https://github.com/pipito-yukio/personal_healthcare/tree/main/src/android-health-care-example" target="_blank">
+                        https://github.com/pipito-yukio/personal_healthcare/tree/main/src/android-health-care-example
+                        </a>
+                    </dd>    
+                    <dt class="indent mt-3">サーバー側のFlaskアプリのソースコードはこちら<dt>
+                    <dd class="indent mt-2">
+                        <a href="https://github.com/pipito-yukio/personal_healthcare/tree/main/src/webapp">
+                        https://github.com/pipito-yukio/personal_healthcare/tree/main/src/webapp
+                        </a>
+                    </dd>    
+                </dl>
+            </div>
+        </div>
+        <script src="assets/highlight/js/highlight.min.js"></script>
+        <script src="assets/highlight/js/java.min.js"></script>
+        <script src="assets/highlight/js/cpp.min.js"></script>
+        <script>
+            hljs.highlightAll();
+        </script>
+        </div>
+    </body>
+</html>
