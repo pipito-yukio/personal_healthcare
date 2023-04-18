@@ -71,10 +71,6 @@ WebアプリケーシにSQLAlchemyを使ったデータベース処理(処理ク
 + 開発環境  
   Android Studio for Ubuntu 64bit
 
-### 2.4 Docker-compose
-
-+ [ソースコード] src/docker
-
-### 2.5 データベース定義
+### 2.4 データベース定義
 
 + [ソースコード] src/data/sql
