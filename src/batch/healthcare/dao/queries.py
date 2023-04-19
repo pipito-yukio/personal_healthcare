@@ -129,16 +129,25 @@ SELECT condition FROM weather.weather_condition WHERE measurement_day=:measureme
         :return: 健康管理データの辞書オブジェクト, 存在しない場合はNone
         """
         # パラメータ辞書生成: 主キー
+        # https://docs.sqlalchemy.org/en/20/orm/session_transaction.html
+        # will automatically begin again
+        # result = session.execute("< some select statement >")
+        # session.add_all([more_objects, ...])
+        # session.commit()  
         params = {"emailAddress": email, "measurementDay": measurement}
         row = None
         try:
             rs: Result = self.sess_healthcare.execute(text(self._QRY_GET_HEALTHCARE), params)
             if rs:
                 row = rs.fetchone()
+            self.sess_healthcare.commit()
         except sqlalchemy.exc.SQLAlchemyError as err:
+            self.sess_healthcare.rollback()
             if self.logger:
                 self.logger.warning(err.args)
             return None
+        finally:
+            self.sess_healthcare.close()
 
         if row is None:
             return None
@@ -184,10 +193,14 @@ SELECT condition FROM weather.weather_condition WHERE measurement_day=:measureme
             rs: Result = self.sess_sensors.execute(text(self._QRY_GET_WEATHER), params)
             if rs:
                 row = rs.fetchone()
+            self.sess_sensors.commit()    
         except sqlalchemy.exc.SQLAlchemyError as err:
+            self.sess_sensors.rollback()
             if self.logger:
                 self.logger.warning(err.args)
             return None
+        finally:
+            self.sess_sensors.close()
 
         if row is None:
             return None
