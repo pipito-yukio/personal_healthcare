@@ -4,7 +4,6 @@ from sqlalchemy.orm import mapped_column
 
 from dao import HealthcareBase
 
-# 健康管理データベース
 # 夜間頻尿要因管理テーブルデータクラス
 
 
@@ -28,13 +27,13 @@ class NocturiaFactors(HealthcareBase):
     def __repr__(self):
         return f"NocturiaFactors(pid={self.pid!r}, " \
                f"measurementDay={self.measurementDay!r}, " \
-               f"midnightToiletVisits={self.midnightToiletVisits!r})" \
-               f"hasTea={self.hasTea!r}" \
-               f"hasAlcohol={self.hasAlcohol!r}" \
-               f"hasNutritionDrink={self.hasNutritionDrink!r}" \
-               f"hasSportsDring={self.hasSportsDring!r}" \
-               f"hasDiuretic={self.hasDiuretic!r}" \
-               f"takeMedicine={self.takeMedicine!r}" \
-               f"takeBathing={self.takeBathing!r}" \
-               f"conditionMemo={len(self.conditionMemo)!r})"
+               f"midnightToiletVisits={self.midnightToiletVisits!r}," \
+               f"hasTea={self.hasTea!r}," \
+               f"hasAlcohol={self.hasAlcohol!r}," \
+               f"hasNutritionDrink={self.hasNutritionDrink!r}," \
+               f"hasSportsDrink={self.hasSportsDrink!r}," \
+               f"hasDiuretic={self.hasDiuretic!r}," \
+               f"takeMedicine={self.takeMedicine!r}," \
+               f"takeBathing={self.takeBathing!r}," \
+               f"conditionMemo={self.conditionMemo!r})"
 
