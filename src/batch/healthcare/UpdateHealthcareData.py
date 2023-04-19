@@ -10,6 +10,7 @@ from sqlalchemy.engine.url import URL
 from sqlalchemy import create_engine, Select, select
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.orm.exc import NoResultFound
+import sqlalchemy.exc
 
 from dao.person import Person
 from dao.sleep_management import SleepManagement
@@ -23,7 +24,7 @@ from dao.weather_condition import WeatherCondition
 健康管理データベースまたは気象センサーデータベース(天候状態)の更新処理
 """
 
-# 健康管理デーベース接続情報: [DB] healthcare_db [PORT] 5433
+# 健康管理デーベース接続情報: [DB] healthcare_db [PORT] 5432
 DB_HEALTHCARE_CONF: str = os.path.join("conf", "db_healthcare.json")
 # 気象センサーデータベース: [DB] sensors_pgdb [PORT] 5432
 DB_SENSORSE_CONF: str = os.path.join("conf", "db_sensors.json")
@@ -67,8 +68,11 @@ def _get_personid(session: Session, email_address: str) -> Optional[int]:
             person: Person = session.scalars(stmt).one()
         return person.id
     except NoResultFound as notFound:
-        print(f"NoResultFound: {notFound}")
+        app_logger.warning(f"NoResultFound: {notFound}")
         return None
+    except Exception as excption:
+        app_logger.error(f"Exception: {excption}")
+        raise excption
 
 
 # 健康管理データ更新
@@ -163,6 +167,8 @@ def _update_healthdata(sess: Session, person_id: int, measurement_day: str, data
     except sqlalchemy.exc.SQLAlchemyError as err:
         sess.rollback()
         app_logger.warning(err.args)
+    finally:
+        sess.close()
 
 
 def _update_weather(sess: Session, measurement_day: str, data: Dict) -> None:
@@ -202,6 +208,8 @@ def _update_weather(sess: Session, measurement_day: str, data: Dict) -> None:
     except sqlalchemy.exc.SQLAlchemyError as err:
         app_logger.warning(err.args)
         sess.rollback()
+    finally:
+        sess.close()
 
 
 if __name__ == '__main__':
@@ -224,7 +232,7 @@ if __name__ == '__main__':
     conn_url: URL = URL.create(**url_dict)
     engine_healthcare: sqlalchemy.Engine = create_engine(conn_url, echo=True)
     Session_healthcare = sessionmaker(bind=engine_healthcare)
-    # 気象センサーデータベース接続状ワウ
+    # 気象センサーデータベース接続情報
     url_dict: dict = get_conn_dict(DB_SENSORSE_CONF)
     conn_url: URL = URL.create(**url_dict)
     engine_sensors: sqlalchemy.Engine = create_engine(conn_url, echo=True)
