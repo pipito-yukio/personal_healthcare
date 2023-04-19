@@ -1,7 +1,7 @@
 {
   "drivername": "postgresql+psycopg2",
   "host": "{hostname}.local",
-  "port": "5433",
+  "port": "5432",
   "database": "healthcare_db",
   "username": "developer",
   "password": "dev%5588"
