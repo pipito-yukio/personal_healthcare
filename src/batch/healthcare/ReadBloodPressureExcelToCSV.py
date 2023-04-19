@@ -117,15 +117,19 @@ if __name__ == '__main__':
             line_step: str = FMT_LINE_STEP_COUNT.format(*step_list)
             csv_walking_list.append(line_step)
 
-    # 保存パス
-    save_path: str = os.path.dirname(excel_file)
+    # Excelファイルのパス
+    save_base_path: str = os.path.dirname(excel_file)
+    # CSVの保存パス: Excelファイルパスの"csv"サブディレクトリ
+    save_csv_path: str = os.path.join(save_base_path, "csv")
+    if not os.path.exists(save_csv_path):
+        os.makedirs(save_csv_path)
     # 血圧測定CSVファイル
     blood_name: str = OUTPUT_BLOOD_PRESSURE.format(sheet_name=args.sheet_name)
-    blood_path: str = os.path.join(save_path, "csv", blood_name)
+    blood_path: str = os.path.join(save_csv_path, blood_name)
     _save_csv(blood_path, csv_blood_list)
     print(f"Saved: {blood_path}")
     # 歩数測定CSVファイル
     step_name: str = OUTPUT_STEP_COUNT.format(sheet_name=args.sheet_name)
-    step_path: str = os.path.join(save_path, "csv", step_name)
+    step_path: str = os.path.join(save_csv_path, step_name)
     _save_csv(step_path, csv_walking_list)
     print(f"Saved: {step_path}")

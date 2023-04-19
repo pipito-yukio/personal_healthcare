@@ -201,25 +201,30 @@ if __name__ == '__main__':
             line_weather: str = FMT_LINE_WEATHER.format(*weather_list)
             csv_weather_list.append(line_weather)
 
-    # 保存パス
-    save_path: str = os.path.dirname(excel_file)
+    # Excelファイルのパス
+    save_base_path: str = os.path.dirname(excel_file)
+    # CSVの保存パス: Excelファイルパスの"csv"サブディレクトリ
+    save_csv_path: str = os.path.join(save_base_path, "csv")
+    if not os.path.exists(save_csv_path):
+        os.makedirs(save_csv_path)
+
     # 睡眠管理CSVファイル
     sleep_man_name: str = OUTPUT_SLEEP_MAN.format(sheet_name=args.sheet_name)
-    sleep_man_path: str = os.path.join(save_path, "csv", sleep_man_name)
+    sleep_man_path: str = os.path.join(save_csv_path, sleep_man_name)
     _save_csv(sleep_man_path, csv_sleep_man)
     print(f"Saved: {sleep_man_path}")
     # 夜間頻尿要因CSVファイル
     nocturia_fact_name: str = OUTPUT_NOCTURIA_FACT.format(sheet_name=args.sheet_name)
-    nocturia_fact_path: str = os.path.join(save_path, "csv", nocturia_fact_name)
+    nocturia_fact_path: str = os.path.join(save_csv_path, nocturia_fact_name)
     _save_csv(nocturia_fact_path, csv_nocturia_fact)
     print(f"Saved: {nocturia_fact_path}")
     # 体温測定CSVファイル
     body_temper_name: str = OUTPUT_BODY_TEMPER.format(sheet_name=args.sheet_name)
-    body_temper_path: str = os.path.join(save_path, "csv", body_temper_name)
+    body_temper_path: str = os.path.join(save_csv_path, body_temper_name)
     _save_csv(body_temper_path, csv_body_temper)
     print(f"Saved: {body_temper_path}")
     # 天候CSVファイル
     weather_name: str = OUTPUT_WEATHER.format(sheet_name=args.sheet_name)
-    weather_path: str = os.path.join(save_path, "csv", weather_name)
+    weather_path: str = os.path.join(save_csv_path, weather_name)
     _save_csv(weather_path, csv_weather_list)
     print(f"Saved: {weather_path}")
