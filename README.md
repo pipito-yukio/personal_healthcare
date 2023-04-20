@@ -415,7 +415,7 @@ psql -Udeveloper -d healthcare_db -c "\copy bodyhealth.sleep_management FROM '/h
 psql -Udeveloper -d healthcare_db -c "\copy bodyhealth.blood_pressure FROM '/home/pi/data/sql/health/csv/blood_pressure.csv' DELIMITER ',' CSV HEADER;"
 # 夜間頻尿要因
 psql -Udeveloper -d healthcare_db -c "\copy bodyhealth.nocturia_factors FROM '/home/pi/data/sql/health/csv/nocturia_factors.csv' DELIMITER ',' CSV HEADER;"
-# 歩数データ
+# 歩数データ$ tar czvf ../raspi4_healthcare.tar.gz 1_create_healthcare_db.sh 3_import_healthcare.sh \4_inst_webapp_healthcare.sh data work bin docker Healthcare/
 psql -Udeveloper -d healthcare_db -c "\copy bodyhealth.walking_count FROM '/home/pi/data/sql/health/csv/walking_count.csv' DELIMITER ',' CSV HEADER;"
 # 体温測定データ
 psql -Udeveloper -d healthcare_db -c "\copy bodyhealth.body_temperature FROM '/home/pi/data/sql/health/csv/body_temperature.csv' DELIMITER ',' CSV HEADER;"
@@ -479,6 +479,216 @@ User=pi
 WantedBy=multi-user.target
 ```
 
+### 3-3.開発PCでtarアーカイブの作成しラズパイ４にコピーする
+```bash
+$ tar czvf ../raspi4_healthcare.tar.gz 1_create_healthcare_db.sh 3_import_healthcare.sh 4_inst_webapp_healthcare.sh data work bin docker Healthcare/  
+
+$ scp ../raspi4_healthcare.tar.gz pi@raspi-4:/home/pi
+```
+
+### 3-4.ラズパイ４側でインストールを実行する
+
+(1) インストール前にUDPバケットモニターサービスを停止する  
+※10分間隔でESP気象センサーからのUDPパケットを受信し気象テーブルに登録している
+```bash
+pi@raspi-4:~ $ sudo systemctl stop udp-weather-mon.service 
+pi@raspi-4:~ $ sudo systemctl disable udp-weather-mon.service 
+Removed /etc/systemd/system/multi-user.target.wants/udp-weather-mon.service.
+```
+
+(2) tarアーカイブを解凍する
+```
+pi@raspi-4:~ $ tar xzf raspi4_healthcare.tar.gz
+pi@raspi-4:~ $ ls -lrt
+合計 132
+drwxr-xr-x 2 pi pi  4096  4月  4  2022 Bookshelf
+drwxr-xr-x 2 pi pi  4096  4月  4  2022 Desktop
+drwxr-xr-x 2 pi pi  4096  4月  4  2022 Videos
+drwxr-xr-x 2 pi pi  4096  4月  4  2022 Templates
+drwxr-xr-x 2 pi pi  4096  4月  4  2022 Public
+drwxr-xr-x 2 pi pi  4096  4月  4  2022 Pictures
+drwxr-xr-x 2 pi pi  4096  4月  4  2022 Music
+drwxr-xr-x 2 pi pi  4096  4月  4  2022 Documents
+drwxr-xr-x 3 pi pi  4096  8月  3  2022 logs
+drwxr-xr-x 3 pi pi  4096  8月  3  2022 db
+drwxr-xr-x 3 pi pi  4096  9月  3  2022 py_venv
+drwxr-xr-x 3 pi pi  4096  9月  3  2022 webapp
+drwxr-xr-x 3 pi pi  4096  9月 21  2022 Downloads
+drwxr-xr-x 3 pi pi  4096  9月 23  2022 PlotWeatherForRaspi4
+drwxr-xr-x 3 pi pi  4096  4月 10 11:57 data
+drwxr-xr-x 3 pi pi  4096  4月 10 13:42 work
+drwxr-xr-x 4 pi pi  4096  4月 10 13:42 docker
+drwxr-xr-x 4 pi pi  4096  4月 10 13:42 bin
+drwxr-xr-x 3 pi pi  4096  4月 10 13:47 Healthcare
+-rwxr-xr-x 1 pi pi   450  4月 10 15:46 4_inst_webapp_healthcare.sh
+-rwxr-xr-x 1 pi pi   577  4月 11 09:52 1_create_healthcare_db.sh
+-rwxr-xr-x 1 pi pi   720  4月 11 10:23 2_inst_healthcare_container.sh
+-rwxr-xr-x 1 pi pi   643  4月 11 10:37 3_import_healthcare.sh
+-rw-r--r-- 1 pi pi 40179  4月 11 13:20 raspi4_healthcare.tar.gz
+```
+
+(3) 天候状態テーブルを気象センサーデータベースに追加しCSVをインポート  
+　と健康管理データベースの作成 
+```bash
+pi@raspi-4:~ $ ./1_create_healthcare_db.sh 
+CREATE TABLE
+ALTER TABLE
+21_createtable_weather_condition.sql >> status=0
+COPY 99
+add_weather_table.sh >> status=0
+CREATE DATABASE
+GRANT
+create_healthcare_db.sh >> status=0
+Done.
+```
+
+(4) 健康管理テーブル作成とCSVの一括インポート
+```bash
+pi@raspi-4:~ $ ./3_import_healthcare.sh 
+Creating network "postgres-12h_default" with the default driver
+Creating postgres-12h ... done
+docker-compose up -d >> status=0pi@raspi-4:~ 
+NOTICE:  schema "bodyhealth" does not exist, skipping
+DROP TABLE
+NOTICE:  schema "bodyhealth" does not exist, skipping
+DROP TABLE
+NOTICE:  schema "bodyhealth" does not exist, skipping
+DROP TABLE
+NOTICE:  schema "bodyhealth" does not exist, skipping
+DROP TABLE
+NOTICE:  schema "bodyhealth" does not exist, skipping
+DROP TABLE
+NOTICE:  schema "bodyhealth" does not exist, skipping
+DROP TABLE
+NOTICE:  schema "bodyhealth" does not exist, skipping
+DROP SCHEMA
+CREATE SCHEMA
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER SCHEMA
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+You are now connected to database "healthcare_db" as user "developer".
+INSERT 0 1
+Create_healthcare_tables.sh >> status=0
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+COPY 99
+COPY 99
+COPY 99
+COPY 99
+COPY 99
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLEインストール
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+Import_from_csv.sh >> status=0
+Stopping postgres-12h ... done
+Removing postgres-12h ... done
+Removing network postgres-12h_default
+Done.
+```
+
+(5) 健康管理Flaskアプリサービスインストール ※実行前にpiユーザのパスワードを設定、リブートあり
+```bash
+pi@raspi-4:~ $ export my_passwd=xxxxxxx
+pi@raspi-4:~ $ ./4_inst_webapp_healthcare.sh 
+
+[notice] A new release of pip available: 22.2.2 -> 23.0.1
+[notice] To update, run: pip install --upgrade pip
+Created symlink /etc/systemd/system/multi-user.target.wants/webapp-healthcare.service → /etc/systemd/system/webapp-healthcare.service.
+rebooting.
+Connection to raspi-4 closed by remote host.
+Connection to raspi-4 closed.
+```
+
+### 3-5.インストール後の確認作業
+
+(1) 健康管理テーブル件数確認
+```
+pi@raspi-4:~ $ docker exec -it postgres-12 bin/bash
+
+bash-5.1# echo "SELECT COUNT(*) FROM bodyhealth.blood_pressure;" | psql -Udeveloper healthcare_db
+ count 
+-------
+    99
+(1 row)
+
+bash-5.1# echo "SELECT COUNT(*) FROM bodyhealth.sleep_management;" | psql -Udeveloper healthcare_db
+ count 
+-------
+    99
+(1 row)
+
+bash-5.1# echo "SELECT COUNT(*) FROM bodyhealth.walking_count;" | psql -Udeveloper healthcare_db
+ count 
+-------
+    99
+(1 row)
+
+bash-5.1# echo "SELECT COUNT(*) FROM bodyhealth.nocturia_factors;" | psql -Udeveloper healthcare_db
+ count 
+-------
+    99
+(1 row)
+
+bash-5.1# echo "SELECT COUNT(*) FROM bodyhealth.body_temperature;" | psql -Udeveloper healthcare_db
+ count 
+-------
+    99
+(1 row)
+
+```
+
+(2) リブート後のサービス確認
+```bash
+pi@raspi-4:~ $ sudo systemctl status webapp-healthcare.service 
+● webapp-healthcare.service - Flask webapp Healthcare service
+     Loaded: loaded (/etc/systemd/system/webapp-healthcare.service; enabled; vendor preset: enabled)
+     Active: active (running) since Tue 2023-04-11 14:30:22 JST; 2min 12s ago
+   Main PID: 1223 (start.sh)
+      Tasks: 6 (limit: 8897)
+        CPU: 1.558s
+     CGroup: /system.slice/webapp-healthcare.service
+             ├─1223 /bin/bash /home/pi/Healthcare/start.sh prod >/dev/null
+             └─1227 python /home/pi/Healthcare/run.py
+
+ 4月 11 14:30:22 raspi-4 systemd[1]: Started Flask webapp Healthcare service.
+ 4月 11 14:30:22 raspi-4 start.sh[1223]: raspi-4.local with production
+```
 
 ### 4.健康管理Flaskアプリインストール後の動作確認
 
