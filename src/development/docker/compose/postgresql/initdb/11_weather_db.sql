@@ -1,5 +1,3 @@
-\connect sensors_pgdb
-
 CREATE SCHEMA IF NOT EXISTS weather;
 
 CREATE TABLE IF NOT EXISTS weather.t_device(

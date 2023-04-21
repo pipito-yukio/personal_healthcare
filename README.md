@@ -268,8 +268,6 @@ psql -Udeveloper healthcare_db < 20_insert_person.sql
 
 + data/sql/health/11_createtable.sql
 ```SQL
-\connnect healthcare_db
-
 DROP INDEX IF EXISTS bodyhealth.idx_person_email;
 DROP TABLE IF EXISTS bodyhealth.sleep_management;
 DROP TABLE IF EXISTS bodyhealth.blood_pressure;
