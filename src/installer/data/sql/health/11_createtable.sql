@@ -1,5 +1,3 @@
-\connnect healthcare_db
-
 DROP INDEX IF EXISTS bodyhealth.idx_person_email;
 DROP TABLE IF EXISTS bodyhealth.sleep_management;
 DROP TABLE IF EXISTS bodyhealth.blood_pressure;
