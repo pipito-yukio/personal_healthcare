@@ -155,7 +155,7 @@ public class AppTopFragment extends Fragment {
     //  選択されているラジオボタンID
     private int mSelectedRadioId;
     // 測定日付の比較用基準オブジェクト(本日)
-    private LocalDate mNowLocalDate;
+    private final LocalDate mNowLocalDate = LocalDate.now();
     // DatePickerDialogに連動するカレンダーオブジェクト
     private final Calendar mMeasurementDayCal = Calendar.getInstance();
     // 夜間頻尿要因チェックボックス
@@ -886,8 +886,6 @@ public class AppTopFragment extends Fragment {
      */
     private void setTodayValue(TextView v) {
         Date now = new Date();
-        // 比較用の 本日LocalDate生成
-        mNowLocalDate = now.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
         // TAG値用の日付生成
         String tagValue = String.format(AppTopUtil.ISO_8601_DATE_FORMAT, now);
         updateDateView(v, tagValue);
@@ -1435,7 +1433,7 @@ public class AppTopFragment extends Fragment {
             mMeasurementDayCal.set(year, month, dayOfMonth);
             // カレンダーで選択した日によって条件を満たさなければサーバーに問い合わせる
             LocalDate selectedLocal = AppTopUtil.localDateOfCalendar(mMeasurementDayCal);
-            DEBUG_OUT.accept(TAG, "selectedLocal: " + selectedLocal);
+            DEBUG_OUT.accept(TAG, "selected: " + selectedLocal + " ,now: " + mNowLocalDate);
             if (selectedLocal.isBefore(mNowLocalDate)) {
                 // 過去日の場合はプリファレンスから登録済み日付を取得する (未登録ならnull)
                 String regDate = getLatestRegisteredDateInPref();
@@ -1689,7 +1687,7 @@ public class AppTopFragment extends Fragment {
         }
         RegisterData registerData = generateRegisterData();
         String result = gson.toJson(registerData);
-        DEBUG_OUT.accept(TAG, result);
+        DEBUG_OUT.accept(TAG, "GenJsonForRegist: \n" + result);
         return result;
     }
 
