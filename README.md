@@ -485,7 +485,7 @@ WantedBy=multi-user.target
 + インストールに失敗した場合に備え、元に戻すためSDカード(64GB)のバックアップを取っておきます  
 ※バックアップ時間は約65分ぐらい掛かりました。サイズは約2GBです。
 ```
-sudo dd bs=4M if=/dev/sdc | gzip > PiOS-64bit-raspi-4-2023-04-11.img.gz
+$ sudo dd bs=4M if=/dev/sdc | gzip > PiOS-64bit-raspi-4-2023-04-11.img.gz
 15226+1 レコード入力
 15226+1 レコード出力
 63864569856 bytes (64 GB, 59 GiB) copied, 3816.94 s, 16.7 MB/s
@@ -652,7 +652,7 @@ Connection to raspi-4 closed by remote host.
 Connection to raspi-4 closed.
 ```
 
-### 3-6.インストール後の確認作業
+### 3-7.インストール後の確認作業
 
 (1) 健康管理テーブル件数確認
 ```
