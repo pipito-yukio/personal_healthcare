@@ -71,20 +71,22 @@ WebアプリケーシにSQLAlchemyを使ったデータベース処理(処理ク
 + 開発環境  
   Android Studio for Ubuntu 64bit
 
-### 2.4 データベース定義
+### 2.4 データベースとテーブル定義
 
 + [ソースコード] src/data/sql
 
 
-## 3.ラズパイ４にアプリケーションをインストールする
+## 3.アプリケーションインストーラーを作成する
+
++ 気象データビューワーのインスール時にdockerとdocker-composeがインストールしており、ラズパイ４ではPostgreSQLがdockerコンテナーサービスとして稼働しているので、インストーラースクリプトでは docker exec コマンドを使ってデータベース作成とテーブルの作成を行います。
 
 ### 3-1.インストーラーのファイル構成
 
-* [**src/installer**] ディレクトリに必要なファイルをまとめました
+* [**src/installer**] 
 ```
 src/installer/
 ├── 1_create_healthcare_db.sh    // 健康管理データベース作成等シェルスクリプト (1)
-├── 3_import_healthcare.sh       // 上記テーブル作成とCSVインポートシェルスクリプト (2)
+├── 3_import_healthcare.sh       // 健康管理テーブル作成とCSVインポートシェルスクリプト (2)
 ├── 4_inst_webapp_healthcare.sh  // 健康管理Flaskアプリサービス登録シェルスクリプト (3)
 ├── Healthcare // Flaskアプリケーシ
 │   ├── healthcare
@@ -122,8 +124,8 @@ src/installer/
 │   │   └── views
 │   │       ├── __init__.py
 │   │       └── app_main.py  // リクエスト処理メイン
-│   ├── run.py
-│   └── start.sh
+│   ├── run.py // プロダクション起動の場合は waitress, それ以外はFlaskアプリをDEBUG実行
+│   └── start.sh  // run.pyを実行するシェルスクリプト(ホスト名とポート番号、起動種別の設定)
 ├── bin
 │   └── conf // データベース接続情報 (SQLAlchemy用) 
 │       ├── db_healthcare.json    // 新規作成する健康管理データベース 
@@ -479,16 +481,26 @@ User=pi
 WantedBy=multi-user.target
 ```
 
-### 3-3.開発PCでtarアーカイブの作成しラズパイ４にコピーする
+### 3-3.ラズパイ4のSDカードをバックアップ
++ インストールに失敗した場合に備え、元に戻すためSDカード(64GB)のバックアップを取っておきます  
+※バックアップ時間は約65分ぐらい掛かりました。サイズは約2GBです。
+```
+sudo dd bs=4M if=/dev/sdc | gzip > PiOS-64bit-raspi-4-2023-04-11.img.gz
+15226+1 レコード入力
+15226+1 レコード出力
+63864569856 bytes (64 GB, 59 GiB) copied, 3816.94 s, 16.7 MB/s
+```
+
+### 3-4.開発PCでtarアーカイブを作成しラズパイ４にコピーする
 ```bash
 $ tar czvf ../raspi4_healthcare.tar.gz 1_create_healthcare_db.sh 3_import_healthcare.sh 4_inst_webapp_healthcare.sh data work bin docker Healthcare/  
 
 $ scp ../raspi4_healthcare.tar.gz pi@raspi-4:/home/pi
 ```
 
-### 3-4.ラズパイ４側でインストールを実行する
+### 3-5.ラズパイ４側で前準備
 
-(1) インストール前にUDPバケットモニターサービスを停止する  
+(1) UDPバケットモニターサービスを停止する  
 ※10分間隔でESP気象センサーからのUDPパケットを受信し気象テーブルに登録している
 ```bash
 pi@raspi-4:~ $ sudo systemctl stop udp-weather-mon.service 
@@ -496,7 +508,7 @@ pi@raspi-4:~ $ sudo systemctl disable udp-weather-mon.service
 Removed /etc/systemd/system/multi-user.target.wants/udp-weather-mon.service.
 ```
 
-(2) tarアーカイブを解凍する
+(2) tarアーカイブを解凍する ※下記は解凍した後のディレクトリ構成
 ```
 pi@raspi-4:~ $ tar xzf raspi4_healthcare.tar.gz
 pi@raspi-4:~ $ ls -lrt
@@ -527,8 +539,11 @@ drwxr-xr-x 3 pi pi  4096  4月 10 13:47 Healthcare
 -rw-r--r-- 1 pi pi 40179  4月 11 13:20 raspi4_healthcare.tar.gz
 ```
 
-(3) 天候状態テーブルを気象センサーデータベースに追加しCSVをインポート  
-　と健康管理データベースの作成 
+### 3-6.インストール実行
+
+(1) 健康管理データベース作成等シェルスクリプトを実行する  
++ 健康管理データベースを作成する
++ 既存の気象センサーデータベースに天候テーブルを追加しCSVファイルから過去３ヶ月分の天候データをインポートする
 ```bash
 pi@raspi-4:~ $ ./1_create_healthcare_db.sh 
 CREATE TABLE
@@ -542,12 +557,15 @@ create_healthcare_db.sh >> status=0
 Done.
 ```
 
-(4) 健康管理テーブル作成とCSVの一括インポート
+(2) 健康管理テーブル作成とCSVインポートシェルスクリプトを実行する  
++ 健康管理データベースに健康管理テーブルを作成する
++ 健康管理テーブルにCSVファイルから過去３ヶ月分の健康管理データをインポートする
+
 ```bash
 pi@raspi-4:~ $ ./3_import_healthcare.sh 
-Creating network "postgres-12h_default" with the default driver
-Creating postgres-12h ... done
-docker-compose up -d >> status=0pi@raspi-4:~ 
+invalid command \connnect
+NOTICE:  schema "bodyhealth" does not exist, skipping
+DROP INDEX
 NOTICE:  schema "bodyhealth" does not exist, skipping
 DROP TABLE
 NOTICE:  schema "bodyhealth" does not exist, skipping
@@ -565,7 +583,6 @@ DROP SCHEMA
 CREATE SCHEMA
 CREATE TABLE
 CREATE INDEX
-CREATE TABLE
 CREATE TABLE
 CREATE TABLE
 CREATE TABLE
@@ -602,7 +619,7 @@ ALTER TABLE
 ALTER TABLE
 COPY 99
 COPY 99
-COPY 99
+COPY 99の
 COPY 99
 COPY 99
 ALTER TABLE
@@ -616,13 +633,13 @@ ALTER TABLE
 ALTER TABLE
 ALTER TABLE
 Import_from_csv.sh >> status=0
-Stopping postgres-12h ... done
-Removing postgres-12h ... done
-Removing network postgres-12h_default
 Done.
 ```
 
-(5) 健康管理Flaskアプリサービスインストール ※実行前にpiユーザのパスワードを設定、リブートあり
+(3) 健康管理Flaskアプリサービス登録シェルスクリプトを実行する  
++ 実行前にpiユーザのパスワードを設定する
++ インストールが完了するとリブートする
+ 
 ```bash
 pi@raspi-4:~ $ export my_passwd=xxxxxxx
 pi@raspi-4:~ $ ./4_inst_webapp_healthcare.sh 
@@ -635,7 +652,7 @@ Connection to raspi-4 closed by remote host.
 Connection to raspi-4 closed.
 ```
 
-### 3-5.インストール後の確認作業
+### 3-6.インストール後の確認作業
 
 (1) 健康管理テーブル件数確認
 ```
