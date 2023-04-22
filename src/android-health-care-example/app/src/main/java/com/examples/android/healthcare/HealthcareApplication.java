@@ -1,6 +1,6 @@
 package com.examples.android.healthcare;
 
-import static com.webriverside.android.healthcare.functions.MyLogging.DEBUG_OUT;
+import static com.examples.android.healthcare.functions.MyLogging.DEBUG_OUT;
 
 import android.app.Application;
 import android.content.res.AssetManager;
