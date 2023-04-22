@@ -106,13 +106,18 @@ public class AppTopUtil {
     }
 
     /**
-     * 処理日付がプリファレンス日付より最新かどうか判定する
-     * <p>True: 測定日付 > プリファレンス日付</p>
+     * POST種別に対応する処理日付がプリファレンス日付より最新かどうか判定する
+     * <ul>POST種別ごとの判定条件
+     *     <li>登録時: [判定条件] 測定日付 > プリファレンス日付</li>
+     *     <li>更新時: [判定条件] 測定日付 >= プリファレンス日付</li>
+     * </ul>
      * @param processDate 処理日付 (必須)
      * @param prefDate プリファレンス日付 (任意: 登録済み日付無し)
-     * @return プリファレンス日付がnullまたはより最新ならtrue, 等しいか過去ならfalse
+     * @param postRequest POST処理種別 (REGISTER | UPDATE)
+     * @return 判定条件を満たしたらtrue, それ以外ならfalse
      */
-    public static boolean morelatestInPrefDate(String processDate, String prefDate) {
+    public static boolean processDateGreaterPrefDate(String processDate, String prefDate,
+                                                     PostRequest postRequest) {
         if (TextUtils.isEmpty(prefDate)) {
             // プリファレンス日付が未設定なら最新
             return true;
@@ -122,7 +127,13 @@ public class AppTopUtil {
         int[] prefArray = splitDateValue(prefDate);
         LocalDate processLocal = LocalDate.of(processArray[0], processArray[1], processArray[2]);
         LocalDate prefLocal = LocalDate.of(prefArray[0], prefArray[1], prefArray[2]);
-        return processLocal.isAfter(prefLocal);
+        if (PostRequest.REGISTER.equals(postRequest)) {
+            // 登録時: より最新(GT)
+            return processLocal.isAfter(prefLocal);
+        } else {
+            // 更新時: 等しいか最新(GE)
+            return processLocal.isEqual(prefLocal) || processLocal.isAfter(prefLocal);
+        }
     }
 
     /**
