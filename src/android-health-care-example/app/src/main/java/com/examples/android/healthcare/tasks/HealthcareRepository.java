@@ -1,5 +1,7 @@
 package com.examples.android.healthcare.tasks;
 
+import static com.examples.android.healthcare.functions.MyLogging.DEBUG_OUT;
+
 import android.os.Handler;
 import android.util.Log;
 
@@ -112,7 +114,7 @@ public abstract class HealthcareRepository<T> {
 
             // Check response code: allow 200 only.
             int respCode = conn.getResponseCode();
-            Log.d(TAG, "ResponseCode:" + respCode);
+            DEBUG_OUT.accept(TAG, "ResponseCode:" + respCode);
             if (respCode == HttpURLConnection.HTTP_OK) {
                 String respText = getResponseText(conn.getInputStream());
                 T result = parseResultJson(respText);
@@ -121,12 +123,12 @@ public abstract class HealthcareRepository<T> {
                 // 4xx - 50x
                 // Flaskアプリからはエラーストリームが生成される
                 String respText = getResponseText(conn.getErrorStream());
-                Log.d(TAG, "NG: " + respText);
+                DEBUG_OUT.accept(TAG, "NG: " + respText);
                 // ウォーニング時のJSONはデータ部が存在しないのでウォーニング専用ハースを実行
                 T result = parseWarningJson(respText);
                 // ResponseStatusのみ, GET用Dataクラス == null
                 ResponseStatus status = ((GetCurrentDataResult) result).getStatus();
-                Log.d(TAG, "NG.ResponseStatus: " + respText);
+                DEBUG_OUT.accept(TAG, "NG.ResponseStatus: " + respText);
                 return new Result.Warning<>(status);
             }
         } catch (Exception ie) {
@@ -173,7 +175,7 @@ public abstract class HealthcareRepository<T> {
 
             // Check response code: allow 200 only.
             int respCode = conn.getResponseCode();
-            Log.d(TAG, "ResponseCode:" + respCode);
+            DEBUG_OUT.accept(TAG, "ResponseCode:" + respCode);
             if (respCode == HttpURLConnection.HTTP_OK) {
                 String respText = getResponseText(conn.getInputStream());
                 T result = parseResultJson(respText);
@@ -182,12 +184,12 @@ public abstract class HealthcareRepository<T> {
                 // 4xx - 50x: ResultStatus, Dataクラス == null
                 // Flaskアプリからはエラーストリームが生成される
                 String respText = getResponseText(conn.getErrorStream());
-                Log.d(TAG, "NG: " + respText);
+                DEBUG_OUT.accept(TAG, "NG: " + respText);
                 // ウォーニング時のJSONはデータ部が存在しないのでウォーニング専用ハースを実行
                 T result = parseWarningJson(respText);
                 // ResponseStatusのみ, Post用Dataクラス == null
                 ResponseStatus status = ((RegisterResult) result).getStatus();
-                Log.d(TAG, "NG.ResponseStatus: " + respText);
+                DEBUG_OUT.accept(TAG, "NG.ResponseStatus: " + respText);
                 return new Result.Warning<>(status);
             }
         } catch (Exception ie) {
