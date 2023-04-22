@@ -75,6 +75,7 @@ import com.examples.android.healthcare.tasks.Result;
 import java.io.File;
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -1975,24 +1976,22 @@ public class AppTopFragment extends Fragment {
                             // リクエストURLをAppBarに表示
                             showActionBarResult(requestUrlWithPath);
                             if (result instanceof Result.Success) {
-                                // 更新前のプリファレンスから最新登録日付を取得する
-                                String before = getLatestRegisteredDateInPref();
-                                // 測定日付から登録日付を取得
-                                String after = toStringOfTextViewBySelfTag(mInpMeasurementDate);
-                                // 登録済みプリファレンスの上書き保存
-                                //  (1) 登録日付がプリファレンス最新登録日付より最新の場合
-                                //  (2) 更新日付がプリファレンス最新登録日付に等しいか、最新の場合
-                                if (AppTopUtil.processDateGreaterPrefDate(after, before,
-                                        mCurrentPostRequest/*REGISTERED | UPDATE*/)) {
-                                    // 最新登録日の復元用に登録済みJSONをファイル保存
-                                    saveJsonToFile(JsonFileSaveTiming.REGISTERED);
-                                }
                                 String recentJson;
-                                if (PostRequest.REGISTER.equals(mCurrentPostRequest)) {
+                                // 登録処理の場合
+                                if (mCurrentPostRequest.equals(PostRequest.REGISTER)) {
+                                    // 更新前のプリファレンスから最新登録日付を取得する
+                                    String before = getLatestRegisteredDateInPref();
+                                    // 測定日付から登録日付を取得
+                                    String after = toStringOfTextViewBySelfTag(mInpMeasurementDate);
+                                    // 登録日付がプリファレンスの最新登録日付より最新の場合のみ上書き保存
+                                    if (AppTopUtil.morelatestInPrefDate(after, before)) {
+                                        // 最新登録日の復元用に登録済みJSONをファイル保存
+                                        saveJsonToFile(JsonFileSaveTiming.REGISTERED);
+                                    }
+                                    // 送信成功なら一時保存JSONファイルを削除する
+                                    deleteSavedFile();
                                     // 登録: リクエストのJSON文字列をそのまま利用
                                     recentJson = jsonText;
-                                    // 登録OKなら一時保存JSONファイルを削除する
-                                    deleteSavedFile();
                                 } else {
                                     // 更新: 全入力ウィジットからJSON文字列を生成する
                                     recentJson = generateJsonTextForRegist();
