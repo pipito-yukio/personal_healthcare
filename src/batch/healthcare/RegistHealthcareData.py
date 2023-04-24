@@ -187,7 +187,7 @@ if __name__ == '__main__':
     if app_logger_debug:
         app_logger.debug(healthcare_data)
 
-    # 健康管理データベス接続情報
+    # 健康管理データベース接続情報
     url_dict: dict = get_conn_dict(DB_HEALTHCARE_CONF)
     conn_url: URL = URL.create(**url_dict)
     engine_healthcare: sqlalchemy.Engine = create_engine(conn_url, echo=False)
@@ -198,8 +198,9 @@ if __name__ == '__main__':
     engine_sensors: sqlalchemy.Engine = create_engine(conn_url, echo=False)
     Session_sensors = sessionmaker(bind=engine_sensors)
 
-    # 健康管理テーブルの主キー
+    # メールアドレス取得
     emailAddress: str = healthcare_data["emailAddress"]
+    # メールアドレスに対応する個人ID取得: 健康管理テーブルの主キー
     person_id: int = _get_personid(Session_healthcare(), emailAddress)
     if person_id is None:
         app_logger.warning("Person not found.")
@@ -208,8 +209,8 @@ if __name__ == '__main__':
     # 測定日付: 健康管理テーブルと天候状態テーブルの主キー
     measurementDay: str = healthcare_data["measurementDay"]
 
-    # 健康管理データ更新
+    # 健康管理データベースの全テーブル一括登録
     _insert_healthdata(Session_healthcare(), person_id, measurementDay, healthcare_data)
-    # 天候状態
+    # 天候状態テーブル登録
     _insert_weather(Session_sensors(), measurementDay, healthcare_data)
 
