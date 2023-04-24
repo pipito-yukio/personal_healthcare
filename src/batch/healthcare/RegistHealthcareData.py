@@ -88,7 +88,7 @@ def _insert_healthdata(sess: Session, person_id: int, measurement_day: str, data
         # (5) 体温データ
         body_temper: Dict = healthcare_data["bodyTemperature"]
     except KeyError as err:
-        app_logger.error("Required All HealthcareData!")
+        app_logger.warning(err)
         exit(1)
 
     # 主キー値を設定
