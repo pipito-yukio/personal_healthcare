@@ -404,8 +404,6 @@ def _update_weather(measurement_day: str, data: Dict) -> None:
         # 更新データ無し
         return
 
-    # 主キー設定
-    weather_condition["measurementDay"] = measurement_day
     # 気象センサDB用セッションオブジェクト取得
     sess = get_sensors_session()
     try:
