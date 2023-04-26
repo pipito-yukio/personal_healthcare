@@ -13,29 +13,13 @@ from dao.queries import Selector
 
 DB_HEALTHCARE_CONF: str = os.path.join("conf", "db_healthcare.json")
 DB_SENSORS_CONF: str = os.path.join("conf", "db_sensors.json")
-JSON_DATA = os.path.join("json_datas", "healthcare_data_latest.json")
-
-JSON_TEMPL = os.path.join("json_datas", 'healthcare_data_templ.txt')
 SAVE_JSON = os.path.join("json_datas", 'out_healthcare_data.json')
-
 LOG_FMT = '%(asctime)s %(filename)s %(funcName)s %(levelname)s %(message)s'
-
-
-def read_text(filePath: str) -> str:
-    with open(filePath, 'r') as fp:
-        text = fp.read()
-    return text
 
 
 def save_text(filePath: str, text) -> None:
     with open(filePath, 'w') as fp:
         fp.write(text)
-
-
-def load_json(filePath: str) -> dict:
-    with open(filePath, 'r') as fp:
-        json_text = json.load(fp)
-    return json_text
 
 
 def get_conn_dict(filePath: str) -> dict:
@@ -50,9 +34,6 @@ def get_conn_dict(filePath: str) -> dict:
 if __name__ == '__main__':
     logging.basicConfig(format=LOG_FMT, level=logging.DEBUG)
     logger = logging.getLogger(__name__)
-    # テンプレート
-    tmpl_json = read_text(JSON_TEMPL)
-    logger.debug(tmpl_json)
 
     # 健康管理データベース: postgresql[5433]
     conn_dict: dict = get_conn_dict(DB_HEALTHCARE_CONF)
@@ -74,7 +55,7 @@ if __name__ == '__main__':
     logger.info(f"Cls_sess_sensors: {Cls_sess_sensors}")
 
     emailAddress: str = "user1@examples.com"
-    measurementDay: str = "2023-03-01"
+    measurementDay: str = "2023-03-14"
     selector = Selector(Cls_sess_healthcare, Cls_sess_sensors, logger=logger)
     healthcare_dict: Dict = selector.get_healthcare_asdict(emailAddress, measurementDay)
     if healthcare_dict:
