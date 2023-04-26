@@ -179,16 +179,16 @@ def _update_weather(sess: Session, measurement_day: str, data: Dict) -> None:
     :data 更新用データ (任意)
     """
     try:
-        # 天候データコンテナは必ずある
+        # 天候データコンテナは必須
         weather_data: Dict = data["weatherData"]
-        # 天候状態
-        weather_condition: Dict = weather_data["weatherCondition"]
-        if app_logger_debug:
-            app_logger.debug(f"weather_condition: {weather_condition}")
     except KeyError as err:
         app_logger.warning(err)
         return
 
+    # 天候状態は任意
+    weather_condition: Dict = _has_dict_in_data("weatherCondition", weather_data)
+    if app_logger_debug:
+        app_logger.debug(f"weather_condition: {weather_condition}")
     if weather_condition is None:
         # 更新データ無し
         return
