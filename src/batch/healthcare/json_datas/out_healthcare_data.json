@@ -38,7 +38,7 @@
    },
    "emailAddress": "user1@examples.com",
    "measurementDay": "2023-03-14",
-   "weatherCondition": {
+   "weatherData": {
       "weatherCondition": {
          "condition": "曇り"
       }
