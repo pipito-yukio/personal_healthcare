@@ -71,8 +71,6 @@ if __name__ == '__main__':
             healthcare_dict["measurementDay"] = measurementDay
             # 天気状態取得
             weather_dict = selector.get_weather_asdict(measurementDay)
-            if app_logger_debug:
-                app_logger.debug(f"Weather: {weather_dict}")
             if weather_dict:
                 healthcare_dict["weatherData"] = weather_dict
             else:
