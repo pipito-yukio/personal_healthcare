@@ -4,6 +4,7 @@ from typing import Dict, Optional, Union
 import sqlalchemy
 from flask import Response, abort, g, jsonify, make_response, request
 from sqlalchemy import Select, select
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, scoped_session
 from sqlalchemy.orm.exc import NoResultFound
 from werkzeug.exceptions import (BadRequest, Conflict, Forbidden,
@@ -13,6 +14,7 @@ from healthcare import (Cls_sess_healthcare, Cls_sess_sensors, app, app_logger,
                         app_logger_debug, engine_healthcare)
 from healthcare.dao.blood_pressure import BloodPressure
 from healthcare.dao.body_temperature import BodyTemperature
+from healthcare.dao.mytransaction_manager import transaction
 from healthcare.dao.nocturia_factors import NocturiaFactors
 from healthcare.dao.person import Person
 from healthcare.dao.queries import Selector
@@ -221,22 +223,17 @@ def _insert_healthdata(person_id: int, measurement_day: str, data: Dict) -> None
     # 健康管理DB用セッションオブジェクト取得
     sess = get_healthcare_session()
     try:
-        sess.begin()
-        sess.add_all(
-            [sleepMan, bloodPressure, factors, walking, bodyTemper]
-        )
-        sess.commit()
-    except sqlalchemy.exc.IntegrityError as err:
-        app_logger.warning(f"IntegrityError: {err.args}")
-        sess.rollback()
+       with transaction(sess):
+            sess.add_all(
+                [sleepMan, bloodPressure, factors, walking, bodyTemper]
+            )
+    except IntegrityError as err:
+        app_logger.warning(f"IntegrityError: {err}")
         # IntegrityErrorならConfilict(409)を返却 ※Androidアプリ側で"登録済み"を表示する
         abort(Conflict.code, _set_errormessage("Already registered."))
-    except sqlalchemy.exc.SQLAlchemyError as err:
-        app_logger.warning(err.args)
-        sess.rollback()
+    except SQLAlchemyError as err:
+        app_logger.warning(err)
         abort(InternalServerError.code, _set_errormessage(f"559,{err}"))
-    finally:
-        sess.close()
     
 
 
@@ -301,50 +298,47 @@ def _update_healthdata(person_id: int, measurement_day: str, data: Dict) -> None
     # https://www.educba.com/sqlalchemy-update-object/
     #  SQLAlchemy update object
     try:
-        sess.begin()
-        if sleep_man is not None:
-            stmt = (
-                sqlalchemy.update(SleepManagement).
-                where(SleepManagement.pid==person_id, SleepManagement.measurementDay==measurement_day).
-                values(**sleep_man)
-            )
-            sess.execute(stmt)
-        if blood_press is not None:
-            stmt = (
-                sqlalchemy.update(BloodPressure).
-                where(BloodPressure.pid==person_id, BloodPressure.measurementDay==measurement_day).
-                values(**blood_press)
-            )
-            sess.execute(stmt)
-        if nocturia_factors is not None:
-            stmt = (
-                sqlalchemy.update(NocturiaFactors).
-                where(NocturiaFactors.pid==person_id, NocturiaFactors.measurementDay==measurement_day).
-                values(**nocturia_factors)
-            )
-            sess.execute(stmt)
-        if walking_count is not None:
-            stmt = (
-                sqlalchemy.update(WalkingCount).
-                where(WalkingCount.pid==person_id, WalkingCount.measurementDay==measurement_day).
-                values(**walking_count)
-            )
-            sess.execute(stmt)
-        if body_temper is not None:
-            stmt = (
-                sqlalchemy.update(BodyTemperature).
-                where(BodyTemperature.pid==person_id, BodyTemperature.measurementDay==measurement_day).
-                values(**body_temper)
-            )
-        sess.commit()
-        if app_logger_debug:
-            app_logger.debug(f"Updated[HealthcareData]: Person.id: {person_id}, MeasuremtDay: {measurement_day}")
-    except sqlalchemy.exc.SQLAlchemyError as err:
-        sess.rollback()
+        with transaction(sess):
+            if sleep_man is not None:
+                stmt = (
+                    sqlalchemy.update(SleepManagement).
+                    where(SleepManagement.pid==person_id, SleepManagement.measurementDay==measurement_day).
+                    values(**sleep_man)
+                )
+                sess.execute(stmt)
+            if blood_press is not None:
+                stmt = (
+                    sqlalchemy.update(BloodPressure).
+                    where(BloodPressure.pid==person_id, BloodPressure.measurementDay==measurement_day).
+                    values(**blood_press)
+                )
+                sess.execute(stmt)
+            if nocturia_factors is not None:
+                stmt = (
+                    sqlalchemy.update(NocturiaFactors).
+                    where(NocturiaFactors.pid==person_id, NocturiaFactors.measurementDay==measurement_day).
+                    values(**nocturia_factors)
+                )
+                sess.execute(stmt)
+            if walking_count is not None:
+                stmt = (
+                    sqlalchemy.update(WalkingCount).
+                    where(WalkingCount.pid==person_id, WalkingCount.measurementDay==measurement_day).
+                    values(**walking_count)
+                )
+                sess.execute(stmt)
+            if body_temper is not None:
+                stmt = (
+                    sqlalchemy.update(BodyTemperature).
+                    where(BodyTemperature.pid==person_id, BodyTemperature.measurementDay==measurement_day).
+                    values(**body_temper)
+                )
+            sess.commit()
+            if app_logger_debug:
+                app_logger.debug(f"Updated[HealthcareData]: Person.id: {person_id}, MeasuremtDay: {measurement_day}")
+    except SQLAlchemyError as err:
         app_logger.warning(err.args)
         abort(InternalServerError.code, _set_errormessage(f"559,{err}"))
-    finally:    
-        sess.close()
 
 
 
@@ -369,17 +363,14 @@ def _insert_weather(measurement_day: str, data: Dict) -> None:
     # 気象センサDB用セッションオブジェクト取得
     sess = get_sensors_session()
     try:
-        sess.begin()
-        sess.add(weather)
-        sess.commit()
-    except sqlalchemy.exc.IntegrityError as err:
-        app_logger.warning(f"IntegrityError: {err.args}")
+        with transaction(sess):
+            sess.add(weather)
+    except IntegrityError as err:
+        app_logger.warning(f"IntegrityError: {err}")
         sess.rollback()
-    except sqlalchemy.exc.SQLAlchemyError as err:
-        app_logger.warning(err.args)
+    except SQLAlchemyError as err:
+        app_logger.warning(err)
         sess.rollback()
-    finally:
-        sess.close()
     
 
 
@@ -407,21 +398,17 @@ def _update_weather(measurement_day: str, data: Dict) -> None:
     # 気象センサDB用セッションオブジェクト取得
     sess = get_sensors_session()
     try:
-        sess.begin()
-        stmt = (
-            sqlalchemy.update(WeatherCondition).
-            where(WeatherCondition.measurementDay==measurement_day).
-            values(**weather_condition)
-        )
-        sess.execute(stmt)
-        sess.commit()
-        if app_logger_debug:
-            app_logger.debug(f"Updated[WeatherData]: MeasuremtDay: {measurement_day}")
+        with transaction(sess):
+            stmt = (
+                sqlalchemy.update(WeatherCondition).
+                where(WeatherCondition.measurementDay==measurement_day).
+                values(**weather_condition)
+            )
+            sess.execute(stmt)
+            if app_logger_debug:
+                app_logger.debug(f"Updated[WeatherData]: MeasuremtDay: {measurement_day}")
     except sqlalchemy.exc.SQLAlchemyError as err:
-        app_logger.warning(err.args)
-        sess.rollback()
-    finally:
-        sess.close()
+        app_logger.warning(err)
     
 
 
