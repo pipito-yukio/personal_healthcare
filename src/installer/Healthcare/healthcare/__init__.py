@@ -4,11 +4,11 @@ import os
 import socket
 import uuid
 
-from flask import Flask
 import sqlalchemy
+from flask import Flask
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.engine.url import URL
+from sqlalchemy.orm import scoped_session, sessionmaker
 
 from healthcare.log import logsetting
 
@@ -57,6 +57,9 @@ conn_dict: dict = getdict_forurl(DB_HEALTHCARE_CONF)
 conn_url: URL = URL.create(**conn_dict)
 app_logger.info(f"Healthcare database URL: {conn_url}")
 engine_healthcare: sqlalchemy.Engine = create_engine(conn_url, echo=False)
+# 個人テーブルチェック用
+Session_healthcare = sessionmaker(bind=engine_healthcare)
+app_logger.info(f"Session_healthcare: {Session_healthcare}")
 # セッションクラス定義
 Cls_sess_healthcare: scoped_session = scoped_session(
     sessionmaker(bind=engine_healthcare)

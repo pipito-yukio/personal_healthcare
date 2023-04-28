@@ -5,13 +5,13 @@ import sqlalchemy
 from flask import Response, abort, g, jsonify, make_response, request
 from sqlalchemy import Select, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import Session, scoped_session
+from sqlalchemy.orm import Session, scoped_session, sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
 from werkzeug.exceptions import (BadRequest, Conflict, Forbidden,
                                  HTTPException, InternalServerError, NotFound)
 
-from healthcare import (Cls_sess_healthcare, Cls_sess_sensors, app, app_logger,
-                        app_logger_debug, engine_healthcare)
+from healthcare import (Cls_sess_healthcare, Cls_sess_sensors,
+                        Session_healthcare, app, app_logger, app_logger_debug)
 from healthcare.dao.blood_pressure import BloodPressure
 from healthcare.dao.body_temperature import BodyTemperature
 from healthcare.dao.mytransaction_manager import transaction
@@ -228,11 +228,11 @@ def _insert_healthdata(person_id: int, measurement_day: str, data: Dict) -> None
                 [sleepMan, bloodPressure, factors, walking, bodyTemper]
             )
     except IntegrityError as err:
-        app_logger.warning(f"IntegrityError: {err}")
+        app_logger.warning(f"IntegrityError: {err.args}")
         # IntegrityErrorならConfilict(409)を返却 ※Androidアプリ側で"登録済み"を表示する
         abort(Conflict.code, _set_errormessage("Already registered."))
     except SQLAlchemyError as err:
-        app_logger.warning(err)
+        app_logger.warning(err.args)
         abort(InternalServerError.code, _set_errormessage(f"559,{err}"))
     
 
@@ -366,9 +366,9 @@ def _insert_weather(measurement_day: str, data: Dict) -> None:
         with transaction(sess):
             sess.add(weather)
     except IntegrityError as err:
-        app_logger.warning(f"IntegrityError: {err}")
+        app_logger.warning(f"IntegrityError: {err.args}")
     except SQLAlchemyError as err:
-        app_logger.warning(err)
+        app_logger.warning(err.args)
     
 
 
@@ -405,8 +405,8 @@ def _update_weather(measurement_day: str, data: Dict) -> None:
             sess.execute(stmt)
             if app_logger_debug:
                 app_logger.debug(f"Updated[WeatherData]: MeasuremtDay: {measurement_day}")
-    except sqlalchemy.exc.SQLAlchemyError as err:
-        app_logger.warning(err)
+    except SQLAlchemyError as err:
+        app_logger.warning(err.args)
     
 
 
@@ -443,9 +443,9 @@ def _get_personid(email_address: str) -> Optional[int]:
     メールアドレスに対応するPersion.idを取得する
     :email_address: メールアドレス
     """
+    sess: Session = Session_healthcare()
     try:
-        session: Session = Session(engine_healthcare)
-        with session.begin():
+        with sess as session:
             stmt: Select = select(Person).where(Person.email == email_address)
             person: Person = session.scalars(stmt).one()
         if app_logger_debug:    

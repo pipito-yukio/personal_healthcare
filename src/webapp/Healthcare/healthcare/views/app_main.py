@@ -5,13 +5,13 @@ import sqlalchemy
 from flask import Response, abort, g, jsonify, make_response, request
 from sqlalchemy import Select, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import Session, scoped_session
+from sqlalchemy.orm import Session, scoped_session, sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
 from werkzeug.exceptions import (BadRequest, Conflict, Forbidden,
                                  HTTPException, InternalServerError, NotFound)
 
-from healthcare import (Cls_sess_healthcare, Cls_sess_sensors, app, app_logger,
-                        app_logger_debug, engine_healthcare)
+from healthcare import (Cls_sess_healthcare, Cls_sess_sensors,
+                        Session_healthcare, app, app_logger, app_logger_debug)
 from healthcare.dao.blood_pressure import BloodPressure
 from healthcare.dao.body_temperature import BodyTemperature
 from healthcare.dao.mytransaction_manager import transaction
@@ -443,9 +443,9 @@ def _get_personid(email_address: str) -> Optional[int]:
     メールアドレスに対応するPersion.idを取得する
     :email_address: メールアドレス
     """
+    sess: Session = Session_healthcare()
     try:
-        session: Session = Session(engine_healthcare)
-        with session.begin():
+        with sess as session:
             stmt: Select = select(Person).where(Person.email == email_address)
             person: Person = session.scalars(stmt).one()
         if app_logger_debug:    
