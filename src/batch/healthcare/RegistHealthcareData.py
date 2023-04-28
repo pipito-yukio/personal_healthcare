@@ -49,13 +49,13 @@ def load_json(filePath: str) -> dict:
     return json_text
 
 
-def _get_personid(session: Session, email_address: str) -> Optional[int]:
+def _get_personid(sess: Session, email_address: str) -> Optional[int]:
     """
     メールアドレスに対応するPersion.idを取得する
     :email_address: メールアドレス
     """
     try:
-        with session.begin():
+        with sess as session:
             stmt: Select = select(Person).where(Person.email == email_address)
             person: Person = session.scalars(stmt).one()
         return person.id
