@@ -228,11 +228,11 @@ def _insert_healthdata(person_id: int, measurement_day: str, data: Dict) -> None
                 [sleepMan, bloodPressure, factors, walking, bodyTemper]
             )
     except IntegrityError as err:
-        app_logger.warning(f"IntegrityError: {err}")
+        app_logger.warning(f"IntegrityError: {err.args}")
         # IntegrityErrorならConfilict(409)を返却 ※Androidアプリ側で"登録済み"を表示する
         abort(Conflict.code, _set_errormessage("Already registered."))
     except SQLAlchemyError as err:
-        app_logger.warning(err)
+        app_logger.warning(err.args)
         abort(InternalServerError.code, _set_errormessage(f"559,{err}"))
     
 
@@ -366,9 +366,9 @@ def _insert_weather(measurement_day: str, data: Dict) -> None:
         with transaction(sess):
             sess.add(weather)
     except IntegrityError as err:
-        app_logger.warning(f"IntegrityError: {err}")
+        app_logger.warning(f"IntegrityError: {err.args}")
     except SQLAlchemyError as err:
-        app_logger.warning(err)
+        app_logger.warning(err.args)
     
 
 
@@ -405,8 +405,8 @@ def _update_weather(measurement_day: str, data: Dict) -> None:
             sess.execute(stmt)
             if app_logger_debug:
                 app_logger.debug(f"Updated[WeatherData]: MeasuremtDay: {measurement_day}")
-    except sqlalchemy.exc.SQLAlchemyError as err:
-        app_logger.warning(err)
+    except SQLAlchemyError as err:
+        app_logger.warning(err.args)
     
 
 
