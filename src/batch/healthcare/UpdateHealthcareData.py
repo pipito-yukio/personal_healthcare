@@ -8,9 +8,9 @@ from typing import Optional, Dict
 import sqlalchemy
 from sqlalchemy.engine.url import URL
 from sqlalchemy import create_engine, Select, select
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, scoped_session
 from sqlalchemy.orm.exc import NoResultFound
-import sqlalchemy.exc
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from dao.person import Person
 from dao.sleep_management import SleepManagement
@@ -19,6 +19,7 @@ from dao.nocturia_factors import NocturiaFactors
 from dao.walking_count import WalkingCount
 from dao.body_temperature import BodyTemperature
 from dao.weather_condition import WeatherCondition
+from dao.mytransaction_manager import transaction
 
 """
 健康管理データベースまたは気象センサーデータベース(天候状態)の更新処理
@@ -76,8 +77,9 @@ def _get_personid(session: Session, email_address: str) -> Optional[int]:
 
 
 # 健康管理データ更新
-def _update_healthdata(sess: Session, person_id: int, measurement_day: str, data: Dict) -> None:
-    # 健康管理データコンテナ: 必須
+def _update_healthdata(sess: scoped_session, person_id: int, measurement_day: str,
+                       data: Dict) -> None:
+    # 健康管理データコンテナは必須
     healthcare_data: Optional[Dict] = _has_dict_in_data("healthcareData", data)
     if healthcare_data is None:
         app_logger.error("Required healthcareData!")
@@ -125,58 +127,54 @@ def _update_healthdata(sess: Session, person_id: int, measurement_day: str, data
         return
 
     try:
-        sess.begin()
-        if sleep_man is not None:
-            stmt = (
-                sqlalchemy.update(SleepManagement).
-                where(SleepManagement.pid==person_id, SleepManagement.measurementDay==measurement_day).
-                values(**sleep_man)
-            )
-            sess.execute(stmt)
-        if blood_press is not None:
-            stmt = (
-                sqlalchemy.update(BloodPressure).
-                where(BloodPressure.pid==person_id, BloodPressure.measurementDay==measurement_day).
-                values(**blood_press)
-            )
-            sess.execute(stmt)
-        if nocturia_factors is not None:
-            stmt = (
-                sqlalchemy.update(NocturiaFactors).
-                where(NocturiaFactors.pid==person_id, NocturiaFactors.measurementDay==measurement_day).
-                values(**nocturia_factors)
-            )
-            sess.execute(stmt)
-        if walking_count is not None:
-            stmt = (
-                sqlalchemy.update(WalkingCount).
-                where(WalkingCount.pid==person_id, WalkingCount.measurementDay==measurement_day).
-                values(**walking_count)
-            )
-            sess.execute(stmt)
-        if body_temper is not None:
-            stmt = (
-                sqlalchemy.update(BodyTemperature).
-                where(BodyTemperature.pid==person_id, BodyTemperature.measurementDay==measurement_day).
-                values(**body_temper)
-            )
-            sess.execute(stmt)
-        sess.commit()
+        with transaction(sess):
+            if sleep_man is not None:
+                stmt = (
+                    sqlalchemy.update(SleepManagement).
+                    where(SleepManagement.pid==person_id, SleepManagement.measurementDay==measurement_day).
+                    values(**sleep_man)
+                )
+                sess.execute(stmt)
+            if blood_press is not None:
+                stmt = (
+                    sqlalchemy.update(BloodPressure).
+                    where(BloodPressure.pid==person_id, BloodPressure.measurementDay==measurement_day).
+                    values(**blood_press)
+                )
+                sess.execute(stmt)
+            if nocturia_factors is not None:
+                stmt = (
+                    sqlalchemy.update(NocturiaFactors).
+                    where(NocturiaFactors.pid==person_id, NocturiaFactors.measurementDay==measurement_day).
+                    values(**nocturia_factors)
+                )
+                sess.execute(stmt)
+            if walking_count is not None:
+                stmt = (
+                    sqlalchemy.update(WalkingCount).
+                    where(WalkingCount.pid==person_id, WalkingCount.measurementDay==measurement_day).
+                    values(**walking_count)
+                )
+                sess.execute(stmt)
+            if body_temper is not None:
+                stmt = (
+                    sqlalchemy.update(BodyTemperature).
+                    where(BodyTemperature.pid==person_id, BodyTemperature.measurementDay==measurement_day).
+                    values(**body_temper)
+                )
+                sess.execute(stmt)
         if app_logger_debug:
             app_logger.debug(f"Updated[HealthcareData]: Person.id: {person_id}, MeasuremtDay: {measurement_day}")
     except sqlalchemy.exc.SQLAlchemyError as err:
-        sess.rollback()
         app_logger.warning(err.args)
-    finally:
-        sess.close()
 
 
-def _update_weather(sess: Session, measurement_day: str, data: Dict) -> None:
+def _update_weather(sess: scoped_session, measurement_day: str, data: Dict) -> None:
     """
     天候状態の更新処理
-    :sess Session
+    :param sess: scoped_session
     :param measurement_day: 測定日
-    :data 更新用データ (任意)
+    :param data: 更新用データ (任意)
     """
     try:
         # 天候データコンテナは必須
@@ -195,21 +193,17 @@ def _update_weather(sess: Session, measurement_day: str, data: Dict) -> None:
 
     # 気象センサDB用セッションオブジェクト取得
     try:
-        sess.begin()
-        stmt = (
-            sqlalchemy.update(WeatherCondition).
-            where(WeatherCondition.measurementDay == measurement_day).
-            values(**weather_condition)
-        )
-        sess.execute(stmt)
-        sess.commit()
+        with transaction(sess):
+            stmt = (
+                sqlalchemy.update(WeatherCondition).
+                where(WeatherCondition.measurementDay == measurement_day).
+                values(**weather_condition)
+            )
+            sess.execute(stmt)
         if app_logger_debug:
             app_logger.debug(f"Updated[WeatherData]: MeasuremtDay: {measurement_day}")
     except sqlalchemy.exc.SQLAlchemyError as err:
         app_logger.warning(err.args)
-        sess.rollback()
-    finally:
-        sess.close()
 
 
 if __name__ == '__main__':
@@ -231,15 +225,25 @@ if __name__ == '__main__':
     url_dict: dict = get_conn_dict(DB_HEALTHCARE_CONF)
     conn_url: URL = URL.create(**url_dict)
     engine_healthcare: sqlalchemy.Engine = create_engine(conn_url, echo=True)
+    # 個人テーブルチェック用
     Session_healthcare = sessionmaker(bind=engine_healthcare)
+    # 登録処理用セッション
+    Cls_sess_healthcare: scoped_session = scoped_session(
+        sessionmaker(bind=engine_healthcare)
+    )
+    app_logger.info(f"Cls_sess_healthcare: {Cls_sess_healthcare}")
     # 気象センサーデータベース接続情報
     url_dict: dict = get_conn_dict(DB_SENSORSE_CONF)
     conn_url: URL = URL.create(**url_dict)
     engine_sensors: sqlalchemy.Engine = create_engine(conn_url, echo=True)
-    Session_sensors = sessionmaker(bind=engine_sensors)
+    Cls_sess_sensors: scoped_session = scoped_session(
+        sessionmaker(bind=engine_sensors)
+    )
+    app_logger.info(f"Cls_sess_sensors: {Cls_sess_sensors}")
 
-    # 健康管理テーブルの主キー
+    # メールアドレス取得
     emailAddress: str = healthcare_data["emailAddress"]
+    # メールアドレスに対応する個人ID取得: 健康管理テーブルの主キー
     person_id: int = _get_personid(Session_healthcare(), emailAddress)
     if person_id is None:
         app_logger.warning("Person not found.")
@@ -249,7 +253,12 @@ if __name__ == '__main__':
     measurementDay: str = healthcare_data["measurementDay"]
 
     # 健康管理データ更新
-    _update_healthdata(Session_healthcare(), person_id, measurementDay, healthcare_data)
-    # 天候状態
-    _update_weather(Session_sensors(), measurementDay, healthcare_data)
+    try:
+        _update_healthdata(Cls_sess_healthcare(), person_id, measurementDay,
+                           healthcare_data)
+    except Exception:
+        pass
+    else:
+        # 天候状態
+        _update_weather(Cls_sess_sensors(), measurementDay, healthcare_data)
 

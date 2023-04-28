@@ -8,9 +8,9 @@ from typing import Optional, Dict
 import sqlalchemy
 from sqlalchemy.engine.url import URL
 from sqlalchemy import create_engine, Select, select
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, scoped_session
 from sqlalchemy.orm.exc import NoResultFound
-import sqlalchemy.exc
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from dao.person import Person
 from dao.sleep_management import SleepManagement
@@ -19,6 +19,7 @@ from dao.nocturia_factors import NocturiaFactors
 from dao.walking_count import WalkingCount
 from dao.body_temperature import BodyTemperature
 from dao.weather_condition import WeatherCondition
+from dao.mytransaction_manager import transaction
 
 """
 健康管理データベースまたは気象センサーデータベース(天候状態)の登録処理
@@ -29,7 +30,7 @@ DB_HEALTHCARE_CONF: str = os.path.join("conf", "db_healthcare.json")
 # 気象センサーデータベース: [DB] sensors_pgdb [PORT] 5432
 DB_SENSORSE_CONF: str = os.path.join("conf", "db_sensors.json")
 # ログフォーマット
-LOG_FMT = '%(asctime)s %(filename)s %(funcName)s %(levelname)s %(message)s'
+LOG_FMT = '%(asctime)s %(levelname)s %(filename)s(%(lineno)d)[%(funcName)s] %(message)s'
 # デバックログ有効
 app_logger_debug: bool = True
 
@@ -66,8 +67,9 @@ def _get_personid(session: Session, email_address: str) -> Optional[int]:
         raise excption
 
 
-# 健康管理データ更新
-def _insert_healthdata(sess: Session, person_id: int, measurement_day: str, data: Dict) -> None:
+# 健康管理データの登録処理
+def _insert_healthdata(sess: scoped_session, person_id: int, measurement_day: str,
+                       data: Dict) -> None:
     # JSONキーチェック
     sleep_man = {}
     blood_press = {}
@@ -121,36 +123,25 @@ def _insert_healthdata(sess: Session, person_id: int, measurement_day: str, data
 
     # 健康管理DB用セッションオブジェクト取得
     try:
-        sess.begin()
-        sess.add_all(
-            [sleepMan, bloodPressure, factors, walking, bodyTemper]
-        )
-        sess.commit()
-    except sqlalchemy.exc.IntegrityError as err:
+        with transaction(sess):
+            sess.add_all(
+                [sleepMan, bloodPressure, factors, walking, bodyTemper]
+            )
+    except IntegrityError as err:
         app_logger.warning(f"IntegrityError: {err.args}")
-        sess.rollback()
         raise err
-    except sqlalchemy.exc.SQLAlchemyError as err:
+    except SQLAlchemyError as err:
         app_logger.warning(err.args)
-        sess.rollback()
         raise err
-    finally:
-        sess.close()
 
 
-def _insert_weather(sess: Session,measurement_day: str, data: Dict) -> None:
-    """
-    天候状態の登録処理
-    :param measurement_day: 測定日
-    :data 登録用データ (必須)
-    """
+# 天候状態の登録処理
+def _insert_weather(sess: scoped_session, measurement_day: str, data: Dict) -> None:
     try:
         # 天候データコンテナは必ずある
         weather_data: Dict = data["weatherData"]
         # 天候状態は必須項目
         weather_condition: Dict = weather_data["weatherCondition"]
-        if app_logger_debug:
-            app_logger.debug(f"weather_condition: {weather_condition}")
     except KeyError as err:
         app_logger.warning(err)
         return
@@ -159,21 +150,18 @@ def _insert_weather(sess: Session,measurement_day: str, data: Dict) -> None:
     weather_condition["measurementDay"] = measurement_day
     weather: WeatherCondition = WeatherCondition(**weather_condition)
     try:
-        sess.begin()
-        sess.add(weather)
-        sess.commit()
-    except sqlalchemy.exc.IntegrityError as err:
+        with transaction(sess):
+            sess.add(weather)
+    except IntegrityError as err:
         app_logger.warning(f"IntegrityError: {err.args}")
-        sess.rollback()
-    except sqlalchemy.exc.SQLAlchemyError as err:
+        raise err
+    except SQLAlchemyError as err:
         app_logger.warning(err.args)
-        sess.rollback()
-    finally:
-        sess.close()
+        raise err
 
 
 if __name__ == '__main__':
-    logging.basicConfig(format=LOG_FMT, level=logging.DEBUG)
+    logging.basicConfig(format=LOG_FMT, level=logging.DEBUG, datefmt="%Y-%m-%d %H:%M:%S")
     app_logger = logging.getLogger(__name__)
 
     parser: argparse.ArgumentParser = argparse.ArgumentParser()
@@ -191,12 +179,21 @@ if __name__ == '__main__':
     url_dict: dict = get_conn_dict(DB_HEALTHCARE_CONF)
     conn_url: URL = URL.create(**url_dict)
     engine_healthcare: sqlalchemy.Engine = create_engine(conn_url, echo=False)
+    # 個人テーブルチェック用
     Session_healthcare = sessionmaker(bind=engine_healthcare)
+    # 登録処理用セッション
+    Cls_sess_healthcare: scoped_session = scoped_session(
+        sessionmaker(bind=engine_healthcare)
+    )
+    app_logger.info(f"Cls_sess_healthcare: {Cls_sess_healthcare}")
     # 気象センサーデータベース接続情報
     url_dict: dict = get_conn_dict(DB_SENSORSE_CONF)
     conn_url: URL = URL.create(**url_dict)
     engine_sensors: sqlalchemy.Engine = create_engine(conn_url, echo=False)
-    Session_sensors = sessionmaker(bind=engine_sensors)
+    Cls_sess_sensors: scoped_session = scoped_session(
+        sessionmaker(bind=engine_sensors)
+    )
+    app_logger.info(f"Cls_sess_sensors: {Cls_sess_sensors}")
 
     # メールアドレス取得
     emailAddress: str = healthcare_data["emailAddress"]
@@ -210,7 +207,11 @@ if __name__ == '__main__':
     measurementDay: str = healthcare_data["measurementDay"]
 
     # 健康管理データベースの全テーブル一括登録
-    _insert_healthdata(Session_healthcare(), person_id, measurementDay, healthcare_data)
-    # 天候状態テーブル登録
-    _insert_weather(Session_sensors(), measurementDay, healthcare_data)
-
+    try:
+        _insert_healthdata(Cls_sess_healthcare(),
+                           person_id, measurementDay, healthcare_data)
+    except Exception:
+        pass
+    else:
+        # 天候状態テーブル登録
+        _insert_weather(Cls_sess_sensors(), measurementDay, healthcare_data)
