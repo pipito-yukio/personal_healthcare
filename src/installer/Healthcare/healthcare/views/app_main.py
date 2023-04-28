@@ -333,7 +333,6 @@ def _update_healthdata(person_id: int, measurement_day: str, data: Dict) -> None
                     where(BodyTemperature.pid==person_id, BodyTemperature.measurementDay==measurement_day).
                     values(**body_temper)
                 )
-            sess.commit()
             if app_logger_debug:
                 app_logger.debug(f"Updated[HealthcareData]: Person.id: {person_id}, MeasuremtDay: {measurement_day}")
     except SQLAlchemyError as err:
@@ -367,10 +366,8 @@ def _insert_weather(measurement_day: str, data: Dict) -> None:
             sess.add(weather)
     except IntegrityError as err:
         app_logger.warning(f"IntegrityError: {err}")
-        sess.rollback()
     except SQLAlchemyError as err:
         app_logger.warning(err)
-        sess.rollback()
     
 
 
