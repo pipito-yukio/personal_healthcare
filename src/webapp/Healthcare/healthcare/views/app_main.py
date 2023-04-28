@@ -333,6 +333,7 @@ def _update_healthdata(person_id: int, measurement_day: str, data: Dict) -> None
                     where(BodyTemperature.pid==person_id, BodyTemperature.measurementDay==measurement_day).
                     values(**body_temper)
                 )
+                sess.execute(stmt)
             if app_logger_debug:
                 app_logger.debug(f"Updated[HealthcareData]: Person.id: {person_id}, MeasuremtDay: {measurement_day}")
     except SQLAlchemyError as err:
