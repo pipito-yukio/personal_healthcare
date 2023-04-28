@@ -3,10 +3,12 @@ from datetime import date, time
 from logging import Logger
 from typing import Dict, Optional
 
-import sqlalchemy
 from sqlalchemy.engine import Result
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import scoped_session
 from sqlalchemy.sql import text
+
+from .mytransaction_manager import transaction
 
 """
 健康管理データベースと気象データデータベースからクエリを実行して辞書オブジェクトを生成するクラス
@@ -135,19 +137,18 @@ SELECT condition FROM weather.weather_condition WHERE measurement_day=:measureme
         # session.add_all([more_objects, ...])
         # session.commit()  
         params = {"emailAddress": email, "measurementDay": measurement}
+
         row = None
         try:
-            rs: Result = self.sess_healthcare.execute(text(self._QRY_GET_HEALTHCARE), params)
-            if rs:
-                row = rs.fetchone()
-            self.sess_healthcare.commit()
-        except sqlalchemy.exc.SQLAlchemyError as err:
-            self.sess_healthcare.rollback()
+            with transaction(self.sess_healthcare):
+                rs: Result = self.sess_healthcare.execute(text(self._QRY_GET_HEALTHCARE),
+                                                          params)
+                if rs:
+                    row = rs.fetchone()
+        except SQLAlchemyError as err:
             if self.logger:
                 self.logger.warning(err.args)
             return None
-        finally:
-            self.sess_healthcare.close()
 
         if row is None:
             return None
@@ -190,17 +191,15 @@ SELECT condition FROM weather.weather_condition WHERE measurement_day=:measureme
         params = {"measurementDay": measurement}
         row = None
         try:
-            rs: Result = self.sess_sensors.execute(text(self._QRY_GET_WEATHER), params)
-            if rs:
-                row = rs.fetchone()
-            self.sess_sensors.commit()    
-        except sqlalchemy.exc.SQLAlchemyError as err:
-            self.sess_sensors.rollback()
+            with transaction(self.sess_sensors):
+                rs: Result = self.sess_sensors.execute(text(self._QRY_GET_WEATHER),
+                                                       params)
+                if rs:
+                    row = rs.fetchone()
+        except SQLAlchemyError as err:
             if self.logger:
                 self.logger.warning(err.args)
             return None
-        finally:
-            self.sess_sensors.close()
 
         if row is None:
             return None

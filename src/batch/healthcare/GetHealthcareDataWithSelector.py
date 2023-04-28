@@ -1,5 +1,6 @@
+import argparse
 import logging
-from typing import Dict
+from typing import Dict, Optional
 import json
 import os
 import socket
@@ -36,6 +37,30 @@ def get_conn_dict(filePath: str) -> dict:
 if __name__ == '__main__':
     logging.basicConfig(format=LOG_FMT, level=logging.DEBUG)
     app_logger = logging.getLogger(__name__)
+    parser: argparse.ArgumentParser = argparse.ArgumentParser()
+    # メールアドレス (例) user1@examples.com
+    parser.add_argument("--mail-address", type=str, required=True,
+                        help="Healthcare Databae Person mailAddress.")
+    # 測定日付 (例) 2023-03-14
+    parser.add_argument("--measurement-day", type=str, required=True,
+                        help="測定日付 yyyy-MM-dd.")
+    # JSON保存パス
+    parser.add_argument("--save-path", type=str,
+                        help="保存パス ~/Documents/Healthcare/json/output")
+    args: argparse.Namespace = parser.parse_args()
+    emailAddress: str = args.mail_address
+    measurementDay: str = args.measurement_day
+    # 保存ファイル名
+    jsonName: str = f"out_healthcare_data_{measurementDay}.json"
+    # 保存パスは任意
+    savePath: Optional[str] = args.save_path
+    saveJsonFile = None
+    if savePath is not None:
+        saveJsonFile = os.path.join(os.path.expanduser(savePath), jsonName)
+    else:
+        # プロジェクト内のjson_datas
+        saveJsonFile = os.path.join("json_datas", jsonName)
+    app_logger.info(f"saveJsonFile: {saveJsonFile}")
 
     # 健康管理データベース: postgresql[5433]
     conn_dict: dict = get_conn_dict(DB_HEALTHCARE_CONF)
@@ -56,8 +81,6 @@ if __name__ == '__main__':
     )
     app_logger.info(f"Cls_sess_sensors: {Cls_sess_sensors}")
 
-    emailAddress: str = "user1@examples.com"
-    measurementDay: str = "2023-03-14"
     selector = Selector(Cls_sess_healthcare, Cls_sess_sensors, logger=app_logger)
     healthcare_dict: Dict = selector.get_healthcare_asdict(emailAddress, measurementDay)
     if healthcare_dict:
@@ -78,4 +101,4 @@ if __name__ == '__main__':
                 healthcare_dict["weatherData"] = None
             # 日本語が含まれる: ensure_ascii=False
             json_str = json.dumps(healthcare_dict, indent=3, ensure_ascii=False)
-            save_text(SAVE_JSON, json_str)
+            save_text(saveJsonFile, json_str)
