@@ -443,9 +443,9 @@ def _get_personid(email_address: str) -> Optional[int]:
     メールアドレスに対応するPersion.idを取得する
     :email_address: メールアドレス
     """
-    sess: Session = Session_healthcare()
+    session: Session = Session_healthcare()
     try:
-        with sess as session:
+        with session:
             stmt: Select = select(Person).where(Person.email == email_address)
             person: Person = session.scalars(stmt).one()
         if app_logger_debug:    
