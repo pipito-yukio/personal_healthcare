@@ -14,7 +14,6 @@ from healthcare import (Cls_sess_healthcare, Cls_sess_sensors,
                         Session_healthcare, app, app_logger, app_logger_debug)
 from healthcare.dao.blood_pressure import BloodPressure
 from healthcare.dao.body_temperature import BodyTemperature
-from healthcare.dao.mytransaction_manager import transaction
 from healthcare.dao.nocturia_factors import NocturiaFactors
 from healthcare.dao.person import Person
 from healthcare.dao.queries import Selector
@@ -223,17 +222,22 @@ def _insert_healthdata(person_id: int, measurement_day: str, data: Dict) -> None
     # 健康管理DB用セッションオブジェクト取得
     sess = get_healthcare_session()
     try:
-       with transaction(sess):
-            sess.add_all(
-                [sleepMan, bloodPressure, factors, walking, bodyTemper]
-            )
+        sess.begin()
+        sess.add_all(
+            [sleepMan, bloodPressure, factors, walking, bodyTemper]
+        )
+        sess.commit()
     except IntegrityError as err:
         app_logger.warning(f"IntegrityError: {err.args}")
+        sess.rollback()
         # IntegrityErrorならConfilict(409)を返却 ※Androidアプリ側で"登録済み"を表示する
         abort(Conflict.code, _set_errormessage("Already registered."))
     except SQLAlchemyError as err:
         app_logger.warning(err.args)
+        sess.rollback()
         abort(InternalServerError.code, _set_errormessage(f"559,{err}"))
+    finally:
+        sess.close()
     
 
 
@@ -298,47 +302,50 @@ def _update_healthdata(person_id: int, measurement_day: str, data: Dict) -> None
     # https://www.educba.com/sqlalchemy-update-object/
     #  SQLAlchemy update object
     try:
-        with transaction(sess):
-            if sleep_man is not None:
-                stmt = (
-                    sqlalchemy.update(SleepManagement).
-                    where(SleepManagement.pid==person_id, SleepManagement.measurementDay==measurement_day).
-                    values(**sleep_man)
-                )
-                sess.execute(stmt)
-            if blood_press is not None:
-                stmt = (
-                    sqlalchemy.update(BloodPressure).
-                    where(BloodPressure.pid==person_id, BloodPressure.measurementDay==measurement_day).
-                    values(**blood_press)
-                )
-                sess.execute(stmt)
-            if nocturia_factors is not None:
-                stmt = (
-                    sqlalchemy.update(NocturiaFactors).
-                    where(NocturiaFactors.pid==person_id, NocturiaFactors.measurementDay==measurement_day).
-                    values(**nocturia_factors)
-                )
-                sess.execute(stmt)
-            if walking_count is not None:
-                stmt = (
-                    sqlalchemy.update(WalkingCount).
-                    where(WalkingCount.pid==person_id, WalkingCount.measurementDay==measurement_day).
-                    values(**walking_count)
-                )
-                sess.execute(stmt)
-            if body_temper is not None:
-                stmt = (
-                    sqlalchemy.update(BodyTemperature).
-                    where(BodyTemperature.pid==person_id, BodyTemperature.measurementDay==measurement_day).
-                    values(**body_temper)
-                )
-                sess.execute(stmt)
-            if app_logger_debug:
-                app_logger.debug(f"Updated[HealthcareData]: Person.id: {person_id}, MeasuremtDay: {measurement_day}")
+        sess.begin()
+        if sleep_man is not None:
+            stmt = (
+                sqlalchemy.update(SleepManagement).
+                where(SleepManagement.pid==person_id, SleepManagement.measurementDay==measurement_day).
+                values(**sleep_man)
+            )
+            sess.execute(stmt)
+        if blood_press is not None:
+            stmt = (
+                sqlalchemy.update(BloodPressure).
+                where(BloodPressure.pid==person_id, BloodPressure.measurementDay==measurement_day).
+                values(**blood_press)
+            )
+            sess.execute(stmt)
+        if nocturia_factors is not None:
+            stmt = (
+                sqlalchemy.update(NocturiaFactors).
+                where(NocturiaFactors.pid==person_id, NocturiaFactors.measurementDay==measurement_day).
+                values(**nocturia_factors)
+            )
+            sess.execute(stmt)
+        if walking_count is not None:
+            stmt = (
+                sqlalchemy.update(WalkingCount).
+                where(WalkingCount.pid==person_id, WalkingCount.measurementDay==measurement_day).
+                values(**walking_count)
+            )
+            sess.execute(stmt)
+        if body_temper is not None:
+            stmt = (
+                sqlalchemy.update(BodyTemperature).
+                where(BodyTemperature.pid==person_id, BodyTemperature.measurementDay==measurement_day).
+                values(**body_temper)
+            )
+        sess.commit()
+        if app_logger_debug:
+            app_logger.debug(f"Updated[HealthcareData]: Person.id: {person_id}, MeasuremtDay: {measurement_day}")
     except SQLAlchemyError as err:
+        sess.rollback()
         app_logger.warning(err.args)
         abort(InternalServerError.code, _set_errormessage(f"559,{err}"))
+    finally:    
+        sess.close()
 
 
 
@@ -363,12 +370,17 @@ def _insert_weather(measurement_day: str, data: Dict) -> None:
     # 気象センサDB用セッションオブジェクト取得
     sess = get_sensors_session()
     try:
-        with transaction(sess):
-            sess.add(weather)
+        sess.begin()
+        sess.add(weather)
+        sess.commit()
     except IntegrityError as err:
         app_logger.warning(f"IntegrityError: {err.args}")
+        sess.rollback()
     except SQLAlchemyError as err:
         app_logger.warning(err.args)
+        sess.rollback()
+    finally:
+        sess.close()
     
 
 
@@ -396,17 +408,21 @@ def _update_weather(measurement_day: str, data: Dict) -> None:
     # 気象センサDB用セッションオブジェクト取得
     sess = get_sensors_session()
     try:
-        with transaction(sess):
-            stmt = (
-                sqlalchemy.update(WeatherCondition).
-                where(WeatherCondition.measurementDay==measurement_day).
-                values(**weather_condition)
-            )
-            sess.execute(stmt)
-            if app_logger_debug:
-                app_logger.debug(f"Updated[WeatherData]: MeasuremtDay: {measurement_day}")
+        sess.begin()
+        stmt = (
+            sqlalchemy.update(WeatherCondition).
+            where(WeatherCondition.measurementDay==measurement_day).
+            values(**weather_condition)
+        )
+        sess.execute(stmt)
+        sess.commit()
+        if app_logger_debug:
+            app_logger.debug(f"Updated[WeatherData]: MeasuremtDay: {measurement_day}")
     except SQLAlchemyError as err:
         app_logger.warning(err.args)
+        sess.rollback()
+    finally:
+        sess.close()
     
 
 
@@ -443,14 +459,22 @@ def _get_personid(email_address: str) -> Optional[int]:
     メールアドレスに対応するPersion.idを取得する
     :email_address: メールアドレス
     """
-    session: Session = Session_healthcare()
     try:
-        with session:
-            stmt: Select = select(Person).where(Person.email == email_address)
-            person: Person = session.scalars(stmt).one()
+        # https://docs.sqlalchemy.org/en/20/orm/session_transaction.html
+        #   Transactions and Connection Management
+        #     Managing Transactions
+        person_id: Optional[int]
+        with Session_healthcare() as session:
+            with session.begin():
+                stmt: Select = select(Person).where(Person.email == email_address)
+                person: Person = session.scalars(stmt).one()
+                if person:
+                    person_id = person.id
+                else:
+                    person_id = None
         if app_logger_debug:    
-            app_logger.debug(f"person.id: {person.id}")
-        return person.id
+            app_logger.debug(f"person_id: {person_id}")
+        return person_id
     except NoResultFound as notFound:
         app_logger.warning(f"NoResultFound: {notFound}")
         return None
