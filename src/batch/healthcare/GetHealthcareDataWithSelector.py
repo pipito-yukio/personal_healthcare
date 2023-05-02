@@ -81,14 +81,15 @@ if __name__ == '__main__':
     )
     app_logger.info(f"Cls_sess_sensors: {Cls_sess_sensors}")
 
-    # 2. 登録済み取得オブジェクト生成
+    # 2. 登録済みデータ検索クラスの検索オブジェクトを生成する
     selector = Selector(Cls_sess_healthcare, Cls_sess_sensors, logger=app_logger)
-    # 2-1. 健康管理データに対応する辞書オブジェクト取得
+    # 2-1. 検索オブジェクトの健康管理データ(辞書オブジェクト)取得関数を呼び出す
     healthcare_dict: Dict = selector.get_healthcare_asdict(emailAddress, measurementDay)
     if healthcare_dict:
+        # 健康管理データ辞書オブジェクトが存在すれば天候状態を取得する
         app_logger.info(healthcare_dict)
 
-        # 2-2. 天候状態データに対応する辞書オブジェクト取得
+        # 2-2. 検索オブジェクトの天候状態データ取得関数を呼び出す
         weather_dict = selector.get_weather_asdict(measurementDay)
         if weather_dict:
             app_logger.info(weather_dict)
