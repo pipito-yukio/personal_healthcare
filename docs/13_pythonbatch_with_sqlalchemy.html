@@ -14,7 +14,7 @@
         <div class="container" style="max-width: 980px">
             <h4 class="m-2 text-center">SQLAlchemyをPythonバッチで使う</h4>
             <hr />
-            <div class="update-date">【最終更新日】2023-04-25</div>
+            <div class="update-date">【最終更新日】2023-05-02</div>
             <p class="indent">
                 PythonバッチスクリプトでSQLAlchemy ORM を使って複数のデータベースにデータを登録する方法について解説します。
             </p>
@@ -35,7 +35,7 @@
             </div>
             <!-- refercence urls -->
             <div class="m-2 mb-4">
-                <div>【参考URL】主に(1)〜(8)の本家サイトの内容を参考に作成</div>
+                <div>【参考URL】主に(1)〜(9)の本家サイトの内容を参考に作成</div>
                 <ul class="ms-2 small">
                     <li>(1) SQLAlchemy本家サイト <b>ドキュメンテーショントップ</b><br/>
     <a href="https://docs.sqlalchemy.org/en/20/index.html" target="_blank">
@@ -55,36 +55,41 @@
     https://docs.sqlalchemy.org/en/20/core/connections.html
     </a>
                     </li>
-                    <li>(5) SQLAlchemy本家サイト <b>Engine Configuration</b> [Creating URLs Programmatically]<br/>
+                    <li>(5) SQLAlchemy本家サイト <b>Engine Configuration [Creating URLs Programmatically]</b><br/>
     <a href="https://flask-sqlalchemy.palletsprojects.com/en/2.x/quickstart/" target="_blank">
     https://flask-sqlalchemy.palletsprojects.com/en/2.x/quickstart/
     </a>
                     </li>
-                    <li>(6) SQLAlchemy本家サイト <b>Table Configuration with Declarative</b><br/>
+                    <li>(6) SQLAlchemy本家サイト <b>Session Basics [Using a sessionmaker]</b><br/>
+    <a href="https://docs.sqlalchemy.org/en/20/orm/session_basics.html#using-a-sessionmaker" target="_blank">
+    https://docs.sqlalchemy.org/en/20/orm/session_basics.html#using-a-sessionmaker
+    </a>
+                    </li>
+                    <li>(7) SQLAlchemy本家サイト <b>Table Configuration with Declarative</b><br/>
     <a href="https://docs.sqlalchemy.org/en/20/orm/declarative_tables.html" target="_blank">
     https://docs.sqlalchemy.org/en/20/orm/declarative_tables.html
     </a>
                     </li>
-                    <li>(7) SQLAlchemy本家サイト <b>Transactions and Connection Management</b><br/>
+                    <li>(8) SQLAlchemy本家サイト <b>Transactions and Connection Management</b><br/>
     <a href="https://docs.sqlalchemy.org/en/20/orm/session_transaction.html" target="_blank">
     https://docs.sqlalchemy.org/en/20/orm/session_transaction.html
     </a>
                     </li>
-                    <li>(8) SQLAlchemy本家サイト <b>Contextual/Thread-local Sessions</b> ※Webアプリでスレッドローカルスコープを使用方法<br/>
+                    <li>(9) SQLAlchemy本家サイト <b>Contextual/Thread-local Sessions</b> ※Webアプリでスレッドローカルスコープを使用方法<br/>
     <a href="https://docs.sqlalchemy.org/en/20/orm/contextual.html" target="_blank">
     https://docs.sqlalchemy.org/en/20/orm/contextual.html</a>
                     </li>
-                    <li>(9) Using SQLAlchemy ORM with existing tables<br/>
+                    <li>(10) Using SQLAlchemy ORM with existing tables<br/>
     <a href="https://sanjayasubedi.com.np/python/sqlalchemy/using-sqlalchemy-orm-with-existing-tables/" target="_blank">
     https://sanjayasubedi.com.np/python/sqlalchemy/using-sqlalchemy-orm-with-existing-tables/
     </a>
                     </li>
-                    <li>(10) Flask本家サイト Flask-SQLAlchemy Quickstart ※完全にFlask依存で可用性が低い<br/>
+                    <li>(11) Flask本家サイト Flask-SQLAlchemy Quickstart ※完全にFlask依存で可用性が低い<br/>
     <a href="https://flask-sqlalchemy.palletsprojects.com/en/2.x/quickstart/" target="_blank">
     https://flask-sqlalchemy.palletsprojects.com/en/2.x/quickstart/
     </a>
                     </li>
-                    <li>(11) Use Flask and SQLalchemy, not Flask-SQLAlchemy! ※上記(3)でFlask-SQLAlchemyを使うことの欠点が記載されてます<br/>
+                    <li>(12) Use Flask and SQLalchemy, not Flask-SQLAlchemy! ※上記(3)でFlask-SQLAlchemyを使うことの欠点が記載されてます<br/>
     <a href="https://nestedsoftware.com/2018/06/11/flask-and-sqlalchemy-without-the-flask-sqlalchemy-extension-3cf8.34704.html" target="_blank">
     https://nestedsoftware.com/2018/06/11/flask-and-sqlalchemy-without-the-flask-sqlalchemy-extension-3cf8.34704.html
     </a>
@@ -140,7 +145,7 @@
 }</code></pre>
                     </li>
                 </ul>
-                <div class="mb-2">(2)変数定義: 各データベース情報ファイルパス, ログ出力フォーマット定義</div>
+                <div class="mb-2">(2) 変数定義: 各データベース情報ファイルパス, ログ出力フォーマット定義</div>
 <pre class="ms-3"><code class="python small"># 健康管理デーベース接続情報: [DB] healthcare_db [PORT] 5432
 DB_HEALTHCARE_CONF: str = os.path.join("conf", "db_healthcare.json")
 # 気象センサーデータベース: [DB] sensors_pgdb [PORT] 5432
@@ -149,24 +154,28 @@ DB_SENSORSE_CONF: str = os.path.join("conf", "db_sensors.json")
 LOG_FMT = '%(asctime)s %(filename)s %(funcName)s %(levelname)s %(message)s'
 # デバックログ有効
 app_logger_debug: bool = True</code></pre>
-                <div class="mb-2">(3)データベース情報ファイル(JSON)を辞書オブジェクトに変換する関数</div>
+                <div class="mb-2">(3) データベース情報ファイル(JSON)を辞書オブジェクトに変換する関数</div>
+                <p class="ms-2 mb-1 small">ここでのポイントは<b>hostname = socket.gethostname() としている</b>箇所。</p>
 <pre class="ms-3"><code class="python small">def get_conn_dict(filePath: str) -&gt; dict:
     with open(filePath, 'r') as fp:
         db_conf: json = json.load(fp)
         hostname = socket.gethostname()  # == `hostname` コマンドで取得できるホスト名
         db_conf["host"] = db_conf["host"].format(hostname=hostname) # == ホスト名.local 
     return db_conf</code></pre>
+                <p class="ms-2 mb-1 small">下記 <b>hostnameコマンド</b>を実行した結果で db_conf["host"] = 'Dell-T7500.local' となります。</p>
+<pre class="ms-3"><code class="bash small">$ hostname
+Dell-T7500
+</code></pre>
 
-                <div class="mb-2">(3)JSONファイル読み込み関数 ※データ登録用JSONファイルを辞書オブジェクトに変換</div>
-<pre class="ms-3"><code class="python small">
-def load_json(filePath: str) -&gt; dict:
+                <div class="mb-2">(4) JSONファイル読み込み関数 ※データ登録用JSONファイルを辞書オブジェクトに変換</div>
+<pre class="ms-3"><code class="python small">def load_json(filePath: str) -&gt; dict:
     with open(filePath, 'r') as fp:
         json_text = json.load(fp)  # 辞書オブジェクト
     return json_text</code></pre>
 
-                <div class="mb-2">(4)メールアドレスに対応するID取得関数</div>
+                <div class="mb-2">(5) メールアドレスに対応するID取得関数</div>
                 <ul class="mb-4 small">
-                    <li>メールアドレスに一致するレコードが存在すればIDを返却 ※withコンテキストを使っているのでセッションは自動でcommitされる</li>
+                    <li>メールアドレスに一致するレコードが存在すればIDを返却 <br/>※セッションは内側のwithでコミットされ、外側のwithでクローズされる。</li>
                     <li>存在しなければNone(未登録)を返却</li>
                     <li>エラーならそのままエラーをスロー <b>※Flaskアプリでは abort(InternalServerError)レスポンス返却</b></li>
                 </ul>
@@ -176,10 +185,16 @@ def load_json(filePath: str) -&gt; dict:
     :email_address: メールアドレス
     """
     try:
-        with session.begin():
-            stmt: Select = select(Person).where(Person.email == email_address)
-            person: Person = session.scalars(stmt).one()
-        return person.id
+        person_id: Optional[int]
+        with Session_healthcare() as session:
+            with session.begin():
+                stmt: Select = select(Person).where(Person.email == email_address)
+                person: Person = session.scalars(stmt).one()
+                if person:
+                    person_id = person.id
+                else:
+                    person_id = None
+        return person_id
     except NoResultFound as notFound:
         app_logger.warning(f"NoResultFound: {notFound}")
         return None
@@ -187,7 +202,7 @@ def load_json(filePath: str) -&gt; dict:
         app_logger.error(f"Exception: {excption}")
         raise excption</code></pre>
 
-                <div class="mb-2">(5)健康管理データベース登録処理</div>
+                <div class="mb-2">(6) 健康管理データベース登録処理</div>
                 <ul class="mb-4 small">
                     <li>テーブル項目チェック処理: <b>全てのテーブル項目が必要で、１つでも存在しない項目があればエラーとし処理終了</b><br/>
                          <b>※Flaskアプリではabort(BadRequest)レスポンス返却</b>
@@ -269,15 +284,9 @@ def load_json(filePath: str) -&gt; dict:
         sess.rollback()
         raise err
     finally:
-        sess.close()
+        sess.close()</code></pre>
 
-        app_logger.warning(f"NoResultFound: {notFound}")
-        return None
-    except Exception as excption:
-        app_logger.error(f"Exception: {excption}")
-        raise excption</code></pre>
-
-                <div class="mb-2">(6)気象センサーデータベース登録処理</div>
+                <div class="mb-2">(7) 気象センサーデータベース登録処理</div>
                 <ul class="mb-4 small">
                     <li>テーブル項目チェック処理: <b> 天候データコンテナと天候状態が必須で、１つでも存在しない項目があればそのまま処理終了</b><br/>
                          <b>※Flaskアプリでは何もせずに処理終了</b>
@@ -323,31 +332,13 @@ def load_json(filePath: str) -&gt; dict:
     finally:
         sess.close()</code></pre>
 
-                <div class="mb-2">(6)メイン処理</div>
+                <div class="mb-2">(8) バッチメイン処理</div>
                 <ul class="mb-2 small">
                     <li>アプリケーションログ設定 ※Flaskアプリのログオブジェクトを模倣してるので関数内のログ出力部分は修正無く使用できる</li>
                     <li>登録用データファイル(JSON)の読み込み、辞書オブジェクトに変換<br/>
                         ※ <b>Flaskアプリではリクエストデータから辞書オブジェクトを取得</b> 
                     </li>
                     <li>各データベース情報からそれぞれのセッションクラスを取得する<br/>
-※<b>Flaskアプリでは下記の通りでバッチのコードとほぼ同じです</b> [src/webapp/Healthcare/healthcare/__init__.py]<br/>
-<pre><code class="small"># SQLAlchemy engine
-# 1.健康管理データベース: postgresql[5433]
-conn_dict: dict = getdict_forurl(DB_HEALTHCARE_CONF)
-conn_url: URL = URL.create(**conn_dict)
-engine_healthcare: sqlalchemy.Engine = create_engine(conn_url, echo=False)
-# セッションクラス定義
-Cls_sess_healthcare: scoped_session = scoped_session(
-    sessionmaker(bind=engine_healthcare)
-    )
-
-# 2.気象センサーデータベース: postgresql[5432]
-conn_dict: dict = getdict_forurl(DB_SENSORS_CONF)
-conn_url: URL = URL.create(**conn_dict)
-engine_sensors: sqlalchemy.Engine = create_engine(conn_url, echo=False)
-Cls_sess_sensors: scoped_session = scoped_session(
-    sessionmaker(bind=engine_sensors)
-    )</code></pre>
                     </li>
                     <li>健康管理テーブルの主キー項目を取得する</li>
                     <li>メールアドレスから個人情報のIDを取得(person_id)する。存在しなければ終了。<br/>
@@ -374,17 +365,24 @@ Cls_sess_sensors: scoped_session = scoped_session(
         app_logger.debug(healthcare_data)
 
     # 健康管理データベース接続情報
-    #   postgresql+psycopg2://developer:xxxx@dell-t7500:5433/healthcare_db
     url_dict: dict = get_conn_dict(DB_HEALTHCARE_CONF)
     conn_url: URL = URL.create(**url_dict)
     engine_healthcare: sqlalchemy.Engine = create_engine(conn_url, echo=False)
+    # 個人テーブルチェック用
     Session_healthcare = sessionmaker(bind=engine_healthcare)
+    # 登録処理用セッション
+    Cls_sess_healthcare: scoped_session = scoped_session(
+        sessionmaker(bind=engine_healthcare)
+    )
+    app_logger.info(f"Cls_sess_healthcare: {Cls_sess_healthcare}")
     # 気象センサーデータベース接続情報
-    #   postgresql+psycopg2://developer:xxxx@dell-t7500:5433/sensors_pgdb
     url_dict: dict = get_conn_dict(DB_SENSORSE_CONF)
     conn_url: URL = URL.create(**url_dict)
     engine_sensors: sqlalchemy.Engine = create_engine(conn_url, echo=False)
-    Session_sensors = sessionmaker(bind=engine_sensors)
+    Cls_sess_sensors: scoped_session = scoped_session(
+        sessionmaker(bind=engine_sensors)
+    )
+    app_logger.info(f"Cls_sess_sensors: {Cls_sess_sensors}")
 
     # メールアドレス取得
     emailAddress: str = healthcare_data["emailAddress"]
@@ -398,15 +396,30 @@ Cls_sess_sensors: scoped_session = scoped_session(
     measurementDay: str = healthcare_data["measurementDay"]
 
     # 健康管理データベースの全テーブル一括登録
-    _insert_healthdata(Session_healthcare(), person_id, measurementDay, healthcare_data)
-    # 天候状態テーブル登録
-    _insert_weather(Session_sensors(), measurementDay, healthcare_data)
-</code></pre>
+    try:
+        _insert_healthdata(Cls_sess_healthcare(),
+                           person_id, measurementDay, healthcare_data)
+    except Exception:
+        pass
+    else:
+        # 天候状態テーブル登録
+        _insert_weather(Cls_sess_sensors(), measurementDay, healthcare_data)</code></pre>
             </div>    
+
             <h5 class="v-line-start">3.データ更新バッチメインスクリプト</h5>
             <div class="m-3">
-                <div class="mb-2">(1)健康管理データベース更新処理</div>
-                <ul class="mb-4 small">
+                <div>(1) 更新用のJSONチェック処理</div>
+                <div class="mb-2 ms-4 small"><b>※ 健康管理の更新データは各テーブル毎に任意なのでキーが無い場合はNoneを返却しエラーにしない。</b></div>
+<pre class="ms-3"><code class="python small">def _has_dict_in_data(dict_key: str, data:Dict) -> Optional[Dict]:
+    try:
+        result: Dict = data[dict_key]
+        return result
+    except KeyError as err:
+        # データ無し
+        return None</code></pre>
+
+                <div class="mb-2">(2) 健康管理データベース更新処理</div>
+                <ul class="small">
                     <li>健康管理データコンテナチェック処理: <b>必須。存在しなければ処理終了。</b><br/>
                          <b>※Flaskアプリではabort(BadRequest)レスポンス返却</b>
                     </li>
@@ -418,7 +431,7 @@ Cls_sess_sensors: scoped_session = scoped_session(
                             <li>SQLAlchemyError: DB操作エラー ※<b>Flaskアプリではabort(InternalError)レスポンス返却</b></li>
                         </ul>
                     </li>
-                    <li>クリーンアップで<b>セッションをクローズする</b> ※<b>これを忘れるとセッションが残ってしまう</b></li>
+                    <li>クリーンアップで<b>セッションをクローズする</b></li>
                 </ul>
 <pre class="ms-3"><code class="python small">def _update_healthdata(sess: Session, person_id: int, measurement_day: str, data: Dict) -&gt; None:
     # 健康管理データコンテナ: 必須
@@ -514,7 +527,7 @@ Cls_sess_sensors: scoped_session = scoped_session(
     finally:
         sess.close()</code></pre>
 
-                <div class="mb-2">(2)気象センサーデータベース更新処理</div>
+                <div class="mb-2">(3) 気象センサーデータベース更新処理</div>
                 <ul class="mb-4 small">
                     <li>テーブル項目チェック処理: <b> 天候データコンテナのみ必須で、１つでも存在しない項目があればそのまま処理終了</b><br/>
                          <b>※Flaskアプリでは何もせずに処理終了</b>
@@ -564,7 +577,7 @@ Cls_sess_sensors: scoped_session = scoped_session(
         sess.rollback()
     finally:
         sess.close()</code></pre>
-                <div class="mb-2">(3)メイン処理 ※登録処理とほぼ内容が同じなのでコードのみ掲載し説明は省略</div>
+                <div class="mb-2">(4) バッチメイン処理 ※登録処理とほぼ内容が同じなのでコードのみ掲載し説明は省略</div>
 <pre class="ms-3"><code class="python small">if __name__ == '__main__':
     logging.basicConfig(format=LOG_FMT, level=logging.DEBUG)
     app_logger = logging.getLogger(__name__)
@@ -584,16 +597,26 @@ Cls_sess_sensors: scoped_session = scoped_session(
     url_dict: dict = get_conn_dict(DB_HEALTHCARE_CONF)
     conn_url: URL = URL.create(**url_dict)
     engine_healthcare: sqlalchemy.Engine = create_engine(conn_url, echo=True)
+    # 個人テーブルチェック用
     Session_healthcare = sessionmaker(bind=engine_healthcare)
+    # 登録処理用セッション
+    Cls_sess_healthcare: scoped_session = scoped_session(
+        sessionmaker(bind=engine_healthcare)
+    )
+    app_logger.info(f"Cls_sess_healthcare: {Cls_sess_healthcare}")
     # 気象センサーデータベース接続情報
     url_dict: dict = get_conn_dict(DB_SENSORSE_CONF)
     conn_url: URL = URL.create(**url_dict)
     engine_sensors: sqlalchemy.Engine = create_engine(conn_url, echo=True)
-    Session_sensors = sessionmaker(bind=engine_sensors)
+    Cls_sess_sensors: scoped_session = scoped_session(
+        sessionmaker(bind=engine_sensors)
+    )
+    app_logger.info(f"Cls_sess_sensors: {Cls_sess_sensors}")
 
-    # 健康管理テーブルの主キー
+    # メールアドレス取得
     emailAddress: str = healthcare_data["emailAddress"]
-    person_id: int = _get_personid(Session_healthcare(), emailAddress)
+    # メールアドレスに対応する個人ID取得: 健康管理テーブルの主キー
+    person_id: int = _get_personid(emailAddress)
     if person_id is None:
         app_logger.warning("Person not found.")
         exit(0)
@@ -602,9 +625,14 @@ Cls_sess_sensors: scoped_session = scoped_session(
     measurementDay: str = healthcare_data["measurementDay"]
 
     # 健康管理データ更新
-    _update_healthdata(Session_healthcare(), person_id, measurementDay, healthcare_data)
-    # 天候状態
-    _update_weather(Session_sensors(), measurementDay, healthcare_data)</code></pre>
+    try:
+        _update_healthdata(Cls_sess_healthcare(), person_id, measurementDay,
+                           healthcare_data)
+    except Exception:
+        pass
+    else:
+        # 天候状態
+        _update_weather(Cls_sess_sensors(), measurementDay, healthcare_data)</code></pre>
             </div>
 
             <div class="row mb-5 small">
