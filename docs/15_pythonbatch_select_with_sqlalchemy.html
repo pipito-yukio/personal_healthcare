@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="stylesheet" href="assets/css/bootstrap_custom.css" />
+        <link rel="stylesheet" href="assets/css/bootstrap.min.css" />
+        <link rel="stylesheet" href="assets/highlight/styles/default.min.css" />
+        <title>SQLAlchemyのRawクエリーを使う</title>
+        <meta name="description" content="Using SQLAlchemy's Raw query in a Python batch script or Flask application.">
+    </head>
+
+    <body>
+        <div class="container" style="max-width: 980px">
+            <h4 class="m-2 text-center">SQLAlchemyのRawクエリーを使う</h4>
+            <hr />
+            <div class="update-date">【最終更新日】2023-05-02</div>
+            <p class="indent">
+                PythonバッチスクリプトでSQLAlchemyのRawクエリーを使って登録済みデータを取得しJSON化する方法について解説します。
+            </p>
+            <p class="indent">
+※著者は残念ながらSQLAlchemyに関してはその道のエキスパートでないため検索処理はORM標準の方法ではなく<b>RAWクエリーを直接実行する</b>方法を採用しています。
+本リポジトリは健康管理データの可視化が目的なので開発に割く工数にはメリハリをつけて実装しています。<b>ORM標準での検索方法を学習するコストもかかります。</b>
+            </p>
+            <!-- refercence urls -->
+            <div class="m-2 mb-4">
+                <div>【参考URL】</div>
+                <ul class="ms-2 small">
+                    <li>(1) SQLAlchemy本家サイト <b>ドキュメンテーショントップ</b><br/>
+    <a href="https://docs.sqlalchemy.org/en/20/index.html" target="_blank">
+    https://docs.sqlalchemy.org/en/20/index.html</a>
+                    </li>
+                    <li>(2) SQLAlchemy本家サイト <b>Session API</b><br/>
+    <a href="https://docs.sqlalchemy.org/en/20/orm/session_api.html" target="_blank">
+    https://docs.sqlalchemy.org/en/20/orm/session_api.html</a>
+                    </li>
+                    <li>(3) SQLAlchemy本家サイト <b>Transactions and Connection Management</b><br/>
+    <a href="https://docs.sqlalchemy.org/en/20/orm/session_transaction.html" target="_blank">
+    https://docs.sqlalchemy.org/en/20/orm/session_transaction.html
+    </a>
+                    </li>
+                    <li>(4) <b>Sqlalchemy, raw query and parameters</b><br/>
+    <a href="https://stackoverflow.com/questions/29208847/sqlalchemy-raw-query-and-parameters" target="_blank">
+    https://stackoverflow.com/questions/29208847/sqlalchemy-raw-query-and-parameters
+    </a>
+                    </li>
+                    <li>(5) <b>How to Execute Raw SQL in SQLAlchemy</b><br/>
+    <a href="https://chartio.com/resources/tutorials/how-to-execute-raw-sql-in-sqlalchemy/" target="_blank">
+    https://chartio.com/resources/tutorials/how-to-execute-raw-sql-in-sqlalchemy/
+    </a>
+                    </li>
+                    <li>(6) <b>How to Execute Plain SQL Queries With SQLAlchemy in Python</b><br/>
+    <a href="https://betterprogramming.pub/how-to-execute-plain-sql-queries-with-sqlalchemy-627a3741fdb1" target="_blank">
+    https://betterprogramming.pub/how-to-execute-plain-sql-queries-with-sqlalchemy-627a3741fdb1
+    </a>
+                    </li>
+                </ul>
+                <div>【SQLAlchemyのソース】</div>
+                <ul class="ms-2">
+                    <li>RAWクエリーのヒント ■■ (_elements_cnstructors.py: textメソッドのpydocの抜粋)
+<pre><code class="python small">@_document_text_coercion("text", ":func:`.text`", ":paramref:`.text.text`")
+def text(text: str) -&gt; TextClause:
+    r"""Construct a new :class:`_expression.TextClause` clause,
+    representing
+    a textual SQL string directly.
+
+    E.g.::
+
+        from sqlalchemy import text
+
+        t = text("SELECT * FROM users")
+        result = connection.execute(t)
+
+    The advantages :func:`_expression.text`
+    provides over a plain string are
+    backend-neutral support for bind parameters, per-statement
+    execution options, as well as
+    bind parameter and result-column typing behavior, allowing
+    SQLAlchemy type constructs to play a role when executing
+    a statement that is specified literally.  The construct can also
+    be provided with a ``.c`` collection of column elements, allowing
+    it to be embedded in other SQL expression constructs as a subquery.
+
+    Bind parameters are specified by name, using the format ``:name``.
+    E.g.::
+
+        t = text("SELECT * FROM users WHERE id=:user_id")  ■■ RAWクエリー
+        result = connection.execute(t, user_id=12)         ■■ 辞書オブジェクトパラメータとする {"user_id":12}
+
+    For SQL statements where a colon is required verbatim, as within
+    an inline string, use a backslash to escape::</code></pre>
+                    </li>
+                </ul>
+            </div>
+
+            <h5 class="v-line-start">1.検索バッチアプリケーション用プロジェクト</h5>
+            <div class="m-3">
+                <div>プロジェクトのクラス構成</div>
+<pre class="m-2 small"><code>healthcare/
+    ├── GetHealthcareDataWithSelector.py  // 登録済みデータ取得バッチスクリプト
+    ├── conf                              // データベース接続情報
+    │   ├── db_healthcare.json            //  (1)健康管理データベース用
+    │   └── db_sensors.json               //  (2)気象センサーデータベース用 
+    └── dao
+         ├── __init__.py                  //  健康管理データベーススキーマ定義
+         └── queries.py                   //  RAW クエリを実行して辞書オブジェクトを生成するクラス
+</code></pre>
+            </div>
+
+            <h5 class="v-line-start">2.RAW クエリを実行して辞書オブジェクトを生成するクラス</h5>
+            <div class="ms-3">
+                <div>(1) datetime.date型, datetime.time型をAndroidアプリ用の文字列に変換する関数</div>
+<pre><code class="python small">def _datetime_to_str(src_dict: dict) -&gt; Dict:
+    """
+    ソース辞書の中のdatetime.date型とdatetime.time型のデータを文字列型に変換する
+    :param src_dict: ソース辞書
+    :return: 変換後の新たな辞書
+    """
+    conv_dict = {}
+    for key, val in zip(src_dict.keys(), src_dict.values()):
+        if isinstance(val, date):
+            # "年(4桁)-月(2桁)-日(2桁)'
+            # (例)  {date} 2023-03-01 -&gt; {str} '2023-03-01'
+            conv_dict[key] = val.isoformat()
+        elif isinstance(val, time):
+            # "時:分" ※秒は不要: Androidアプリ側の精度が分まで
+            # (例) {time} 05:55:00 -&gt; {str} '05:55'
+            conv_dict[key] = val.strftime("%H:%M")
+        else:
+            conv_dict[key] = val
+    return conv_dict
+</code></pre>
+                <figure class="figure ms-2">
+                    <figcaption class="figure-caption text-center">
+                        【テーブルの時刻フィールドをAndroidアプリ用文字列に変換】
+                    </figcaption>
+                    <img class="figure-img img-fluid" src="15_pythonbatch_select_with_sqlalchemy/images/python_dateTimeToAndroidApp.png" width="860" />
+                </figure>
+                    </li>
+                </ul>
+                <div class="mb-2">(2) SELECT項目を辞書オブジェクトに変換するためのコンテナクラス</div>
+                <p class="ms-2 indent">
+<b>名前付きフィールドを持つタプルのサブクラスを作成するとテーブルから取得した値を簡単に辞書オブジェクトに変換できます。
+ポイントはタプルのフィールド名をJSONのプロパティ名に一致させるだけです。</b>
+                </p>
+<pre class="ms-3"><code class="python small">class Selector:
+    # 1.健康管理データベース
+    # 1-1.睡眠管理データ
+    _SleepManagement = namedtuple('SleepManagement', [
+        'wakeupTime','sleepScore','sleepingTime','deepSleepingTime']
+    )
+    # 1-2.血圧測定データ
+    _BloodPressure = namedtuple('BloodPressure', [
+        'morningMeasurementTime','morningMax','morningMin','morningPulseRate',
+        'eveningMeasurementTime', 'eveningMax', 'eveningMin', 'eveningPulseRate']
+    )
+    # 1-3.頻尿要因データ
+    _NocturiaFactors = namedtuple('NocturiaFactors', [
+        'midnightToiletVisits','hasCoffee','hasTea','hasAlcohol','hasNutritionDrink',
+        'hasSportsDrink','hasDiuretic','takeMedicine','takeBathing','conditionMemo']
+    )
+    # 1-4.歩数データ
+    _WalkingCount = namedtuple('WalkingCount', ['counts'])
+    # 1-5.体温管理データ
+    _BodyTemperature = namedtuple('_BodyTemperature', ['measurementTime', 'temperature'])
+
+    # 2.気象データベース.天候データ
+    _WeatherCondition = namedtuple('WeatherCondition', ['condition'])
+</code></pre>
+                <div class="mb-2">(3) 健康管理データベース検索クエリ定義</div>
+<pre class="ms-3"><code class="sql small">_QRY_GET_HEALTHCARE: str = """
+SELECT
+  sm.measurement_day
+  ,wakeup_time --必ず入力する
+  ,sleep_score --任意
+  ,sleeping_time --任意
+  ,deep_sleeping_time --任意
+  ,morning_measurement_time --任意
+  ,morning_max --任意
+  ,morning_min --任意
+  ,morning_pulse_rate --任意
+  ,evening_measurement_time--任意
+  ,evening_max --任意
+  ,evening_min --任意
+  ,evening_pulse_rate --任意
+  ,midnight_toilet_visits --必ず入力する
+  ,has_coffee
+  ,has_tea
+  ,has_alcohol
+  ,has_nutrition_drink
+  ,has_sports_drink
+  ,has_diuretic
+  ,take_medicine
+  ,take_bathing
+  ,condition_memo --任意
+  ,counts --必ず入力する
+  ,measurement_time --BLEデバイス取得(任意)
+  ,temperature -- BLEデバイス取得(任意)
+FROM
+  bodyhealth.person p
+  INNER JOIN bodyhealth.sleep_management sm ON p.id = sm.pid
+  INNER JOIN bodyhealth.blood_pressure bp ON p.id = bp.pid
+  INNER JOIN bodyhealth.nocturia_factors nf ON p.id = nf.pid
+  INNER JOIN bodyhealth.walking_count wc ON p.id = wc.pid
+  INNER JOIN bodyhealth.body_temperature bt ON p.id = bt.pid
+WHERE    _QRY_GET_HEALTHCARE: str = """
+SELECT
+  sm.measurement_day
+  ,wakeup_time --必ず入力する
+  ,sleep_score --任意
+  ,sleeping_time --任意
+  ,deep_sleeping_time --任意
+  ,morning_measurement_time --任意
+  ,morning_max --任意
+  ,morning_min --任意
+  ,morning_pulse_rate --任意
+  ,evening_measurement_time--任意
+  ,evening_max --任意
+  ,evening_min --任意
+  ,evening_pulse_rate --任意
+  ,midnight_toilet_visits --必ず入力する
+  ,has_coffee
+  ,has_tea
+  ,has_alcohol
+  ,has_nutrition_drink
+  ,has_sports_drink
+  ,has_diuretic
+  ,take_medicine
+  ,take_bathing
+  ,condition_memo --任意
+  ,counts --必ず入力する
+  ,measurement_time --BLEデバイス取得(任意)
+  ,temperature -- BLEデバイス取得(任意)
+FROM
+  bodyhealth.person p
+  INNER JOIN bodyhealth.sleep_management sm ON p.id = sm.pid
+  INNER JOIN bodyhealth.blood_pressure bp ON p.id = bp.pid
+  INNER JOIN bodyhealth.nocturia_factors nf ON p.id = nf.pid
+  INNER JOIN bodyhealth.walking_count wc ON p.id = wc.pid
+  INNER JOIN bodyhealth.body_temperature bt ON p.id = bt.pid
+WHERE
+  email=:emailAddress                -- params={"emailAddress": "user1@example.com",}
+  AND
+  sm.measurement_day=:measurementDay -- params={"measurementDay": "2023-04-01"}
+  AND  
+  bp.measurement_day=:measurementDay
+  AND 
+  nf.measurement_day=:measurementDay
+  AND
+  wc.measurement_day=:measurementDay
+  AND
+  bt.measurement_day=:measurementDay
+"""</code></pre>
+                <div class="ms-3">
+                    <figure class="figure">
+                        <figcaption class="figure-caption text-center">
+                            【SELECT項目とテーブル用データクラス関連図】
+                        </figcaption>
+                        <img class="figure-img img-fluid" src="15_pythonbatch_select_with_sqlalchemy/images/python_selectFiedsToNamedTuple.png" />
+                    </figure>
+                </div>
+                <div class="mb-2">(4) 気象センサーデータベースの天候状態テーブル検索クエリ定義</div>
+<pre class="ms-3"><code class="sql small">    _QRY_GET_WEATHER: str = """
+SELECT condition FROM weather.weather_condition WHERE measurement_day=:measurementDay
+"""</code></pre>
+
+                <div class="mb-2">(5) コンストラクタ</div>
+                <ul class="mb-4 small">[引数]
+                    <li>cls_sess_healthcare: 健康管理データベースセッションクラス <b>(scoped_session)</b></li>
+                    <li>cls_sess_sensors: 気象センサーデータベースセッションクラス <b>(scoped_session)</b></li>
+                    <li>app_logger: アプリケーションロガー</li>
+                </ul>
+<pre class="ms-3"><code class="python small">    def __init__(self, cls_sess_healthcare, cls_sess_sensors, app_logger: app_logger=None):
+        # 健康管理DB用セッションオブジェクト生成
+        self.sess_healthcare: scoped_session = cls_sess_healthcare() # セッションクラスからセッションオブジェクトを生成
+        # 気象センサーDB用セッションオブジェクト生成
+        self.sess_sensors: scoped_session = cls_sess_sensors()
+        self.app_logger = app_logger
+</code></pre>
+
+                <div class="mb-2">(6) 健康管理データベース検索結果取得関数</div>
+                <ul class="mb-4 small">
+                    <li>■ A-1 検索用パラメータとして主キー項目(メールアドレス, 測定日付)の辞書オブジェクを作成</li>
+<pre><code class="python">params = {"emailAddress": email, "measurementDay": measurement}</code></pre>
+                    <li>■ A-2 検索実行でResultオブジェクト(rs)を取得する。</li>
+<pre><code class="python">rs: Result = self.sess_healthcare.execute(text(self._QRY_GET_HEALTHCARE), params)</code></pre>
+                    <li>■ A-3 Resultオブジェクト(rs)がNone以外なら1件データを取り出す(tuple) ※rowの内容は見やすくするするため改行を入れています<br/>
+<pre><code class="python">row = rs.fetchone()
+"""[デバックコンソールの内容] row=(
+ datetime.date(2023, 3, 14), 
+ datetime.time(5, 30), 86, datetime.time(6, 50), datetime.time(0, 50), 
+ datetime.time(6, 40), 122, 70, 62, datetime.time(22, 10), 101, 63, 67, 
+ 1, False, False, False, True, False, False, True, True, None, 
+ 8460,
+ None, None
+)"""</code></pre>
+                    </li>
+                    <li>■ A-4 (1)〜(5) 取得結果(タプル)をスライスして各テーブル用テータクラスに設定する
+                    <figure class="figure ms-2">
+                        <figcaption class="figure-caption text-center">
+                            【検索結果(tuple)を辞書オブジェクトに変換】
+                        </figcaption>
+                        <img class="figure-img img-fluid" src="15_pythonbatch_select_with_sqlalchemy/images/python_tupleToNamedTuple.png" width="860" />
+                    </figure>
+                    </li>
+                    <li>■ A-5 (1)〜(3) 日付・時刻フィールドを含むテーブル用データオブジェクトの辞書オブジェクトを取得し日付・時刻文字列に変換する</li>
+                    <li>■ A-6 時刻フィールドを含まないテーブル用データオブジェクトの辞書オブジェクトを取得する</li>
+                    <li>■ A-7 各辞書オブジェクトを健康管理データコンテナー用辞書に格納する ※下記は睡眠管理辞書オブジェクトの例</li>
+<pre><code class="json">sleepman_dict:
+{
+  'wakeupTime': '05:30', 'sleepScore': 86, 'sleepingTime': '06:50', 'deepSleepingTime': '00:50'
+}
+
+container_dict["sleepManagement"]=sleepman_dict:
+'sleepManagement': {
+  'wakeupTime': '05:30', 'sleepScore': 86, 'sleepingTime': '06:50', 'deepSleepingTime': '00:50'
+  }</code></pre>
+                    <li>■ A-8 コンテナーオブジェクトを健康管理データ用辞書に格納するして返却する</li>
+                </ul>
+<pre class="ms-3"><code class="python small">    def get_healthcare_asdict(self, email: str, measurement: str) -&gt; Optional[dict]:
+        """
+        健康管理DBから指定された主キー項目(メールアドレス,測定日付)のデータの辞書オブジェクトを取得する
+        :param email: メールアドレス
+        :param measurement: 測定日付
+        :return: 健康管理データの辞書オブジェクト, 存在しない場合はNone
+        """
+        # パラメータ辞書生成: 主キー
+        # https://docs.sqlalchemy.org/en/20/orm/session_transaction.html
+        # will automatically begin again
+        # result = session.execute("&lt; some select statement &gt;")
+        # session.add_all([more_objects, ...])
+        # session.commit()  
+        params = {"emailAddress": email, "measurementDay": measurement} # ■ A-1
+        row = None
+        try:
+            rs: Result = self.sess_healthcare.execute(text(self._QRY_GET_HEALTHCARE), params) # ■ A-2
+            if rs:
+                row = rs.fetchone()                                     # ■ A-3
+            self.sess_healthcare.commit()
+        except sqlalchemy.exc.SQLAlchemyError as err:
+            self.sess_healthcare.rollback()
+            if self.app_logger:
+                self.app_logger.warning(err.args)
+            return None
+        finally:
+            self.sess_healthcare.close()
+
+        if row is None:
+            return None
+
+        # 取得したTupleデータを位置引数で引き渡す
+        # 先頭の測定日付はスキップする
+        # 睡眠管理データ: 4項目
+        sleepman = self._SleepManagement(*row[1:5])    # ■ A-4 (1)
+        # 血圧データ: 8項目
+        bloodpress = self._BloodPressure(*row[5:13])   # ■ A-4 (2)
+        # 頻尿要因データ: 10項目
+        factors = self._NocturiaFactors(*row[13:23])   # ■ A-4 (3)
+        # 歩数データ: 1項目
+        walkingcnt = self._WalkingCount(*row[23:24])   # ■ A-4 (4)
+        # 体温データ: 2項目
+        bodytemper = self._BodyTemperature(*row[24:])  # ■ A-4 (5)
+        # ■ A-5 時刻データが含まれるデータ変換import argparse
+import logging
+from typing import Dict, Optional
+import json
+import os
+import socket
+
+import sqlalchemy
+from sqlalchemy.engine.url import URL
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, scoped_session
+
+from dao.queries import Selector
+
+DB_HEALTHCARE_CONF: str = os.path.join("conf", "db_healthcare.json")
+DB_SENSORS_CONF: str = os.path.join("conf", "db_sensors.json")
+SAVE_JSON = os.path.join("json_datas", 'out_healthcare_data.json')
+LOG_FMT = '%(asctime)s %(filename)s %(funcName)s %(levelname)s %(message)s'
+# デバックログ有効
+app_logger_debug: bool = True
+
+
+def save_text(filePath: str, text) -> None:
+    with open(filePath, 'w') as fp:
+        fp.write(text)
+
+
+def get_conn_dict(filePath: str) -> dict:
+    with open(filePath, 'r') as fp:
+        db_conf: json = json.load(fp)
+        hostname = socket.gethostname()
+        # host in /etc/hosts
+        db_conf["host"] = db_conf["host"].format(hostname=hostname)
+    return db_conf
+
+
+
+        sleepman_dict: Dict = _datetime_to_str(sleepman._asdict())     # ■ A-5 (1)
+        bloodpress_dict: Dict = _datetime_to_str(bloodpress._asdict()) # ■ A-5 (2)
+        bodytemper_dict: Dict = _datetime_to_str(bodytemper._asdict()) # ■ A-5 (3)
+        # ■ A-6 それ以外は namedtupleからDictオブジェクトに変換する
+        factors_dict: Dict = factors._asdict()
+        walkingcnt_dict: Dict = walkingcnt._asdict()
+        # ■ A-7 各辞書オブジェクトを健康管理データコンテナー用辞書に格納する
+        container_dict: Dict = {}
+        container_dict["sleepManagement"] = sleepman_dict
+        container_dict["bloodPressure"] = bloodpress_dict
+        container_dict["nocturiaFactors"] = factors_dict
+        container_dict["walkingCount"] = walkingcnt_dict
+        container_dict["bodyTemperature"] = bodytemper_dict
+        # ■ A-8 コンテナーオブジェクトを健康管理データ用辞書に格納する
+        return {"healthcareData": container_dict}</code></pre>
+                <div class="mb-2">【戻り値】デバックコンソールの値 ※見やすくするするため改行を入れています</div>
+<pre class="ms-3"><code class="json small">{'healthcareData': {
+  'sleepManagement': {
+    'wakeupTime': '05:30', 'sleepScore': 86, 'sleepingTime': '06:50', 'deepSleepingTime': '00:50'
+  }, 
+  'bloodPressure': {
+    'morningMeasurementTime': '06:40', 'morningMax': 122, 'morningMin': 70, 'morningPulseRate': 62,
+    'eveningMeasurementTime': '22:10', 'eveningMax': 101, 'eveningMin': 63, 'eveningPulseRate': 67
+  }, 
+  'nocturiaFactors': {
+    'midnightToiletVisits': 1, 'hasCoffee': False, 'hasTea': False, 'hasAlcohol': False, 
+    'hasNutritionDrink': True, 'hasSportsDrink': False, 'hasDiuretic': False, 
+    'takeMedicine': True, 'takeBathing': True, 'conditionMemo': None
+  }, 
+  'walkingCount': {
+    'counts': 8460
+  }, 
+  'bodyTemperature': {
+    'measurementTime': None, 'temperature': None
+  }
+}</code></pre>
+
+                <div class="mb-2">(6) 気象センサーデータベース検索処理</div>
+                <ul class="mb-4 small">
+                    <li>テーブル項目チェック処理: <b> 天候データコンテナと天候状態が必須で、１つでも存在しない項目があればそのまま処理終了</b><br/>
+                         <b>※Flaskアプリでは何もせずに処理終了</b>
+                    </li>
+                </ul>
+<pre class="ms-3"><code class="python small">    def get_weather_asdict(self, measurement: str) -&gt; Optional[dict]:
+        """
+        指定された日付(主キー)の天候を取得し辞書オブジェクトとして返却する
+        :param measurement_day: 日付
+        :return: 天候データの辞書オブジェクト, 存在しない場合はNone
+        """
+        params = {"measurementDay": measurement}
+        row = None
+        try:
+            rs: Result = self.sess_sensors.execute(text(self._QRY_GET_WEATHER), params)
+            if rs:
+                row = rs.fetchone()
+            self.sess_sensors.commit()    
+        except sqlalchemy.exc.SQLAlchemyError as err:
+            self.sess_sensors.rollback()
+            if self.app_logger:
+                self.app_logger.warning(err.args)
+            return None
+        finally:
+            self.sess_sensors.close()
+
+        if row is None:
+            return None
+
+        weather_condition = self._WeatherCondition(*row)
+        container_dict = {"weatherCondition": weather_condition._asdict()}
+        return container_dict</code></pre>
+                <div class="mb-2">【戻り値】デバックコンソールの値 </div>
+<pre class="ms-3"><code class="json small">container_dict= {dict:1} {'weatherCondition': {'condition': '曇り'}}</code></pre>
+            </div>
+
+            <h5 class="v-line-start">3.登録済みデータ検索メインクラス</h5>
+            <div class="m-3">
+                <ul class="mb-2 small">
+                    <li>■  1 コマンドラインオプションから検索主キーを取得する (1)メールアドレス, (2)測定日付<br/>
+                        ※Flaskアプリへのリクエストパラメータを模倣
+                    </li>
+                    <li>■  2 登録済みデータ検索クラスの検索オブジェクトを生成する</li>
+                    <li>■  3 検索オブジェクトの健康管理データ取得関数を呼び出す</li>
+                    <li>■  4 健康管理データが存在すれば天候状態データ取得関数を呼び出す</li>
+                    <li>■  5 Flaskアプリのレスポンス形式の辞書オブジェクトを生成しJSON文字列に変換しファイル保存</li>
+                </ul>
+<pre class="ms-3"><code class="python small">import argparse
+import logging
+from typing import Dict, Optional
+import json
+import os
+import socket
+
+import sqlalchemyimport argparse
+import logging
+from typing import Dict, Optional
+import json
+import os
+import socket
+
+import sqlalchemy
+from sqlalchemy.engine.url import URL
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, scoped_session
+
+from dao.queries import Selector
+
+DB_HEALTHCARE_CONF: str = os.path.join("conf", "db_healthcare.json")
+DB_SENSORS_CONF: str = os.path.join("conf", "db_sensors.json")
+SAVE_JSON = os.path.join("json_datas", 'out_healthcare_data.json')
+LOG_FMT = '%(asctime)s %(filename)s %(funcName)s %(levelname)s %(message)s'
+# デバックログ有効
+app_logger_debug: bool = True
+
+
+def save_text(filePath: str, text) -> None:
+    with open(filePath, 'w') as fp:
+        fp.write(text)
+
+
+def get_conn_dict(filePath: str) -> dict:
+    with open(filePath, 'r') as fp:
+        db_conf: json = json.load(fp)
+        hostname = socket.gethostname()
+        # host in /etc/hosts
+        db_conf["host"] = db_conf["host"].format(hostname=hostname)
+    return db_conf
+
+
+
+from sqlalchemy.engine.url import URL
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, scoped_session
+
+from dao.queries import Selector
+
+DB_HEALTHCARE_CONF: str = os.path.join("conf", "db_healthcare.json")
+DB_SENSORS_CONF: str = os.path.join("conf", "db_sensors.json")
+SAVE_JSON = os.path.join("json_datas", 'out_healthcare_data.json')
+LOG_FMT = '%(asctime)s %(filename)s %(funcName)s %(levelname)s %(message)s'
+# デバックログ有効
+app_logger_debug: bool = True
+
+
+def save_text(filePath: str, text) -> None:
+    with open(filePath, 'w') as fp:
+        fp.write(text)
+
+
+def get_conn_dict(filePath: str) -> dict:
+    with open(filePath, 'r') as fp:
+        db_conf: json = json.load(fp)
+        hostname = socket.gethostname()
+        # host in /etc/hosts
+        db_conf["host"] = db_conf["host"].format(hostname=hostname)
+    return db_conf
+
+
+if __name__ == '__main__':
+    logging.basicConfig(format=LOG_FMT, level=logging.DEBUG)
+    app_logger = logging.getLogger(__name__)
+    # ■ 1 コマンドラインオプション
+    parser: argparse.ArgumentParser = argparse.ArgumentParser()
+    # ■ 1-1 検索主キーを取得
+    # (1) メールアドレス (例) user1@examples.com
+    parser.add_argument("--mail-address", type=str, required=True,
+                        help="Healthcare Databae Person mailAddress.")
+    # (2) 測定日付 (例) 2023-03-14
+    parser.add_argument("--measurement-day", type=str, required=True,
+                        help="測定日付 yyyy-MM-dd.")
+    # JSON保存パス
+    parser.add_argument("--save-path", type=str,
+                        help="保存パス ~/Documents/Healthcare/json/output")
+    args: argparse.Namespace = parser.parse_args()
+    emailAddress: str = args.mail_address
+    measurementDay: str = args.measurement_day
+    # 保存ファイル名
+    jsonName: str = f"out_healthcare_data_{measurementDay}.json"
+    # 保存パスは任意
+    savePath: Optional[str] = args.save_path
+    saveJsonFile = None
+    if savePath is not None:
+        saveJsonFile = os.path.join(os.path.expanduser(savePath), jsonName)
+    else:
+        # プロジェクト内のjson_datas
+        saveJsonFile = os.path.join("json_datas", jsonName)
+    app_logger.info(f"saveJsonFile: {saveJsonFile}")
+
+    # 1-1. 健康管理データベース
+    conn_dict: dict = get_conn_dict(DB_HEALTHCARE_CONF)
+    conn_url: URL = URL.create(**conn_dict)
+    engine_healthcare: sqlalchemy.Engine = create_engine(conn_url, echo=False)
+    # Flaskアプリで使うscoped_sessionに合わせるためバッチでもscoped_sessionクラスを生成する
+    Cls_sess_healthcare: scoped_session = scoped_session(
+        sessionmaker(bind=engine_healthcare)
+    )
+    app_logger.info(f"Cls_sess_healthcare: {Cls_sess_healthcare}")
+
+    # 1-2. 気象センサデータベース
+    conn_sensors: dict = get_conn_dict(DB_SENSORS_CONF)
+    conn_url: URL = URL.create(**conn_sensors)
+    engine_sensors: sqlalchemy.Engine = create_engine(conn_url, echo=False)
+    Cls_sess_sensors: scoped_session = scoped_session(
+        sessionmaker(bind=engine_sensors)
+    )
+    app_logger.info(f"Cls_sess_sensors: {Cls_sess_sensors}")
+
+    # ■ 2 登録済みデータ検索クラスの検索オブジェクトを生成する
+    selector = Selector(Cls_sess_healthcare, Cls_sess_sensors, app_logger=app_logger)
+    # ■ 3 検索オブジェクトの健康管理データ(辞書オブジェクト)取得関数を呼び出す
+    healthcare_dict: Dict = selector.get_healthcare_asdict(emailAddress, measurementDay)
+    # ■ 4 健康管理データ辞書オブジェクトが存在すれば天候状態を取得する
+    if healthcare_dict:
+        app_logger.info(healthcare_dict)
+
+        # ■ 4-1 検索オブジェクトの天候状態データ取得関数を呼び出す
+        weather_dict = selector.get_weather_asdict(measurementDay)
+        if weather_dict:
+            # 天候データは必ずある想定
+            app_app_logger.info(weather_dict)
+            # ■ 4-2 健康管理データ辞書オブジェクトに天候状態データ辞書オブジェクトを追加
+            healthcare_dict["weatherData"] = weather_dict
+
+            # ■ 5 辞書オブジェクトを登録データ取得レスポンス形式(JSON)でファイル保存
+            # ※ Flaskアプリでのレスポンスの生成を模倣
+            healthcare_dict["emailAddress"] = emailAddress
+            healthcare_dict["measurementDay"] = measurementDay
+            # 日本語が含まれるため: ensure_ascii=False
+            json_str = json.dumps(healthcare_dict, indent=3, ensure_ascii=False)
+            # JSON文字列をファイル保存
+            # ※保存されるJSONはFlaskアプリのレスポンスと同一となる
+            save_text(SAVE_JSON, json_str)</code></pre>
+                <div class="mb-2">【出力内容】JSONファイル ※Flaskアプリが返却するJSONレスポンスと同一になります</div>
+<pre class="ms-3"><code class="json small">{
+   "data": {
+      "healthcareData": {
+         "sleepManagement": {
+            "wakeupTime": "05:30",
+            "sleepScore": 68,
+            "sleepingTime": "05:20",
+            "deepSleepingTime": "00:50"
+         },
+         "bloodPressure": {
+            "morningMeasurementTime": "06:55",
+            "morningMax": 109,
+            "morningMin": 71,
+            "morningPulseRate": 68,
+            "eveningMeasurementTime": "22:15",
+            "eveningMax": 122,
+            "eveningMin": 69,
+            "eveningPulseRate": 66
+         },
+         "nocturiaFactors": {
+            "midnightToiletVisits": 4,
+            "hasCoffee": false,
+            "hasTea": false,
+            "hasAlcohol": false,
+            "hasNutritionDrink": true,
+            "hasSportsDrink": false,
+            "hasDiuretic": false,
+            "takeMedicine": true,
+            "takeBathing": true,
+            "conditionMemo": null
+         },
+         "walkingCount": {
+            "counts": 9820
+         },
+         "bodyTemperature": {
+            "measurementTime": null,
+            "temperature": null
+         }
+      },
+      "weatherData": {
+         "weatherCondition": {
+            "condition": "晴れ"
+         }
+      },
+      "emailAddress": "user1@examples.com",
+      "measurementDay": "2023-03-15"
+   },
+   "status": {
+      "code": 0,
+      "message": "OK"
+   }
+}</code></pre>
+            </div>    
+
+            <div class="row mb-5 small">
+                <dl class="ms-3">
+                    <dt class="indent">メニューページへ<dt>
+                    <dd class="indent mt-2">
+                        <a href="index.html">戻る</a>
+                    </dd>    
+                    <dt class="indent mt-3">Pythonバッチアプリのソースコードはこちら<dt>
+                    <dd class="indent mt-2">
+                        <a href="https://github.com/pipito-yukio/personal_healthcare/tree/main/src/batch" target="_blank">
+                        https://github.com/pipito-yukio/personal_healthcare/tree/main/src/batch
+                        </a>
+                    </dd>    
+                    <dt class="indent mt-3">サーバー側のFlaskアプリのソースコードはこちら<dt>
+                    <dd class="indent mt-2">
+                        <a href="https://github.com/pipito-yukio/personal_healthcare/tree/main/src/webapp">
+                        https://github.com/pipito-yukio/personal_healthcare/tree/main/src/webapp
+                        </a>
+                    </dd>    
+                </dl>
+            </div>
+        </div>
+        <script src="assets/highlight/js/highlight.min.js"></script>
+        <script src="assets/highlight/js/java.min.js"></script>
+        <script src="assets/highlight/js/cpp.min.js"></script>
+        <script>
+            hljs.highlightAll();
+        </script>
+        </div>
+    </body>
+</html>
