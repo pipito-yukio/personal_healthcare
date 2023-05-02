@@ -92,19 +92,14 @@ if __name__ == '__main__':
         # 2-2. 検索オブジェクトの天候状態データ取得関数を呼び出す
         weather_dict = selector.get_weather_asdict(measurementDay)
         if weather_dict:
+            # 天候データは必ずある想定
             app_logger.info(weather_dict)
+            healthcare_dict["weatherData"] = weather_dict
 
             # 3. 辞書オブジェクトを登録データ取得レスポンス形式(JSON)でファイル保存
             # ※ Flaskアプリでのレスポンスの生成を模倣
             healthcare_dict["emailAddress"] = emailAddress
             healthcare_dict["measurementDay"] = measurementDay
-            # 天気状態取得
-            weather_dict = selector.get_weather_asdict(measurementDay)
-            if weather_dict:
-                healthcare_dict["weatherData"] = weather_dict
-            else:
-                # 天候がなければ未設定
-                healthcare_dict["weatherData"] = None
             # 日本語が含まれるため: ensure_ascii=False
             # 3-1. 辞書オブジェクトをJSON形式文字列に変換
             json_str = json.dumps(healthcare_dict, indent=3, ensure_ascii=False)
