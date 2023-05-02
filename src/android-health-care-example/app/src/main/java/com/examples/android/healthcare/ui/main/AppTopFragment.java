@@ -38,6 +38,7 @@ import androidx.viewbinding.BuildConfig;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.examples.android.healthcare.HealthcareApplication;
+import com.examples.android.healthcare.SharedPrefUtil;
 import com.examples.android.healthcare.R;
 
 import com.examples.android.healthcare.SettingsActivity;
@@ -75,6 +76,7 @@ import com.examples.android.healthcare.tasks.Result;
 import java.io.File;
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -1435,7 +1437,8 @@ public class AppTopFragment extends Fragment {
             DEBUG_OUT.accept(TAG, "selected: " + selectedLocal + " ,now: " + mNowLocalDate);
             if (selectedLocal.isBefore(mNowLocalDate)) {
                 // 過去日の場合はプリファレンスから登録済み日付を取得する (未登録ならnull)
-                String regDate = getLatestRegisteredDateInPref();
+                String regDate = SharedPrefUtil.getLatestRegisteredDate(
+                        Objects.requireNonNull(getContext()));
                 DEBUG_OUT.accept(TAG, String.format("Compare: %s =< %s", selectedLocal, regDate));
                 // カレンダー選択日が最新の登録済み日付以下ならリクエストする
                 // 過去日で登録済み日付を超える選択日は未登録日付なのでリクエストしない
@@ -1636,7 +1639,9 @@ public class AppTopFragment extends Fragment {
                 // Jsonデータをファイル保存
                 FileManager.saveText(Objects.requireNonNull(getContext()), fileName, json);
                 // 日付をプリファレンスに保存する
-                SharedPreferences sharedPref = getThisSharedPref();
+                SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInAppTop(
+                        Objects.requireNonNull(getContext())
+                );
                 SharedPreferences.Editor editor = sharedPref.edit();
                 editor.putString(prefKey, dateValue);
                 editor.commit();
@@ -1976,7 +1981,8 @@ public class AppTopFragment extends Fragment {
                             showActionBarResult(requestUrlWithPath);
                             if (result instanceof Result.Success) {
                                 // 更新前のプリファレンスから最新登録日付を取得する
-                                String before = getLatestRegisteredDateInPref();
+                                String before = SharedPrefUtil.getLatestRegisteredDate(
+                                        Objects.requireNonNull(getContext()));
                                 // 測定日付から登録日付を取得
                                 String after = toStringOfTextViewBySelfTag(mInpMeasurementDate);
                                 // 登録済みプリファレンスの上書き保存
@@ -2123,35 +2129,6 @@ public class AppTopFragment extends Fragment {
     }
 
     /**
-     * このフラグメントが属するアクティビィティのプリファレンスを取得する
-     * @return プリファレンス
-     */
-    private SharedPreferences getThisSharedPref() {
-        return Objects.requireNonNull(getContext()).getSharedPreferences(
-                getString(R.string.sharedpref_app_top_fragment), Context.MODE_PRIVATE);
-    }
-
-    /**
-     * 最終保存日をプリファレンスから取得する
-     * @return 最終保存日
-     */
-    private String getLastSavedDateInPref() {
-        SharedPreferences sharedPref = getThisSharedPref();
-        DEBUG_OUT.accept(TAG, sharedPref.getAll().toString());
-        return sharedPref.getString(getString(R.string.sharedpref_saved_key), null);
-    }
-
-    /**
-     * 最新登録日をプリファレンスから取得する
-     * @return 最新登録日
-     */
-    private String getLatestRegisteredDateInPref() {
-        SharedPreferences sharedPref = getThisSharedPref();
-        DEBUG_OUT.accept(TAG, sharedPref.getAll().toString());
-        return sharedPref.getString(getString(R.string.sharedpref_registered_key), null);
-    }
-
-    /**
      * JSONファイルから入力ウィジットを復元する
      * @param jsonFileType JSONファイル保存契機("登録"|"一時保存)
      * @param jsonFileName JSONファイル名
@@ -2191,23 +2168,30 @@ public class AppTopFragment extends Fragment {
      * </ol>
      */
     private void restoreWidgetsFromJson() {
-        // 最終保存日を取得
-        String lastDate = getLastSavedDateInPref();
-        DEBUG_OUT.accept(TAG, "restore.lastSavedDate: " + lastDate);
-        if (!TextUtils.isEmpty(lastDate)) {
+        // 一時保存日を取得
+        String savedDate = SharedPrefUtil.getLastSavedDate(Objects.requireNonNull(getContext()));
+        DEBUG_OUT.accept(TAG, "restore.lastSavedDate: " + savedDate);
+        if (!TextUtils.isEmpty(savedDate)) {
             // JSONファイルから復元
             loadJsonFromFile(JsonFileSaveTiming.SAVE, getString(R.string.last_saved_json_file));
-            // ステータスに処理日付を表示
-            showStatusWithPreocessDate(lastDate, getString(R.string.status_saved_datefmt));
+            // ステータスに一時保存日付を表示
+            showStatusWithPreocessDate(savedDate, getString(R.string.status_saved_datefmt));
             return;
         }
 
         // 最新登録日を取得
-        String latestDate = getLatestRegisteredDateInPref();
+        String latestDate = SharedPrefUtil.getLatestRegisteredDate(
+                Objects.requireNonNull(getContext()));
         if (!TextUtils.isEmpty(latestDate)) {
-            DEBUG_OUT.accept(TAG, "restore.latestRegisteredDate: " + latestDate);
-            loadJsonFromFile(JsonFileSaveTiming.REGISTERED,
-                    getString(R.string.latest_registered_json_file));
+            LocalDate latestLocal = LocalDate.parse(latestDate, DateTimeFormatter.ISO_LOCAL_DATE);
+            DEBUG_OUT.accept(TAG, "latestDateLocal: " + latestLocal);
+            if (latestLocal.isEqual(mNowLocalDate)) {
+                // 最新登録日が当日ならJSONから復元
+                DEBUG_OUT.accept(TAG, "restore.latestRegisteredDate: " + latestDate);
+                loadJsonFromFile(JsonFileSaveTiming.REGISTERED,
+                        getString(R.string.latest_registered_json_file));
+            } // else {過去または翌日なら復元せず初期値のまま}
+            // ステータスの最新登録日を表示
             showStatusWithPreocessDate(latestDate,
                     getString(R.string.status_last_registered_datefmt));
         }
@@ -2572,7 +2556,8 @@ public class AppTopFragment extends Fragment {
      * 一時JSONファイルを削除する
      */
     private void deleteSavedFile() {
-        String lastDate = getLastSavedDateInPref();
+        String lastDate = SharedPrefUtil.getLastSavedDate(
+                Objects.requireNonNull(getContext()));
         String fileName =getString(R.string.last_saved_json_file);
         DEBUG_OUT.accept(TAG, "delete.lastDate: " + lastDate);
         if (TextUtils.isEmpty(lastDate)) {
@@ -2601,7 +2586,8 @@ public class AppTopFragment extends Fragment {
                 DEBUG_OUT.accept(TAG, "Not delete: " + jsonFile);
             }
             // プリファレンス取得
-            SharedPreferences sharedPref = getThisSharedPref();
+            SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInAppTop(
+                    Objects.requireNonNull(getContext()));
             SharedPreferences.Editor editor = sharedPref.edit();
             // キーを削除
             editor.remove(getString(R.string.sharedpref_saved_key));

@@ -1,5 +1,7 @@
 package com.examples.android.healthcare;
 
+import static com.examples.android.healthcare.functions.MyLogging.DEBUG_OUT;
+
 import android.content.Intent;
 import android.os.Bundle;
 
@@ -9,6 +11,7 @@ import com.examples.android.healthcare.ui.main.MultiScreenFragmentAdapter;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.text.TextUtils;
 import android.util.Log;
 
 import androidx.viewpager2.widget.ViewPager2;
@@ -20,6 +23,7 @@ import android.view.MenuItem;
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = MainActivity.class.getSimpleName();
 
+    private static final int FRAGMENT_APPTOP = 0;
     private AppBarConfiguration appBarConfiguration;
     private ActivityMainBinding binding;
 
@@ -49,7 +53,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onStart() {
         super.onStart();
-        Log.d(TAG, "onStart()");
+        DEBUG_OUT.accept(TAG, "onStart()");
 
         // ページャの切り替わりをモニタするコールバック
         mOnPageChangeCallback = new ViewPager2.OnPageChangeCallback() {
@@ -66,12 +70,40 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onStop() {
         super.onStop();
-        Log.d(TAG, "onStop()");
+        DEBUG_OUT.accept(TAG, "onStop()");
 
         // ページャコールバックの登録解除
         if (mOnPageChangeCallback != null) {
             mViewPager2.unregisterOnPageChangeCallback(mOnPageChangeCallback);
             mOnPageChangeCallback = null;
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        DEBUG_OUT.accept(TAG, "onBackPressed()");
+
+        if (mOnPageChangeCallback != null) {
+            int currentItem = mViewPager2.getCurrentItem();
+            if (currentItem == FRAGMENT_APPTOP) {
+                String registeredDate = SharedPrefUtil.getLatestRegisteredDate(this);
+                String savedDate = SharedPrefUtil.getLastSavedDate(this);
+                DEBUG_OUT.accept(TAG, String.format("registeredDate: %s, savedDate: %s",
+                        registeredDate, savedDate));
+                if (!TextUtils.isEmpty(registeredDate) && TextUtils.isEmpty(savedDate)) {
+                    // 登録済みでバックキーなら最近の画面に残さない
+                    // https://developer.android.com/guide/components/activities/recents?hl=ja#java
+                    // 最近の画面
+                    // [最近] 画面は、最近アクセスしたアクティビティとタスクを一覧表示するシステムレベルの UI です
+                    // The document is no longer needed; remove its task.
+                    // AppTask クラスを使用したタスクの削除
+                    DEBUG_OUT.accept(TAG, "finishAndRemoveTask()");
+                    finishAndRemoveTask();
+                } else {
+                    DEBUG_OUT.accept(TAG, "super.onBackPressed()");
+                    super.onBackPressed();
+                }
+            }
         }
     }
 
