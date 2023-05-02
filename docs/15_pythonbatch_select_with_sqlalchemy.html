@@ -360,43 +360,7 @@ container_dict["sleepManagement"]=sleepman_dict:
         walkingcnt = self._WalkingCount(*row[23:24])   # ■ A-4 (4)
         # 体温データ: 2項目
         bodytemper = self._BodyTemperature(*row[24:])  # ■ A-4 (5)
-        # ■ A-5 時刻データが含まれるデータ変換import argparse
-import logging
-from typing import Dict, Optional
-import json
-import os
-import socket
-
-import sqlalchemy
-from sqlalchemy.engine.url import URL
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, scoped_session
-
-from dao.queries import Selector
-
-DB_HEALTHCARE_CONF: str = os.path.join("conf", "db_healthcare.json")
-DB_SENSORS_CONF: str = os.path.join("conf", "db_sensors.json")
-SAVE_JSON = os.path.join("json_datas", 'out_healthcare_data.json')
-LOG_FMT = '%(asctime)s %(filename)s %(funcName)s %(levelname)s %(message)s'
-# デバックログ有効
-app_logger_debug: bool = True
-
-
-def save_text(filePath: str, text) -> None:
-    with open(filePath, 'w') as fp:
-        fp.write(text)
-
-
-def get_conn_dict(filePath: str) -> dict:
-    with open(filePath, 'r') as fp:
-        db_conf: json = json.load(fp)
-        hostname = socket.gethostname()
-        # host in /etc/hosts
-        db_conf["host"] = db_conf["host"].format(hostname=hostname)
-    return db_conf
-
-
-
+        # ■ A-5 時刻データが含まれるデータ変換
         sleepman_dict: Dict = _datetime_to_str(sleepman._asdict())     # ■ A-5 (1)
         bloodpress_dict: Dict = _datetime_to_str(bloodpress._asdict()) # ■ A-5 (2)
         bodytemper_dict: Dict = _datetime_to_str(bodytemper._asdict()) # ■ A-5 (3)
