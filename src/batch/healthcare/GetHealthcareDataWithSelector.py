@@ -62,17 +62,17 @@ if __name__ == '__main__':
         saveJsonFile = os.path.join("json_datas", jsonName)
     app_logger.info(f"saveJsonFile: {saveJsonFile}")
 
-    # 健康管理データベース: postgresql[5433]
+    # 1-1. 健康管理データベース
     conn_dict: dict = get_conn_dict(DB_HEALTHCARE_CONF)
     conn_url: URL = URL.create(**conn_dict)
     engine_healthcare: sqlalchemy.Engine = create_engine(conn_url, echo=False)
+    # Flaskアプリで使うscoped_sessionに合わせるためバッチでもscoped_sessionクラスを生成する
     Cls_sess_healthcare: scoped_session = scoped_session(
         sessionmaker(bind=engine_healthcare)
     )
     app_logger.info(f"Cls_sess_healthcare: {Cls_sess_healthcare}")
 
-    # 2.気象センサデータベース
-    # 気象センサーデータベース: postgresql[5432]
+    # 1-2. 気象センサデータベース
     conn_sensors: dict = get_conn_dict(DB_SENSORS_CONF)
     conn_url: URL = URL.create(**conn_sensors)
     engine_sensors: sqlalchemy.Engine = create_engine(conn_url, echo=False)
@@ -81,15 +81,20 @@ if __name__ == '__main__':
     )
     app_logger.info(f"Cls_sess_sensors: {Cls_sess_sensors}")
 
+    # 2. 登録済み取得オブジェクト生成
     selector = Selector(Cls_sess_healthcare, Cls_sess_sensors, logger=app_logger)
+    # 2-1. 健康管理データに対応する辞書オブジェクト取得
     healthcare_dict: Dict = selector.get_healthcare_asdict(emailAddress, measurementDay)
     if healthcare_dict:
         app_logger.info(healthcare_dict)
 
+        # 2-2. 天候状態データに対応する辞書オブジェクト取得
         weather_dict = selector.get_weather_asdict(measurementDay)
         if weather_dict:
             app_logger.info(weather_dict)
 
+            # 3. 辞書オブジェクトを登録データ取得レスポンス形式(JSON)でファイル保存
+            # ※ Flaskアプリでのレスポンスの生成を模倣
             healthcare_dict["emailAddress"] = emailAddress
             healthcare_dict["measurementDay"] = measurementDay
             # 天気状態取得
@@ -99,6 +104,9 @@ if __name__ == '__main__':
             else:
                 # 天候がなければ未設定
                 healthcare_dict["weatherData"] = None
-            # 日本語が含まれる: ensure_ascii=False
+            # 日本語が含まれるため: ensure_ascii=False
+            # 3-1. 辞書オブジェクトをJSON形式文字列に変換
             json_str = json.dumps(healthcare_dict, indent=3, ensure_ascii=False)
+            # 3-2. JSON文字列をファイル保存
+            # ※保存されるJSONはFlaskアプリのレスポンスと同一となる
             save_text(saveJsonFile, json_str)
