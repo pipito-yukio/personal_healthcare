@@ -85,26 +85,34 @@ if __name__ == '__main__':
     selector = Selector(Cls_sess_healthcare, Cls_sess_sensors, logger=app_logger)
     # 2-1. 検索オブジェクトの健康管理データ(辞書オブジェクト)取得関数を呼び出す
     healthcare_dict: Dict = selector.get_healthcare_asdict(emailAddress, measurementDay)
+    if app_logger_debug:
+        app_logger.debug(f"Healthcare: {healthcare_dict}")
     if healthcare_dict:
-        # 健康管理データ辞書オブジェクトが存在すれば天候状態を取得する
-        app_logger.info(healthcare_dict)
+        # 2-2. レスポンス用に入力パラメータのメールアドレスと測定日付を辞書オブジェクトに追加する
+        healthcare_dict["emailAddress"] = emailAddress
+        healthcare_dict["measurementDay"] = measurementDay
 
-        # 2-2. 検索オブジェクトの天候状態データ取得関数を呼び出す
+        # 2-3. 検索オブジェクトの天候状態データ取得関数を呼び出す
         weather_dict: Dict = selector.get_weather_asdict(measurementDay)
+        if app_logger_debug:
+            app_logger.debug(f"Weather: {weather_dict}")
         if weather_dict:
-            # 天候データは必ずある想定
-            app_logger.info(weather_dict)
+            # 天候状態データを天候データにラップして辞書オブジェクトに追加
             healthcare_dict["weatherData"] = weather_dict
+        else:
+            # 天候がなければ未設定
+            # ※登録時に気象センサーデータベースに障害があった場合に可能性が有るが
+            # 通常ここにくることは想定していない
+            healthcare_dict["weatherData"] = None
 
-            # 3. 辞書オブジェクトを登録データ取得レスポンス形式(JSON)でファイル保存
-            healthcare_dict["emailAddress"] = emailAddress
-            healthcare_dict["measurementDay"] = measurementDay
-            # ※ Flaskアプリでのレスポンスの生成を模倣
-            result_dict: Dict = {"data": healthcare_dict,
-                                 "status": {"code": 0, "message": "OK"}}
-            # 日本語が含まれるため: ensure_ascii=False
-            # 3-1. 辞書オブジェクトをJSON形式文字列に変換
-            json_str = json.dumps(result_dict, indent=3, ensure_ascii=False)
-            # 3-2. JSON文字列をファイル保存
-            # ※保存されるJSONはFlaskアプリのレスポンスと同一となる
-            save_text(saveJsonFile, json_str)
+        # ※ FlaskアプリのOKレスポンスと同じ辞書オブジェクトを生成
+        resp_obj: Dict = {
+            "data": healthcare_dict,
+            "status": {"code": 0, "message": "OK"}
+        }
+        # 3-1. 辞書オブジェクトをJSON形式文字列に変換
+        # 日本語が含まれるため: ensure_ascii=False
+        json_str = json.dumps(resp_obj, indent=2, ensure_ascii=False)
+        # 3-2. JSON文字列をファイル保存
+        # ※保存されるJSONはFlaskアプリのレスポンスと同一
+        save_text(saveJsonFile, json_str)
