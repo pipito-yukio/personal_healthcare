@@ -266,15 +266,15 @@ SELECT condition FROM weather.weather_condition WHERE measurement_day=:measureme
 
                 <div class="mb-2">(5) コンストラクタ</div>
                 <ul class="mb-4 small">[引数]
-                    <li>cls_sess_healthcare: 健康管理データベースセッションクラス <b>(scoped_session)</b></li>
-                    <li>cls_sess_sensors: 気象センサーデータベースセッションクラス <b>(scoped_session)</b></li>
+                    <li>cls_sess_healthcare: 健康管理データベースセッションオブジェクト <b>(scoped_session)</b></li>
+                    <li>cls_sess_sensors: 気象センサーデータベースセッションオブジェクト <b>(scoped_session)</b></li>
                     <li>app_logger: アプリケーションロガー</li>
                 </ul>
-<pre class="ms-3"><code class="python small">    def __init__(self, cls_sess_healthcare, cls_sess_sensors, app_logger: app_logger=None):
-        # 健康管理DB用セッションオブジェクト生成
-        self.sess_healthcare: scoped_session = cls_sess_healthcare() # セッションクラスからセッションオブジェクトを生成
-        # 気象センサーDB用セッションオブジェクト生成
-        self.sess_sensors: scoped_session = cls_sess_sensors()
+<pre class="ms-3"><code class="python small">    __init__(self, sess_healthcare, sess_sensors, logger: Logger=None):
+        # 健康管理DB用セッションオブジェクト
+        self.sess_healthcare: scoped_session = sess_healthcare
+        # 気象センサーDB用セッションオブジェクト
+        self.sess_sensors: scoped_session = sess_sensors
         self.app_logger = app_logger
 </code></pre>
 
@@ -325,18 +325,41 @@ container_dict["sleepManagement"]=sleepman_dict:
         :return: 健康管理データの辞書オブジェクト, 存在しない場合はNone
         """
         # パラメータ辞書生成: 主キー
-        # https://docs.sqlalchemy.org/en/20/orm/session_transaction.html
-        # will automatically begin again
-        # result = session.execute("&lt; some select statement &gt;")
-        # session.add_all([more_objects, ...])
-        # session.commit()  
         params = {"emailAddress": email, "measurementDay": measurement} # ■ A-1
-        row = None
         try:
             rs: Result = self.sess_healthcare.execute(text(self._QRY_GET_HEALTHCARE), params) # ■ A-2
+            row = None
             if rs:
                 row = rs.fetchone()                                     # ■ A-3
             self.sess_healthcare.commit()
+            if row is None:
+                return None
+
+            # 取得したTupleデータを位置引数で引き渡す
+            # 先頭の測定日付はスキップする
+            # 睡眠管理データ: 4項目
+            sleepman = self._SleepManagement(*row[1:5])    # ■ A-4 (1)
+            # 血圧データ: 8項目
+            bloodpress = self._BloodPressure(*row[5:13])   # ■ A-4 (2)
+            # 頻尿要因データ: 10項目
+            factors = self._NocturiaFactors(*row[13:23])   # ■ A-4 (3)
+            # 歩数データ: 1項目
+            walkingcnt = self._WalkingCount(*row[23:24])   # ■ A-4 (4)
+            # 体温データ: 2項目
+            bodytemper = self._BodyTemperature(*row[24:])  # ■ A-4 (5)
+            # ■ A-5 時刻データが含まれるデータ変換
+            sleepman_dict: Dict = _datetime_to_str(sleepman._asdict())     # ■ A-5 (1)
+            bloodpress_dict: Dict = _datetime_to_str(bloodpress._asdict()) # ■ A-5 (2)
+            bodytemper_dict: Dict = _datetime_to_str(bodytemper._asdict()) # ■ A-5 (3)
+            # ■ A-6 それ以外は namedtupleからDictオブジェクトに変換する
+            factors_dict: Dict = factors._asdict()
+            walkingcnt_dict: Dict = walkingcnt._asdict()
+            # ■ A-7 各辞書オブジェクトを健康管理データコンテナー用辞書に格納する
+            container_dict: Dict = {"sleepManagement": sleepman_dict,
+                                    "bloodPressure": bloodpress_dict,
+                                    "nocturiaFactors": factors_dict,
+                                    "walkingCount": walkingcnt_dict,
+                                    "bodyTemperature": bodytemper_dict}
         except sqlalchemy.exc.SQLAlchemyError as err:
             self.sess_healthcare.rollback()
             if self.app_logger:
@@ -345,35 +368,6 @@ container_dict["sleepManagement"]=sleepman_dict:
         finally:
             self.sess_healthcare.close()
 
-        if row is None:
-            return None
-
-        # 取得したTupleデータを位置引数で引き渡す
-        # 先頭の測定日付はスキップする
-        # 睡眠管理データ: 4項目
-        sleepman = self._SleepManagement(*row[1:5])    # ■ A-4 (1)
-        # 血圧データ: 8項目
-        bloodpress = self._BloodPressure(*row[5:13])   # ■ A-4 (2)
-        # 頻尿要因データ: 10項目
-        factors = self._NocturiaFactors(*row[13:23])   # ■ A-4 (3)
-        # 歩数データ: 1項目
-        walkingcnt = self._WalkingCount(*row[23:24])   # ■ A-4 (4)
-        # 体温データ: 2項目
-        bodytemper = self._BodyTemperature(*row[24:])  # ■ A-4 (5)
-        # ■ A-5 時刻データが含まれるデータ変換
-        sleepman_dict: Dict = _datetime_to_str(sleepman._asdict())     # ■ A-5 (1)
-        bloodpress_dict: Dict = _datetime_to_str(bloodpress._asdict()) # ■ A-5 (2)
-        bodytemper_dict: Dict = _datetime_to_str(bodytemper._asdict()) # ■ A-5 (3)
-        # ■ A-6 それ以外は namedtupleからDictオブジェクトに変換する
-        factors_dict: Dict = factors._asdict()
-        walkingcnt_dict: Dict = walkingcnt._asdict()
-        # ■ A-7 各辞書オブジェクトを健康管理データコンテナー用辞書に格納する
-        container_dict: Dict = {}
-        container_dict["sleepManagement"] = sleepman_dict
-        container_dict["bloodPressure"] = bloodpress_dict
-        container_dict["nocturiaFactors"] = factors_dict
-        container_dict["walkingCount"] = walkingcnt_dict
-        container_dict["bodyTemperature"] = bodytemper_dict
         # ■ A-8 コンテナーオブジェクトを健康管理データ用辞書に格納する
         return {"healthcareData": container_dict}</code></pre>
                 <div class="mb-2">【戻り値】デバックコンソールの値 ※見やすくするするため改行を入れています</div>
@@ -399,7 +393,7 @@ container_dict["sleepManagement"]=sleepman_dict:
 }</code></pre>
 
                 <div class="mb-2">(6) 気象センサーデータベース検索処理</div>
-                <ul class="mb-4 small">
+                <ul class="mb-2 small">
                     <li>テーブル項目チェック処理: <b> 天候データコンテナと天候状態が必須で、１つでも存在しない項目があればそのまま処理終了</b><br/>
                          <b>※Flaskアプリでは何もせずに処理終了</b>
                     </li>
@@ -411,25 +405,25 @@ container_dict["sleepManagement"]=sleepman_dict:
         :return: 天候データの辞書オブジェクト, 存在しない場合はNone
         """
         params = {"measurementDay": measurement}
-        row = None
         try:
             rs: Result = self.sess_sensors.execute(text(self._QRY_GET_WEATHER), params)
+            row = None
             if rs:
                 row = rs.fetchone()
             self.sess_sensors.commit()    
-        except sqlalchemy.exc.SQLAlchemyError as err:
+            if row is None:
+                return None
+
+            weather_condition = self._WeatherCondition(*row)
+            container_dict = {"weatherCondition": weather_condition._asdict()}
+        except SQLAlchemyError as err:
             self.sess_sensors.rollback()
-            if self.app_logger:
-                self.app_logger.warning(err.args)
+            if self.logger:
+                self.logger.warning(err.args)
             return None
         finally:
             self.sess_sensors.close()
 
-        if row is None:
-            return None
-
-        weather_condition = self._WeatherCondition(*row)
-        container_dict = {"weatherCondition": weather_condition._asdict()}
         return container_dict</code></pre>
                 <div class="mb-2">【戻り値】デバックコンソールの値 </div>
 <pre class="ms-3"><code class="json small">container_dict= {dict:1} {'weatherCondition': {'condition': '曇り'}}</code></pre>
@@ -538,8 +532,14 @@ if __name__ == '__main__':
     )
     app_logger.info(f"Cls_sess_sensors: {Cls_sess_sensors}")
 
+    # 健康管理DBセッションオブジェクト生成
+    sess_healthcare = Cls_sess_healthcare()
+    app_logger.info(f"sess_healthcare: {sess_healthcare}")
+    # 気象センサーDBセッションオブジェクト生成
+    sess_sensors = Cls_sess_sensors()
+    app_logger.info(f"sess_sensors: {sess_sensors}")
     # ■ 2 登録済みデータ検索クラスの検索オブジェクトを生成する
-    selector = Selector(Cls_sess_healthcare, Cls_sess_sensors, app_logger=app_logger)
+    selector = Selector(sess_healthcare, sess_sensors, logger=app_logger)
     # ■ 3 検索オブジェクトの健康管理データ(辞書オブジェクト)取得関数を呼び出す
     healthcare_dict: Dict = selector.get_healthcare_asdict(emailAddress, measurementDay)
     if app_logger_debug:
