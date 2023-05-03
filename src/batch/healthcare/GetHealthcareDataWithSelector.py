@@ -81,8 +81,14 @@ if __name__ == '__main__':
     )
     app_logger.info(f"Cls_sess_sensors: {Cls_sess_sensors}")
 
+    # 健康管理DBセッションオブジェクト生成
+    sess_healthcare = Cls_sess_healthcare()
+    app_logger.info(f"sess_healthcare: {sess_healthcare}")
+    # 気象センサーDBセッションオブジェクト生成
+    sess_sensors = Cls_sess_sensors()
+    app_logger.info(f"sess_sensors: {sess_sensors}")
     # 2. 登録済みデータ検索クラスの検索オブジェクトを生成する
-    selector = Selector(Cls_sess_healthcare, Cls_sess_sensors, logger=app_logger)
+    selector = Selector(sess_healthcare, sess_sensors, logger=app_logger)
     # 2-1. 検索オブジェクトの健康管理データ(辞書オブジェクト)取得関数を呼び出す
     healthcare_dict: Dict = selector.get_healthcare_asdict(emailAddress, measurementDay)
     if app_logger_debug:

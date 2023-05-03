@@ -114,11 +114,11 @@ WHERE
 SELECT condition FROM weather.weather_condition WHERE measurement_day=:measurementDay
 """
 
-    def __init__(self, cls_sess_healthcare, cls_sess_sensors, logger: Logger=None):
-        # 健康管理DB用セッションオブジェクト生成
-        self.sess_healthcare: scoped_session = cls_sess_healthcare()
-        # 気象センサーDB用セッションオブジェクト生成
-        self.sess_sensors: scoped_session = cls_sess_sensors()
+    def __init__(self, sess_healthcare, sess_sensors, logger: Logger=None):
+        # 健康管理DB用セッションオブジェクト
+        self.sess_healthcare: scoped_session = sess_healthcare
+        # 気象センサーDB用セッションオブジェクト
+        self.sess_sensors: scoped_session = sess_sensors
         self.logger = logger
 
     def get_healthcare_asdict(self, email: str, measurement: str) -> Optional[dict]:
@@ -135,12 +135,40 @@ SELECT condition FROM weather.weather_condition WHERE measurement_day=:measureme
         # session.add_all([more_objects, ...])
         # session.commit()  
         params = {"emailAddress": email, "measurementDay": measurement}
-        row = None
         try:
             rs: Result = self.sess_healthcare.execute(text(self._QRY_GET_HEALTHCARE), params)
+            row = None
             if rs:
                 row = rs.fetchone()
             self.sess_healthcare.commit()
+            if row is None:
+                return None
+
+            # 取得したTupleデータを位置引数で引き渡す
+            # 先頭の測定日付はスキップする
+            # 睡眠管理データ: 4項目
+            sleepman = self._SleepManagement(*row[1:5])
+            # 血圧データ: 8項目
+            bloodpress = self._BloodPressure(*row[5:13])
+            # 頻尿要因データ: 10項目
+            factors = self._NocturiaFactors(*row[13:23])
+            # 歩数データ: 1項目
+            walkingcnt = self._WalkingCount(*row[23:24])
+            # 体温データ: 2項目
+            bodytemper = self._BodyTemperature(*row[24:])
+            # 時刻データが含まれるデータ変換
+            sleepman_dict: Dict = _datetime_to_str(sleepman._asdict())
+            bloodpress_dict: Dict = _datetime_to_str(bloodpress._asdict())
+            bodytemper_dict: Dict = _datetime_to_str(bodytemper._asdict())
+            # それ以外は namedtupleからDictオブジェクトに変換する
+            factors_dict: Dict = factors._asdict()
+            walkingcnt_dict: Dict = walkingcnt._asdict()
+            # 各辞書オブジェクトを健康管理データコンテナー用辞書に格納する
+            container_dict: Dict = {"sleepManagement": sleepman_dict,
+                                    "bloodPressure": bloodpress_dict,
+                                    "nocturiaFactors": factors_dict,
+                                    "walkingCount": walkingcnt_dict,
+                                    "bodyTemperature": bodytemper_dict}
         except SQLAlchemyError as err:
             self.sess_healthcare.rollback()
             if self.logger:
@@ -149,35 +177,6 @@ SELECT condition FROM weather.weather_condition WHERE measurement_day=:measureme
         finally:
             self.sess_healthcare.close()
 
-        if row is None:
-            return None
-
-        # 取得したTupleデータを位置引数で引き渡す
-        # 先頭の測定日付はスキップする
-        # 睡眠管理データ: 4項目
-        sleepman = self._SleepManagement(*row[1:5])
-        # 血圧データ: 8項目
-        bloodpress = self._BloodPressure(*row[5:13])
-        # 頻尿要因データ: 10項目
-        factors = self._NocturiaFactors(*row[13:23])
-        # 歩数データ: 1項目
-        walkingcnt = self._WalkingCount(*row[23:24])
-        # 体温データ: 2項目
-        bodytemper = self._BodyTemperature(*row[24:])
-        # 時刻データが含まれるデータ変換
-        sleepman_dict: Dict = _datetime_to_str(sleepman._asdict())
-        bloodpress_dict: Dict = _datetime_to_str(bloodpress._asdict())
-        bodytemper_dict: Dict = _datetime_to_str(bodytemper._asdict())
-        # それ以外は namedtupleからDictオブジェクトに変換する
-        factors_dict: Dict = factors._asdict()
-        walkingcnt_dict: Dict = walkingcnt._asdict()
-        # 各辞書オブジェクトを健康管理データコンテナー用辞書に格納する
-        container_dict: Dict = {}
-        container_dict["sleepManagement"] = sleepman_dict
-        container_dict["bloodPressure"] = bloodpress_dict
-        container_dict["nocturiaFactors"] = factors_dict
-        container_dict["walkingCount"] = walkingcnt_dict
-        container_dict["bodyTemperature"] = bodytemper_dict
         # コンテナーオブジェクトを健康管理データ用辞書に格納する
         return {"healthcareData": container_dict}
 
@@ -188,12 +187,17 @@ SELECT condition FROM weather.weather_condition WHERE measurement_day=:measureme
         :return: 天候データの辞書オブジェクト, 存在しない場合はNone
         """
         params = {"measurementDay": measurement}
-        row = None
         try:
             rs: Result = self.sess_sensors.execute(text(self._QRY_GET_WEATHER), params)
+            row = None
             if rs:
                 row = rs.fetchone()
-            self.sess_sensors.commit()    
+            self.sess_sensors.commit()
+            if row is None:
+                return None
+
+            weather_condition = self._WeatherCondition(*row)
+            container_dict = {"weatherCondition": weather_condition._asdict()}
         except SQLAlchemyError as err:
             self.sess_sensors.rollback()
             if self.logger:
@@ -202,9 +206,4 @@ SELECT condition FROM weather.weather_condition WHERE measurement_day=:measureme
         finally:
             self.sess_sensors.close()
 
-        if row is None:
-            return None
-
-        weather_condition = self._WeatherCondition(*row)
-        container_dict = {"weatherCondition": weather_condition._asdict()}
         return container_dict

@@ -103,7 +103,9 @@ def getcurrentdata():
         abort(BadRequest.code, _set_errormessage("461,User is not found."))
 
     # 健康管理DBと気象センサーDBからデータ取得する
-    selector = Selector(Cls_sess_healthcare, Cls_sess_sensors, logger=app_logger)
+    sess_healthcare: scoped_session = get_healthcare_session()
+    sess_sensors: scoped_session = get_sensors_session()
+    selector = Selector(sess_healthcare, sess_sensors, logger=app_logger)
     # 健康管理データ取得
     healthcare_dict: Dict = selector.get_healthcare_asdict(emailAddress, measurementDay)
     if app_logger_debug:
