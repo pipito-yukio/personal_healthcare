@@ -14,7 +14,7 @@
         <div class="container" style="max-width: 980px">
             <h4 class="m-2 text-center">SQLAlchemyのRawクエリーを使う</h4>
             <hr />
-            <div class="update-date">【最終更新日】2023-05-02</div>
+            <div class="update-date">【最終更新日】2023-05-03</div>
             <p class="indent">
                 PythonバッチスクリプトでSQLAlchemyのRawクエリーを使って登録済みデータを取得しJSON化する方法について解説します。
             </p>
@@ -542,79 +542,89 @@ if __name__ == '__main__':
     selector = Selector(Cls_sess_healthcare, Cls_sess_sensors, app_logger=app_logger)
     # ■ 3 検索オブジェクトの健康管理データ(辞書オブジェクト)取得関数を呼び出す
     healthcare_dict: Dict = selector.get_healthcare_asdict(emailAddress, measurementDay)
+    if app_logger_debug:
+        app_logger.debug(f"Healthcare: {healthcare_dict}")
     # ■ 4 健康管理データ辞書オブジェクトが存在すれば天候状態を取得する
     if healthcare_dict:
-        app_logger.info(healthcare_dict)
+        # ■ 4-1 レスポンス用に入力パラメータのメールアドレスと測定日付を辞書オブジェクトに追加する
+        healthcare_dict["emailAddress"] = emailAddress
+        healthcare_dict["measurementDay"] = measurementDay
 
-        # ■ 4-1 検索オブジェクトの天候状態データ取得関数を呼び出す
-        weather_dict = selector.get_weather_asdict(measurementDay)
+        # ■ 4-2 検索オブジェクトの天候状態データ取得関数を呼び出す
+        weather_dict: Dict = selector.get_weather_asdict(measurementDay)
+        if app_logger_debug:
+            app_logger.debug(f"Weather: {weather_dict}")
         if weather_dict:
-            # 天候データは必ずある想定
-            app_app_logger.info(weather_dict)
-            # ■ 4-2 健康管理データ辞書オブジェクトに天候状態データ辞書オブジェクトを追加
+            # ■ 4-3 天候状態データを天候データにラップして辞書オブジェクトに追加
             healthcare_dict["weatherData"] = weather_dict
+        else:
+            # 天候がなければ未設定
+            # ※登録時に気象センサーデータベースに障害があった場合に可能性が有るが
+            # 通常ここにくることは想定していない
+            healthcare_dict["weatherData"] = None
 
-            # ■ 5 辞書オブジェクトを登録データ取得レスポンス形式(JSON)でファイル保存
-            # ※ Flaskアプリでのレスポンスの生成を模倣
-            healthcare_dict["emailAddress"] = emailAddress
-            healthcare_dict["measurementDay"] = measurementDay
-            # 日本語が含まれるため: ensure_ascii=False
-            json_str = json.dumps(healthcare_dict, indent=3, ensure_ascii=False)
-            # JSON文字列をファイル保存
-            # ※保存されるJSONはFlaskアプリのレスポンスと同一となる
-            save_text(SAVE_JSON, json_str)</code></pre>
+        # ■ 5 FlaskアプリのOKレスポンスと同じ辞書オブジェクトを生成
+        resp_obj: Dict = {
+            "data": healthcare_dict,
+            "status": {"code": 0, "message": "OK"}
+        }
+        # ■ 5-1. 辞書オブジェクトをJSON形式文字列に変換
+        # 日本語が含まれるため: ensure_ascii=False
+        json_str = json.dumps(resp_obj, indent=2, ensure_ascii=False)
+        # ■ 5-2. JSON文字列をファイル保存 ※保存されるJSONはFlaskアプリのレスポンスと同一
+        save_text(SAVE_JSON, json_str)</code></pre>
                 <div class="mb-2">【出力内容】JSONファイル ※Flaskアプリが返却するJSONレスポンスと同一になります</div>
 <pre class="ms-3"><code class="json small">{
-   "data": {
-      "healthcareData": {
-         "sleepManagement": {
-            "wakeupTime": "05:30",
-            "sleepScore": 68,
-            "sleepingTime": "05:20",
-            "deepSleepingTime": "00:50"
-         },
-         "bloodPressure": {
-            "morningMeasurementTime": "06:55",
-            "morningMax": 109,
-            "morningMin": 71,
-            "morningPulseRate": 68,
-            "eveningMeasurementTime": "22:15",
-            "eveningMax": 122,
-            "eveningMin": 69,
-            "eveningPulseRate": 66
-         },
-         "nocturiaFactors": {
-            "midnightToiletVisits": 4,
-            "hasCoffee": false,
-            "hasTea": false,
-            "hasAlcohol": false,
-            "hasNutritionDrink": true,
-            "hasSportsDrink": false,
-            "hasDiuretic": false,
-            "takeMedicine": true,
-            "takeBathing": true,
-            "conditionMemo": null
-         },
-         "walkingCount": {
-            "counts": 9820
-         },
-         "bodyTemperature": {
-            "measurementTime": null,
-            "temperature": null
-         }
+  "data": {
+    "healthcareData": {
+      "sleepManagement": {
+        "wakeupTime": "05:30",
+        "sleepScore": 86,
+        "sleepingTime": "06:50",
+        "deepSleepingTime": "00:50"
       },
-      "weatherData": {
-         "weatherCondition": {
-            "condition": "晴れ"
-         }
+      "bloodPressure": {
+        "morningMeasurementTime": "06:40",
+        "morningMax": 122,
+        "morningMin": 70,
+        "morningPulseRate": 62,
+        "eveningMeasurementTime": "22:10",
+        "eveningMax": 101,
+        "eveningMin": 63,
+        "eveningPulseRate": 67
       },
-      "emailAddress": "user1@examples.com",
-      "measurementDay": "2023-03-15"
-   },
-   "status": {
-      "code": 0,
-      "message": "OK"
-   }
+      "nocturiaFactors": {
+        "midnightToiletVisits": 1,
+        "hasCoffee": false,
+        "hasTea": false,
+        "hasAlcohol": false,
+        "hasNutritionDrink": true,
+        "hasSportsDrink": false,
+        "hasDiuretic": false,
+        "takeMedicine": true,
+        "takeBathing": true,
+        "conditionMemo": null
+      },
+      "walkingCount": {
+        "counts": 8460
+      },
+      "bodyTemperature": {
+        "measurementTime": null,
+        "temperature": null
+      }
+    },
+    "emailAddress": "user1@examples.com",
+    "measurementDay": "2023-03-14",
+    "weatherData": {
+      "weatherCondition": {
+        "condition": "曇り"
+      }
+    }
+  },
+  "status": {
+    "code": 0,
+    "message": "OK"
+  }
 }</code></pre>
             </div>    
 
