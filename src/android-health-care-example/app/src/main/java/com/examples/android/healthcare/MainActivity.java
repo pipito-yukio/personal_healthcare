@@ -86,23 +86,17 @@ public class MainActivity extends AppCompatActivity {
         if (mOnPageChangeCallback != null) {
             int currentItem = mViewPager2.getCurrentItem();
             if (currentItem == FRAGMENT_APPTOP) {
-                String registeredDate = SharedPrefUtil.getLatestRegisteredDate(this);
-                String savedDate = SharedPrefUtil.getLastSavedDate(this);
-                DEBUG_OUT.accept(TAG, String.format("registeredDate: %s, savedDate: %s",
-                        registeredDate, savedDate));
-                if (!TextUtils.isEmpty(registeredDate) && TextUtils.isEmpty(savedDate)) {
-                    // 登録済みでバックキーなら最近の画面に残さない
-                    // https://developer.android.com/guide/components/activities/recents?hl=ja#java
-                    // 最近の画面
-                    // [最近] 画面は、最近アクセスしたアクティビティとタスクを一覧表示するシステムレベルの UI です
-                    // The document is no longer needed; remove its task.
-                    // AppTask クラスを使用したタスクの削除
-                    DEBUG_OUT.accept(TAG, "finishAndRemoveTask()");
-                    finishAndRemoveTask();
-                } else {
-                    DEBUG_OUT.accept(TAG, "super.onBackPressed()");
-                    super.onBackPressed();
-                }
+                // 登録画面でバックキー押下なら最近の画面に残さない
+                // https://developer.android.com/guide/components/activities/recents?hl=ja#java
+                // 最近の画面
+                // [最近] 画面は、最近アクセスしたアクティビティとタスクを一覧表示するシステムレベルの UI です
+                // The document is no longer needed; remove its task.
+                // AppTask クラスを使用したタスクの削除
+                DEBUG_OUT.accept(TAG, "finishAndRemoveTask()");
+                finishAndRemoveTask();
+            } else {
+                DEBUG_OUT.accept(TAG, "super.onBackPressed()");
+                super.onBackPressed();
             }
         }
     }
