@@ -202,7 +202,7 @@ Dell-T7500
         app_logger.error(f"Exception: {excption}")
         raise excption</code></pre>
 
-                <div class="mb-2">(6) 健康管理データベース登録処理</div>
+                <div id="_insert_healthdata" class="mb-2">(6) 健康管理データベース登録処理</div>
                 <ul class="mb-4 small">
                     <li>テーブル項目チェック処理: <b>全てのテーブル項目が必要で、１つでも存在しない項目があればエラーとし処理終了</b><br/>
                          <b>※Flaskアプリではabort(BadRequest)レスポンス返却</b>
@@ -418,7 +418,7 @@ Dell-T7500
         # データ無し
         return None</code></pre>
 
-                <div class="mb-2">(2) 健康管理データベース更新処理</div>
+                <div id="_update_healthdata" class="mb-2">(2) 健康管理データベース更新処理</div>
                 <ul class="small">
                     <li>健康管理データコンテナチェック処理: <b>必須。存在しなければ処理終了。</b><br/>
                          <b>※Flaskアプリではabort(BadRequest)レスポンス返却</b>
