@@ -33,7 +33,7 @@ def get_healthcare_session() -> scoped_session:
     """
     if 'healthcare_session' not in g:
         # 健康管理DB用セッションオブジェクト生成
-        g.healthcare_session = Cls_sess_healthcare()
+        g.healthcare_session: scoped_session = Cls_sess_healthcare()
         if app_logger_debug:
             app_logger.debug(f"g.healthcare_session:{g.healthcare_session}")
     return g.healthcare_session
@@ -45,7 +45,7 @@ def get_sensors_session() -> scoped_session:
     """
     if 'sensors_session' not in g:
         # 気象センサDB用セッションオブジェクト生成
-        g.sensors_session = Cls_sess_sensors()
+        g.sensors_session: scoped_session = Cls_sess_sensors()
         if app_logger_debug:
             app_logger.debug(f"g.sensors_session:{g.sensors_session}")
     return g.sensors_session
@@ -60,21 +60,15 @@ def close_sessions(exception=None) -> None:
     sess: scoped_session = g.pop('healthcare_session', None)
     app_logger.debug(f"healthcare_session:{sess}")
     if sess is not None:
-        try:
-            # クラスのremoveメソッド呼び出し
-            Cls_sess_healthcare.remove()
-        except Exception as err:    
-            app_logger.warning(f"Error removed Cls_sess_healthcare :{err}")
+        # クラスのremoveメソッド呼び出し
+        Cls_sess_healthcare.remove()
 
     # 気象センサDB用セッション
     sess: scoped_session = g.pop('sensors_session', None)
     app_logger.debug(f"sensors_session:{sess}")
     if sess is not None:
-        try:
-            Cls_sess_sensors.remove()
-        except Exception as err:    
-            app_logger.warning(f"Error removed Cls_sess_sensors :{err}")
-        
+        Cls_sess_sensors.remove()
+       
 
 @app.route(APP_ROOT + "/getcurrentdata", methods=["GET"])
 def getcurrentdata():
