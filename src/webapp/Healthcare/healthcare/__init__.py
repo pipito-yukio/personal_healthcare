@@ -61,7 +61,7 @@ engine_healthcare: sqlalchemy.Engine = create_engine(conn_url, echo=False)
 Session_healthcare = sessionmaker(bind=engine_healthcare)
 app_logger.info(f"Session_healthcare: {Session_healthcare}")
 # セッションクラス定義
-Cls_sess_healthcare: scoped_session = scoped_session(
+Cls_sess_healthcare: sqlalchemy.orm.scoping.scoped_session = scoped_session(
     sessionmaker(bind=engine_healthcare)
     )
 app_logger.info(f"Cls_sess_healthcare: {Cls_sess_healthcare}")
@@ -71,7 +71,7 @@ conn_dict: dict = getdict_forurl(DB_SENSORS_CONF)
 conn_url: URL = URL.create(**conn_dict)
 app_logger.info(f"Sensors database URL: {conn_url}")
 engine_sensors: sqlalchemy.Engine = create_engine(conn_url, echo=False)
-Cls_sess_sensors: scoped_session = scoped_session(
+Cls_sess_sensors: sqlalchemy.orm.scoping.scoped_session = scoped_session(
     sessionmaker(bind=engine_sensors)
     )
 app_logger.info(f"Cls_sess_sensors: {Cls_sess_sensors}")
