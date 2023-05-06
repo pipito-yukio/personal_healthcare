@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="stylesheet" href="assets/css/bootstrap_custom.css" />
+        <link rel="stylesheet" href="assets/css/bootstrap.min.css" />
+        <link rel="stylesheet" href="assets/highlight/styles/default.min.css" />
+        <title>Flaskで素のSQLAlchemyを使う</title>
+        <meta name="description" content="How to use SQLAlchemy alone without Flask-SQLAlchemy in Flask app.">
+    </head>
+
+    <body>
+        <div class="container" style="max-width: 980px">
+            <h4 class="m-2 text-center">Flaskで素のSQLAlchemyを使う</h4>
+            <hr />
+            <div class="update-date">【最終更新日】2023-05-06</div>
+            <p class="indent">
+                FlaskアプリでFlask-SQLAlchemyを使わず単独でSQLAlchemyを使う方法を紹介します。
+            </p>
+            <p class="indent">
+                Flask-SQLAlchemyを使ってしまうとデータベース処理の開発・テストがWebアプリ依存のものになってしまい開発効率が低下します。実際のシステムではWebアプリケーション以外にバッチシステムもたくさんあります。
+            </p>
+            <!-- refercence urls -->
+            <div class="m-2 mb-4">
+                <div>【参考URL】</div>
+                <ul class="ms-2">
+                    <li>(1) SQLAlchemy本家サイト <b>Contextual/Thread-local Sessions</b><br/>
+    <a href="https://docs.sqlalchemy.org/en/20/orm/contextual.html#sqlalchemy.util.ThreadLocalRegistry" target="_blank">
+    https://docs.sqlalchemy.org/en/20/orm/contextual.html#sqlalchemy.util.ThreadLocalRegistry
+    </a>
+                    </li>
+                    <li>(2) Flask公式ドキュメンテーション<b>The Application Context</b><br/>
+    <a href="https://flask.palletsprojects.com/en/2.2.x/appcontext/" target="_blank">
+    https://flask.palletsprojects.com/en/2.2.x/appcontext/
+    </a>
+                    </li>
+                    <li>(3) Flask公式ドキュメンテーション<b>SQLAlchemy in Flask</b><br/>
+    <a href="https://flask.palletsprojects.com/en/2.2.x/patterns/sqlalchemy/" target="_blank">
+    https://flask.palletsprojects.com/en/2.2.x/patterns/sqlalchemy/
+    </a>
+                    </li>
+                </ul>
+            </div>
+
+            <h5 class="v-line-start">1.Flaskアプリケーション用プロジェクト</h5>
+            <div class="m-3">
+                <div>プロジェクトのクラス構成</div>
+<pre class="m-2"><code>Healthcare/
+├── healthcare
+│   ├── __init__.py                // Flaskアプリケーション生成・初期化, データベースセッション取得等
+│   ├── dao                        // テーブル定義クラス
+│   │   ├── __init__.py            // 健康管理データベースのスキーマ定義
+│   │   ├── blood_pressure.py      // (健康) 血圧測定テーブルクラス
+│   │   ├── body_temperature.py    // (健康) 体温測定テーブルクラス
+│   │   ├── nocturia_factors.py    // (健康) 夜間頻尿要因テーブルクラス
+│   │   ├── person.py              // (健康) 個人情報テーブルクラス
+│   │   ├── queries.py             // (健康・気象) 登録済みデータ検索クラス
+│   │   ├── sleep_management.py    // (健康) 睡眠管理テーブルクラス
+│   │   ├── walking_count.py       // (健康) 歩数管理テーブルクラス
+│   │   └── weather_condition.py   // (気象) 天候状態テーブルクラス
+│   ├── log
+│   │   ├── __init__.py
+│   │   ├── logconf_main.json
+│   │   └── logsetting.py
+│   ├── util
+│   │   ├── __init__.py
+│   │   ├── dateutil.py
+│   │   ├── file_util.py
+│   │   └── image_util.py
+│   └── views
+│       ├── __init__.py
+│       └── app_main.py             // リクエスト処理メインクラス
+├── run.py   // デバックモードでFlask, 本番モードでwaitressを起動するpythonスタートアップスクリプト
+└── start.sh // 仮想環境に入りpythonスタートアップスクリプトを実行するシェルスクリプト
+</code></pre>
+                <div class="ms-2">(1) Pythonスタートアップスクリプトを実行するシェルスクリプト</div>
+                <ul class="ms-4 mt-2">
+                    <li>【参考】シェルスクリプトを起動するシステムサービス<br/>
+/etc/default/<b>webapp-healthcare</b> ※Flaskアプリケーションのポート番号<br/>
+<pre><code class="small">FLASK_PROD_PORT=12920</code></pre>
+/etc/systemd/system/<b>webapp-healthcare.service</b> ※start.shを起動するシステムサービス
+<pre><code class="small">[Unit]
+Description=Flask webapp Healthcare service
+After=postgres-12-docker.service
+
+[Service]
+Type=idle
+# FLASK_PROD_PORT
+EnvironmentFile=/etc/default/webapp-healthcare
+ExecStart=/home/pi/Healthcare/start.sh prod &gt;/dev/null # ■ 本番環境で起動
+User=pi
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+                    </li>
+                    <li>1 ホスト名決定： システムのホスト名(<b>/etc/hostname</b>)から Flask Webアプリ用ホスト名を決定する<br/>
+                    <b>※ [本番環境] raspi-4.local</b><br/>
+                    </li>
+                    <li>2 環境変数設定： Pythonスタートアップスクリプト用に <b>Webアプリ用ホスト名とFLASK_ENV</b>を設定する</li>
+                    <li>3 実行パス設定： Webアプリケーションの実行パスを決定する<br/>
+                    <b>※ [本番環境] /home/pi/Healthcare</b> 、開発PCでは ~/.bashrc の内でプロジェクトパスを環境変数に設定
+                    </li>
+                    <li>4 Python仮想環境(raspi4_apps)に入り Pythonスタートアップスクリプトを実行する<br/>
+                    ※開発PC(Ubuntu)でもラズパイ4と同じ環境名で Python仮想環境を作成しているのでこの部分は共通。
+                    </li>
+                </ul>
+<pre class="ms-4"><code class="bash small">#!/bin/bash
+
+# ./start.sh                    -&gt; development             # スクリプト引数がなければ開発環境で起動
+# ./start.sh prod | production  -&gt;production               # スクリプト引数が "production" なら本番環境で起動
+
+env_mode="development"
+if [ $# -eq 0 ]; then
+    :
+else
+   if [[ "$1" = "prod" || "$1" = "production" ]]; then 
+        env_mode="production"
+   fi
+fi
+
+host_name="$(/bin/cat /etc/hostname)"                          # ■ 1-1 ホスト名取得
+IP_HOST_ORG="${host_name}.local"   # ADD host suffix ".local"  # ■ 1-2 Webアプリ用のホスト名決定
+export IP_HOST="${IP_HOST_ORG,,}"  # to lowercase              # ■ 2-1 環境変数: Webアプリ用ホスト名 (小文字)
+export FLASK_ENV=$env_mode                                     # ■ 2-2 環境変数: FLASK_ENV (Flaskアプリケーション用)
+echo "$IP_HOST with $FLASK_ENV"
+
+EXEC_PATH=
+if [ -n "$PATH_HEALTHCARE" ]; then
+   EXEC_PATH=$PATH_HEALTHCARE                                  # ■ 3-1 開発環境では開発PCの環境変数(PATH_HEALTHCARE)を設定
+else
+   EXEC_PATH="$HOME/Healthcare"                                # ■ 3-2 本番環境(ラズパイ) /home/pi/Healthcare
+fi
+echo "$EXEC_PATH"
+
+. $HOME/py_venv/raspi4_apps/bin/activate                       # ■ 4-1 Python仮想環境に入る
+
+python $EXEC_PATH/run.py                                       # ■ 4-2 Pythonスタートアップスクリプト実行
+
+deactivate</code></pre>
+            </div>
+
+            <h5 class="v-line-start">2.Flaskアプリケーション初期化クラス</h5>
+            <div class="ms-3">
+                <div>(1) Flask初期化スクリプト <b>※Healthcare/healthcare/__init__.py が先に実行される</b></div>
+                <ul class="ms-2 mt-2">
+                    <li>(1)-1 インポートとデータベース情報読み込み関数定義
+<pre><code class="python small">import json
+import logging
+import os
+import socket
+import uuid
+
+import sqlalchemy
+from flask import Flask
+from sqlalchemy import create_engine
+from sqlalchemy.engine.url import URL
+from sqlalchemy.orm import scoped_session, sessionmaker
+
+from healthcare.log import logsetting
+
+
+def getdict_forurl(filePath: str) -&gt; dict:
+    with open(filePath, 'r') as fp:
+        db_conf: json = json.load(fp)
+        hostname = socket.gethostname()
+        # host in /etc/hosts
+        db_conf["host"] = db_conf["host"].format(hostname=hostname)
+    return db_conf
+
+# PostgreSQL connection information json file.
+CONF_PATH: str = os.path.expanduser("~/bin/conf")
+DB_HEALTHCARE_CONF: str = os.path.join(CONF_PATH, "db_healthcare.json")
+DB_SENSORS_CONF: str = os.path.join(CONF_PATH, "db_sensors.json")</code></pre>
+                    </li>
+                    <li>(1)-2 Flaskアプリケーション生成・コンフィグレーション設定
+                       <ol>
+                           <li> Flaskアプリケーション生成: <b>app: Flask = Flask(__name__)</b></li>
+                           <li> 実行環境ごと (開発/本番) のサーバーホスト(ポート番号含む)の設定
+                               <ul class="small">
+                                   <li>本番環境: raspi-4.local:12345 ※ポート番号はWebアプリケーションサービスで設定される</li>
+                                   <li>開発環境: [開発PCホスト名].local:5000</li>
+                               </ul>   
+                           </li>
+                           <li> Flaskアプリケーションコンフィグレーション設定する
+                               <ul class="small">
+                                   <li>サーバーホスト (SERVER_HOST): ※Healthcare/healthcare/<b>run.py</b> で参照する</li>
+                                   <li>アプリケーションパス (APPLICATION_ROOT) ※Healthcare/healthcare/views/<b>app_main.py</b> で参照する</li>
+                               </ul>   
+                           </li>
+                           <li> 日本語が含まれるJSON出力設定: <b>JSON出力時に日本語をASCIIに変換しない</b></li>
+                       </ol>
+<pre><code class="python small">app: Flask = Flask(__name__)    # ■ 1
+# ロガーを本アプリ用のものに設定する
+app_logger: logging.Logger = logsetting.get_logger("app_main")
+app_logger_debug: bool = (app_logger.getEffectiveLevel() &lt;= logging.DEBUG)
+app.config.from_object("healthcare.config")
+# セッション用の秘密キー
+app.secret_key = uuid.uuid4().bytes
+
+# サーバホストとセッションのドメインが一致しないとブラウザにセッションIDが設定されない
+IP_HOST: str = os.environ.get("IP_HOST", "localhost")
+FLASK_PROD_PORT: str = os.environ.get("FLASK_PROD_PORT", "8080")
+has_prod: bool = os.environ.get("FLASK_ENV", "development") == "production"
+SERVER_HOST: str
+if has_prod:
+    # Production mode
+    SERVER_HOST = IP_HOST + ":" + FLASK_PROD_PORT      # ■ 2-1 本番環境用ホスト
+else:
+    SERVER_HOST = IP_HOST + ":5000"                    # ■ 2-2 開発環境用ホスト
+app_logger.info("SERVER_HOST: {}".format(SERVER_HOST))
+
+app.config["SERVER_NAME"] = SERVER_HOST                # ■ 3-2
+app.config["APPLICATION_ROOT"] = "/healthcare"         # ■ 3-2
+# use flask jsonify with japanese message
+app.config["JSON_AS_ASCII"] = False                    # ■ 4 
+
+# ... (3) データベースセッション取得処理 ...
+
+# Application main program
+from healthcare.views import app_main</code></pre>
+                    </li>
+                    <li>(1)-3 データベースセッション取得処理
+                        <ol>
+                            <li>健康管理データベースの個人テーブル検索用セッションクラス ※<span class="small"><b>通常のSessionクラス</b></span></li>
+                            <li>健康管理データベース用セッションクラス ※<span class="small"><b>scoped_sessionクラス (Thread-Local Scope)</b></span></li>
+                            <li>気象センサーデータベース用セッションクラス※<span class="small"><b>scoped_sessionクラス (Thread-Local Scope)</b></span></li>
+                        </ol>
+<pre><code class="python small"># SQLAlchemy engine
+# 1.健康管理データベース: postgresql[5433]
+conn_dict: dict = getdict_forurl(DB_HEALTHCARE_CONF)
+conn_url: URL = URL.create(**conn_dict)
+app_logger.info(f"Healthcare database URL: {conn_url}")
+engine_healthcare: sqlalchemy.Engine = create_engine(conn_url, echo=False)
+# 個人テーブルチェック用
+Session_healthcare = sessionmaker(bind=engine_healthcare)                    # ■ 1
+app_logger.info(f"Session_healthcare: {Session_healthcare}")
+# セッションクラス定義
+Cls_sess_healthcare: sqlalchemy.orm.scoping.scoped_session = scoped_session( # ■ 2
+    sessionmaker(bind=engine_healthcare)
+    )
+app_logger.info(f"Cls_sess_healthcare: {Cls_sess_healthcare}")
+
+# 2.気象センサーデータベース: postgresql[5432]
+conn_dict: dict = getdict_forurl(DB_SENSORS_CONF)
+conn_url: URL = URL.create(**conn_dict)
+app_logger.info(f"Sensors database URL: {conn_url}")
+engine_sensors: sqlalchemy.Engine = create_engine(conn_url, echo=False)
+Cls_sess_sensors: sqlalchemy.orm.scoping.scoped_session = scoped_session(    # ■ 3
+    sessionmaker(bind=engine_sensors)
+    )
+app_logger.info(f"Cls_sess_sensors: {Cls_sess_sensors}")
+if app_logger_debug:
+    app_logger.debug(f"{app.config}")</code></pre>
+                    </li>
+                </ul>
+                <div>(2) pythonスタートアップスクリプト <b>Healthcare/run.py</b> ※上記(1)実行後に起動される</b></div>
+                <div class="ms-2"></div>
+                <ul class="ms-4 mt-2">
+                    <li>1 本番環境の判定: シェルスクリプトから起動時の実行環境を取得する</li>
+                    <li>2 Flaskコンフィグレーションからサーバー情報(<b>SERVER_NAME</b>)を取得し、ホスト名とポート番号に分解する</li>
+                    <li>3 Webアプリケーションサーバーの起動
+                        <ul class="small">
+                            <li>[A] 本番環境なら <b>Python WSGI サーバーをプロダクションモードで起動する</b></li>
+                            <li>[B] 開発環境なら Flask内部サーバーをDEBUGモードで起動する</li>
+                            <li>[C] 本番環境でWSGI サーバーが未インストールなら Flask内部サーバーを通常モードで起動する <b>※これは想定していない</b></li>
+                        </ul>
+                    </li>
+                </ul>
+<pre class="ms-4"><code class="python small">import os
+
+from healthcare import app, app_logger  # ■ app を参照しているので上記(1)__init__.pyが先に実行される
+
+"""
+This module load after app(==__init__.py)
+"""
+
+if __name__ == "__main__":
+    has_prod = os.environ.get("FLASK_ENV") == "production"              # ■ 1
+    # app config SERVER_NAME
+    srv_host = app.config["SERVER_NAME"]                                # ■ 2-1 ホスト情報
+    srv_hosts = srv_host.split(":")                                     # ■ 2-2 ホスト名とポート番号に分解
+    host, port = srv_hosts[0], srv_hosts[1]
+    app_logger.info("run.py in host: {}, port: {}".format(host, port))
+    if has_prod:
+        # Production mode
+        try:
+            # Prerequisites: pip install waitress
+            from waitress import serve
+
+            app_logger.info("Production start.")
+            # console log for Reqeust suppress: _quiet=True  
+            serve(app, host=host, port=port, _quiet=True)               # ■ 3[A]
+        except ImportError:
+            # Production with flask,debug False
+            app_logger.info("Development start, without debug.")
+            app.run(host=host, port=port, debug=False)                  # ■ 3[C]
+    else:
+        # Development mode
+        app_logger.info("Development start, with debug.")
+        app.run(host=host, port=port, debug=True)                       # ■ 3[B]</code></pre>
+            </div>
+
+            <h5 class="v-line-start">3.リクエスト処理メインクラス</h5>
+            <div class="ms-3">
+                <div>(1) インポート部分</div>
+<pre class="ms-3"><code class="python small">import json
+from typing import Dict, Optional, Union
+
+import sqlalchemy
+from flask import Response, abort, g, jsonify, make_response, request
+from sqlalchemy import Select, select
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.orm import Session, scoped_session, sessionmaker
+from sqlalchemy.orm.exc import NoResultFound
+from werkzeug.exceptions import (BadRequest, Conflict, Forbidden,
+                                 HTTPException, InternalServerError, NotFound)
+
+from healthcare import (Cls_sess_healthcare, Cls_sess_sensors,
+                        Session_healthcare, app, app_logger, app_logger_debug)
+from healthcare.dao.blood_pressure import BloodPressure
+from healthcare.dao.body_temperature import BodyTemperature
+from healthcare.dao.nocturia_factors import NocturiaFactors
+from healthcare.dao.person import Person
+from healthcare.dao.queries import Selector
+from healthcare.dao.sleep_management import SleepManagement
+from healthcare.dao.walking_count import WalkingCount
+from healthcare.dao.weather_condition import WeatherCondition</code></pre>
+                <div>(2) 定数定義</div>
+                <ul class="mb-1 small">
+                    <li>エラー時レスポンス用辞書オブジェクト</li>
+                    <li>アプリケーションルートパス</li>
+                </ul>
+<pre class="ms-3"><code class="python small">MSG_DESCRIPTION: str = "error_message"
+ABORT_DICT_BLANK_MESSAGE: Dict[str, str] = {MSG_DESCRIPTION: ""}
+# アプリケーションルートパス
+APP_ROOT: str = app.config["APPLICATION_ROOT"]</code></pre>
+                <div class="mb-2">(3) Webアプリケーション固有の処理関数</div>
+                <p class="ms-2 mb-1">データベース接続オブジェクトの取得とクリーンアップ方法 <b>※上記【参考URL】(2) のサンプルコード参照</b></p>
+                <ul class="ms-2 mb-1 small">
+                    <li>接続オブジェクト取得： <b>gオブジェクトにデータベース接続を設定</b>し呼び出し元に返却</li>
+                    <li>クリーンアップ： <b>@app.teardown_appcontext</b>コンテキストを付与した関数で、gオブジェクトから接続オブジェクトを取り出しクローズ<br/>
+                    <b>※上記コンテキストを付与した関数はレスポンス返却前に必ず呼び出しされる。</b>
+                    </li>
+                </ul>
+<pre class="ms-2"><code class="python small">from flask import g
+
+def get_db():
+    if 'db' not in g:
+        g.db = connect_to_database()
+
+    return g.db
+
+@app.teardown_appcontext
+def teardown_db(exception):  # ■ レスポンス返却前に必ず呼び出しされる
+    db = g.pop('db', None)
+
+    if db is not None:
+        db.close()</code></pre>
+                    <ul>
+                        <li>健康管理データベース用セッションオブジェクト生成し Flaskの <b>g オブジェクト</b>に格納して返却する
+<pre class="ms-3"><code class="python small">def get_healthcare_session() -> scoped_session:
+    """
+    健康管理DB用セッションオブジェクトを取得する
+    """
+    if 'healthcare_session' not in g:
+        # 健康管理DB用セッションオブジェクト生成
+        g.healthcare_session = Cls_sess_healthcare()
+        if app_logger_debug:
+            app_logger.debug(f"g.healthcare_session:{g.healthcare_session}")
+    return g.healthcare_session</code></pre>
+                        </li> 
+                        <li>気象センサーデータベース用セッションオブジェクト生成し Flaskの <b>g オブジェクト</b>に格納して返却する
+<pre class="ms-3"><code class="python small">def get_sensors_session() -> scoped_session:
+    """
+    気象センサDB用セッションオブジェクトを取得する
+    """
+    if 'sensors_session' not in g:
+        # 気象センサDB用セッションオブジェクト生成
+        g.sensors_session = Cls_sess_sensors()
+        if app_logger_debug:
+            app_logger.debug(f"g.sensors_session:{g.sensors_session}")
+    return g.sensors_session</code></pre>
+                        </li> 
+                        <li>セッションオブジェクトのクリーンアップ <b>※上記【参考URL】(3) Manual Object Relational Mapping 参照</b>
+                            <ol>
+                                <li>Flaskの <b>gオブジェクト</b>からそれぞれのデータベースのセッションオブジェクトを取得する</li>
+                                <li>セッションオブジェクトが存在すれば <b>scoped_sessionクラスのremove()メソッド</b>を呼び出してセッションオブジェクトをリセットする。※次のリクエストで新たなセッションオブジェクトが生成される。<br/>※間際らしいがクラスとオブジェクトではパッケージが異なりメソッドも異なるので注意が必要。
+                                   <ul>
+                                       <li>scoped_sessionクラス: <b>sqlalchemy.orm.scoping.</b>scoped_session ※remove()メソッド有り</li>
+                                       <li>scoped_sessionオブジェクト: <b>sqlalchemy.orm.</b>scoped_session ※remove()メソッドは未定義</li>
+                                   </ul>
+                                </li>
+                            </ol>
+<pre class="ms-3"><code class="python small">@app.teardown_appcontext
+def close_sessions(exception=None) -> None:
+    """
+    各データベース用セッションのクリーンアップ
+    """
+    # 健康管理DB用セッション
+    sess: scoped_session = g.pop('healthcare_session', None)   # ■ 1-1 gオブジェクトからセッションオブジェクトを取得
+    app_logger.debug(f"healthcare_session:{sess}")
+    if sess is not None:                                       # ■ 1-2 セッションオブジェクトが存在
+        # クラスのremoveメソッド呼び出し
+        Cls_sess_healthcare.remove()                           # ■ 2
+
+    # 気象センサDB用セッション
+    sess: scoped_session = g.pop('sensors_session', None)
+    app_logger.debug(f"sensors_session:{sess}")
+    if sess is not None:
+        Cls_sess_sensors.remove()</code></pre>
+                        </li>
+                        <li>リクエストチェック関数</li>
+<pre class="ms-3"><code class="python small">def _check_postdata(request):
+    # リクエストヘッダーチェック
+    if "application/json" not in request.headers["Content-Type"]:
+        abort(BadRequest.code, _set_errormessage("450,Bad request Content-Type."))
+
+    # 登録用データ取得
+    data: dict = json.loads(request.data)
+    if app_logger_debug:
+        app_logger.debug(data)
+
+    # メールアドレスチェック
+    emailAddress = data.get("emailAddress", None)
+    if emailAddress is None:
+        abort(BadRequest.code, _set_errormessage("462,Required EmailAddress."))
+
+    # 測定日付チェック
+    measurementDay = data.get("measurementDay", None)
+    if measurementDay is None:
+        abort(BadRequest.code, _set_errormessage("463,Required MeasurementDay."))
+
+    # PersonテーブルにemailAddressが存在するか
+    personId = _get_personid(emailAddress)
+    if personId is None:
+        abort(BadRequest.code, _set_errormessage("461,User is not found."))
+
+    return personId, emailAddress, measurementDay, data</code></pre>
+
+                        <li>POSTリクエスト時(登録・更新)の正常レスポンス生成関数 </li>
+<pre class="ms-3"><code class="python small">def make_register_success(email_address: str, measurement_day: str) -&gt; Response:
+    """
+    登録処理OKレスポンス
+    :param email_address: メールアドレス
+    :param measurement_day 測定日付
+    :return: Response
+    """
+    resp_obj: Dict = {
+        "status":
+            {"code": 0, "message": "OK"},
+        "data": {
+            "emailAddress": email_address,
+            "measurementDay": measurement_day
+        }
+    }
+    return _make_respose(resp_obj, 200)</code></pre>
+
+                        <li>GETリクエスト時の正常レスポンス生成関数</li>
+<pre class="ms-3"><code class="python small">def make_getdata_success(json_dict: Dict) -&gt; Response:
+    """
+    データ取得処理OKレスポンス
+    :param json_dict: JSON出力用辞書
+    :return: Response
+    """
+    resp_obj: Dict = {
+        "status": {
+            "code": 0, "message": "OK"},
+        "data": json_dict
+    }
+    return _make_respose(resp_obj, 200)</code></pre>
+
+                        <li>エラーレスポンス生成関数</li>
+<pre class="ms-3"><code class="python small">def _set_errormessage(message: str) -&gt; Dict:
+    ABORT_DICT_BLANK_MESSAGE[MSG_DESCRIPTION] = message
+    return ABORT_DICT_BLANK_MESSAGE
+
+
+def _make_respose(resp_obj: Dict, resp_code) -&gt; Response:
+    response = make_response(jsonify(resp_obj), resp_code)
+    response.headers["Content-Type"] = "application/json"
+    return response</code></pre>
+
+                        <li>エラーハンドラー関数: <b>abort(HTTPエラー番号,エラーメッセージ)関数</b>呼び出しに対応</li>
+<pre class="ms-3"><code class="python small">@app.errorhandler(BadRequest.code)
+@app.errorhandler(Forbidden.code)
+@app.errorhandler(NotFound.code)
+@app.errorhandler(Conflict.code) # IntegrityError (登録済み)
+@app.errorhandler(InternalServerError.code)
+def error_handler(error: HTTPException) -&gt; Response:
+    app_logger.warning(f"error_type:{type(error)}, {error}")
+    resp_obj: Dict[str, Dict[str, Union[int, str]]] = {
+        "status": {"code": error.code, "message": error.description["error_message"]}
+    }
+    return _make_respose(resp_obj, error.code)</code></pre>
+                    </ul> 
+                <div class="mb-2">(4) データ登録リクエスト処理【リクエストパス】/healthcare/<b>register</b></div>
+                <ul class="ms-3">
+                    <li>データベース登録処理はバッチ実行と同じなので下記コンテンツをご覧ください。<br/>
+<a href="13_pythonbatch_with_sqlalchemy.html#_insert_healthdata" target="_blank">SQLAlchemyをPythonバッチで使う【データベース登録処理】</a>
+                    </li>               
+                </ul>
+<pre class="ms-3"><code class="python small">@app.route(APP_ROOT + "/register", methods=["POST"])
+def register():
+    """
+    健康管理データ(必須)と天候データ(必須)の登録
+    """
+    if app_logger_debug:
+        app_logger.debug(request.path)
+
+    # 登録データチェック
+    personId, emailAddress, measurementDay, data = _check_postdata(request)
+    
+    # 健康管理データ登録 (必須)
+    _insert_healthdata(personId, measurementDay, data)
+    # 気象データ登録 (必須) ※気象センサーデータベース
+    _insert_weather(measurementDay, data)
+
+    # ここまでエラーがなければOKレスポンス
+    return make_register_success(emailAddress, measurementDay)</code></pre>
+                <div class="mb-2">(5) 登録済みデータ更新リクエスト処理【リクエストパス】/healthcare/<b>update</b></div>
+                <ul class="ms-3">
+                    <li>データベース更新処理はバッチ実行と同じなので下記コンテンツをご覧ください。<br/>
+<a href="13_pythonbatch_with_sqlalchemy.html#_update_healthdata" target="_blank">SQLAlchemyをPythonバッチで使う【データベース更新処理】</a>
+                    </li>               
+                </ul>
+<pre class="ms-3"><code class="python small">@app.route(APP_ROOT + "/update", methods=["POST"])
+def update():
+    """
+    健康管理データ(任意)または天候データ(任意)の更新
+    """
+    if app_logger_debug:
+        app_logger.debug(request.path)
+
+    # 更新データチェック
+    personId, emailAddress, measurementDay, data = _check_postdata(request)
+
+    # 健康管理データの更新
+    _update_healthdata(personId, measurementDay, data)
+    # 天候状態(気象データベース)の更新
+    _update_weather(measurementDay, data)
+
+    # ここまでエラーがなければOKレスポンス
+    return make_register_success(emailAddress, measurementDay)</code></pre>
+                <div class="mb-2">(6) 登録済みデータ取得リクエスト処理【リクエストパス】/healthcare/<b>getcurrentdata</b></div>
+                <ul class="ms-3">
+                    <li>データ取得処理はバッチ実行と同じなので下記コンテンツをご覧ください。<br/>
+<a href="15_pythonbatch_select_with_sqlalchemy.html#queries_selector" target="_blank">SQLAlchemyのRawクエリーを使う</a>
+                    </li>               
+                </ul>
+<pre class="ms-3"><code class="python small">@app.route(APP_ROOT + "/getcurrentdata", methods=["GET"])
+def getcurrentdata():
+    """メールアドレスと測定日付から健康管理データを取得するリクエスト
+
+    :param: request parameter: ?emailAddress=user1@examples.com&measurementDay=2023-0-03
+    :return: JSON形式(健康管理DBから取得したデータ + 気象センサーDBから取得した天候)
+    """
+    if app_logger_debug:
+        app_logger.debug(request.path)
+        app_logger.debug(request.args.to_dict())
+
+    # 1.リクエストパラメータチェック
+    # 1-1.メールアドレス
+    emailAddress = request.args.get("emailAddress")
+    if emailAddress is None:
+        abort(BadRequest.code, _set_errormessage("462,Required EmailAddress."))
+    # 1-2.測定日付
+    measurementDay = request.args.get("measurementDay")
+    if emailAddress is None:
+        abort(BadRequest.code, _set_errormessage("463,Required MeasurementDay."))
+
+    # PersonテーブルにemailAddressが存在するか
+    personId = _get_personid(emailAddress)
+    if personId is None:
+        abort(BadRequest.code, _set_errormessage("461,User is not found."))
+
+    # 健康管理DBと気象センサーDBからデータ取得する
+    sess_healthcare: scoped_session = get_healthcare_session()
+    sess_sensors: scoped_session = get_sensors_session()
+    selector = Selector(sess_healthcare, sess_sensors, logger=app_logger)
+    # 健康管理データ取得
+    healthcare_dict: Dict = selector.get_healthcare_asdict(emailAddress, measurementDay)
+    if app_logger_debug:
+        app_logger.debug(f"Healthcare: {healthcare_dict}")    
+    if healthcare_dict:
+        healthcare_dict["emailAddress"] = emailAddress
+        healthcare_dict["measurementDay"] = measurementDay
+        # 天気状態取得
+        weather_dict = selector.get_weather_asdict(measurementDay)
+        if app_logger_debug:
+            app_logger.debug(f"Weather: {weather_dict}")    
+        if weather_dict:
+            healthcare_dict["weatherData"] = weather_dict
+        else:
+            # 天候がなければ未設定
+            healthcare_dict["weatherData"] = None
+        
+        return make_getdata_success(healthcare_dict)
+    else:
+        abort(NotFound.code, _set_errormessage("Data is not found."))</code></pre>
+            </div>
+
+
+            <div class="row mb-5">
+                <dl class="ms-3">
+                    <dt class="indent">メニューページへ<dt>
+                    <dd class="indent mt-2">
+                        <a href="index.html">戻る</a>
+                    </dd>    
+                    <dt class="indent mt-3">サーバー側のFlaskアプリのソースコードはこちら<dt>
+                    <dd class="indent mt-2">
+                        <a href="https://github.com/pipito-yukio/personal_healthcare/tree/main/src/webapp">
+                        https://github.com/pipito-yukio/personal_healthcare/tree/main/src/webapp
+                        </a>
+                    </dd>    
+                    <dt class="indent mt-3">Pythonバッチアプリのソースコードはこちら<dt>
+                    <dd class="indent mt-2">
+                        <a href="https://github.com/pipito-yukio/personal_healthcare/tree/main/src/batch" target="_blank">
+                        https://github.com/pipito-yukio/personal_healthcare/tree/main/src/batch
+                        </a>
+                    </dd>    
+                </dl>
+            </div>
+        </div>
+        <script src="assets/highlight/js/highlight.min.js"></script>
+        <script src="assets/highlight/js/java.min.js"></script>
+        <script src="assets/highlight/js/cpp.min.js"></script>
+        <script>
+            hljs.highlightAll();
+        </script>
+        </div>
+    </body>
+</html>
