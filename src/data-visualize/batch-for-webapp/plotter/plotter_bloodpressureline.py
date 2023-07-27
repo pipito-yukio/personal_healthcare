@@ -17,8 +17,11 @@ from sqlalchemy.orm import scoped_session
 
 from plotter.common.statistics import BloodPressStatistics
 from plotter.common.todaydata import TodayBloodPress
-from plotter.plotter_bloodpressure import calcBloodPressureStatistics
-from plotter.plotter_common import pixelToInch, DrawPosition, makeTitleWithMonthRange
+from plotter.plotter_bloodpressure import calcBloodPressureStatistics, decideTargetValues
+from plotter.plotter_common import (
+    DrawPosition, makeTitleWithMonthRange, pixelToInch, rebuildIndex
+)
+from plotter.plotparameter import BloodPressUserTarget, PhoneImageInfo
 from plotter.dao import (
     COL_INDEX, COL_MORNING_MAX, COL_MORNING_MIN, COL_MORNING_PULSE,
     COL_EVENING_MAX, COL_EVENING_MIN, COL_EVENING_PULSE,
@@ -180,47 +183,14 @@ def addTodayData(df_org: DataFrame, val_today: TodayBloodPress,
         return False, None
 
 
-def rebuildIndex(df_org: DataFrame, s_start_date: str,
-                 val_end_day: int = None,
-                 val_today: TodayBloodPress = None) -> Tuple[bool, Optional[DataFrame]]:
-    """
-    DataFrameのインデックス再構築が必要なら再構築する
-    :param df_org: オリジナルのDataFrame
-    :param s_start_date: 検索開始日
-    :param val_end_day: 月間データなら末日, それ以外はNone
-    :param val_today: 当日データオブジェクト デフォルトNone
-    :return: 再構築ならTuple[True, 再構築後のDataFrame], それ以外[False, None]
-    """
-    df_size: int = len(df_org)
-    # 指定範囲の日数
-    days_range: int
-    if val_today is None:
-        # 月間データ: 月末日未満の場合
-        days_range = val_end_day
-    else:
-        # 過去2週+当日データ: 範囲日数未満の場合
-        diff_days: int = du.diffInDays(s_start_date, val_today.measurement_day)
-        days_range = diff_days + 1
-    print(f"days_range: {days_range}, df_size: {df_size}")
-    # 再インデックス判定
-    if df_size < days_range:
-        # 欠損データ有りの場合はインデックスを振り直す
-        result: DataFrame = df_org.reindex(
-            pd.date_range(start=s_start_date, periods=days_range, name=COL_INDEX)
-        )
-        return True, result
-    else:
-        return False, None
-
-
-def makeDateTicks(s_start_date: str, s_end_date: str, has_today: bool = False,
+def makeDateTicks(s_start_date: str, s_end_date: str, is_yearmonth: bool = True,
                   logger: logging.Logger = None, is_debug: bool = False
                   ) -> Tuple[List[int], List[str]]:
     """
     X軸整数リストと日付ラベルリストを生成する
     :param s_start_date: 検索開始日
     :param s_end_date: 検索終了日 ※当日データがある場合は当日測定日
-    :param has_today: 当日データがある場合 True, デフォルトFalse
+    :param is_yearmonth: True=月間データ, デフォルトFalse=2週過去
     :param logger:
     :param is_debug:
     :return: Tuple(X軸整数リスト,軸ラベルリスト)
@@ -234,7 +204,7 @@ def makeDateTicks(s_start_date: str, s_end_date: str, has_today: bool = False,
     period_idx_size: int = len(period_idx)
     ticks: List[int]
     ticks_labels: List[str]
-    if not has_today:
+    if is_yearmonth:
         # 月間データの場合: PLOT_DAY_INTERVAL 間隔で間引く
         if period_idx_size < 30:
             # 2月28日 or 29日: [1,5,9,...,25]
@@ -322,10 +292,10 @@ def drawTextOverValue(axes: Axes, values: np.ndarray, std_value: float,
 
 def plot(sess: scoped_session,
          email_address: str, start_date: str, end_date: str,
-         phone_pix_width: int, phone_pix_height: int, phone_density: float,
+         phone_image_info: PhoneImageInfo,
+         is_yearmonth: bool = True,
          today_data: TodayBloodPress = None,
-         user_target_max: int = None,
-         user_target_min: int = None,
+         user_target: BloodPressUserTarget = None,
          suppress_show_over: bool = False,
          logger: logging.Logger = None, is_debug=False) -> Tuple[BloodPressStatistics, Optional[str]]:
     """
@@ -334,12 +304,10 @@ def plot(sess: scoped_session,
     :param email_address:
     :param start_date: 検索開始年月日
     :param end_date: 検索終了年月日
-    :param phone_pix_width:
-    :param phone_pix_height:
-    :param phone_density:
-    :param today_data: 当日AM血圧測定データ(テーブル未登録データ), default None
-    :param user_target_max: ユーザー目標最高血圧値 ※スマホからリクエストで設定される場合がある (端末で設定している場合)
-    :param user_target_min: ユーザー目標最低血圧値 ※スマホからリクエストで設定される場合がある (端末で設定している場合)
+    :param phone_image_info: 携帯端末の画像領域サイズ情報
+    :param is_yearmonth: デフォルトTrue=月間データ, False=2週過去
+    :param today_data: 当日AM血圧測定データ(テーブル未登録データ), default None (月間), 2週過去の場合はオプション
+    :param user_target: 血圧値のユーザー目標値 ※スマホからリクエストで設定される場合がある (端末で設定している場合)
     :param suppress_show_over: 基準値オーバー時の値を出力しない ※デフォルトFalseで出力する
     :param logger:
     :param is_debug:
@@ -347,13 +315,14 @@ def plot(sess: scoped_session,
     :raise: DatabaseError
     """
     # 目標値設定: 未設定ならデフォルト値設定
-    if user_target_max is None:
-        user_target_max = TARGET_PRESS_MAX
-    if user_target_min is None:
-        user_target_min = TARGET_PRESS_MIN
+    target_max: float
+    target_min: float
+    target_max, target_min = decideTargetValues(
+        TARGET_PRESS_MAX, TARGET_PRESS_MIN, user_target=user_target
+    )
+    if logger is not None and is_debug:
+        logger.debug(f"target_max: {target_max}, target_min: {target_min}")
 
-    # 検索終了年月日から日を取り出す
-    end_dates: List = end_date.split('-')
     dao: BloodPressureDao = BloodPressureDao(
         email_address, start_date, end_date, parse_dates=[COL_INDEX],
         logger=logger, is_debug=is_debug
@@ -373,7 +342,6 @@ def plot(sess: scoped_session,
         return statistics, None
 
     # 当日データがあればdf_dataに追加する
-    end_day: int = int(end_dates[2])
     if today_data is not None:
         is_add: bool
         df_added: DataFrame
@@ -396,7 +364,7 @@ def plot(sess: scoped_session,
     # 再インデックス処理
     has_rebuild: bool
     rebuild_df: DataFrame
-    has_rebuild, rebuild_df = rebuildIndex(df_data, start_date, end_day, today_data)
+    has_rebuild, rebuild_df = rebuildIndex(df_data, start_date, end_date)
     if has_rebuild:
         df_data = rebuild_df
         logger.debug(f"rebuild.df_data.size: {df_data.shape}")
@@ -405,7 +373,7 @@ def plot(sess: scoped_session,
 
     # 携帯用の描画領域サイズ(ピクセル)をインチに変換
     fig_width_inch, fig_height_inch = pixelToInch(
-        phone_pix_width, phone_pix_height, phone_density,
+        phone_image_info.px_width, phone_image_info.px_height, phone_image_info.density,
         logger=logger, is_debug=is_debug
     )
 
@@ -449,22 +417,20 @@ def plot(sess: scoped_session,
     if not suppress_show_over:
         # 目標値をオーバーした値を出力
         # AM測定値
-        drawTextOverValue(ax_press, df_data[COL_MORNING_MAX], user_target_max)
-        drawTextOverValue(ax_press, df_data[COL_MORNING_MIN], user_target_min)
+        drawTextOverValue(ax_press, df_data[COL_MORNING_MAX], target_max)
+        drawTextOverValue(ax_press, df_data[COL_MORNING_MIN], target_min)
         # PM測定値
-        drawTextOverValue(ax_press, df_data[COL_EVENING_MAX], user_target_max,
-                          measure_pm=True)
-        drawTextOverValue(ax_press, df_data[COL_EVENING_MIN], user_target_min,
-                          measure_pm=True)
+        drawTextOverValue(ax_press, df_data[COL_EVENING_MAX], target_max, measure_pm=True)
+        drawTextOverValue(ax_press, df_data[COL_EVENING_MIN], target_min, measure_pm=True)
 
     # 目標血圧 (正常値): 最高血圧
     # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.hlines.html
     # ax_press.hlines(user_target_max, x_index_min, x_index_max, **TARGET_MAX_STYLE)
     # https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.axhline.html
-    ax_press.axhline(y=user_target_max, **TARGET_MAX_STYLE)
+    ax_press.axhline(y=target_max, **TARGET_MAX_STYLE)
     # 目標血圧 (正常値): 最低血圧
     # ax_press.hlines(user_target_min, x_index_min, x_index_max, **TARGET_MIN_STYLE)
-    ax_press.axhline(user_target_min, **TARGET_MIN_STYLE)
+    ax_press.axhline(y=target_min, **TARGET_MIN_STYLE)
     # Y軸設定
     ax_press.set_yticks(y_tick_range, y_tick_labels, **Y_TICKS_STYLE)
     ax_press.set_ylim(BLOOD_PRESS_MIN, BLOOD_PRESS_MAX)
@@ -475,8 +441,7 @@ def plot(sess: scoped_session,
     # 脈拍プロット領域
     # X軸ラベル: '年/月'
     x_ticks, x_ticks_labels = makeDateTicks(
-        start_date, end_date, has_today=True if today_data is not None else False,
-        logger=logger, is_debug=is_debug
+        start_date, end_date, is_yearmonth=is_yearmonth, logger=logger, is_debug=is_debug
     )
     if is_debug:
         logger.debug(f"x_ticks: {x_ticks}")

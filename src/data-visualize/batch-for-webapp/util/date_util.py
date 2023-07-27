@@ -50,6 +50,44 @@ def check_str_date(s_date, fmt_date=FMT_ISO8601) -> bool:
         return False
 
 
+def check_str_time(s_time: str, has_second: bool=True) -> bool:
+    """
+    時刻文字列チェック ('時:分' | '時:分:秒' ※秒精度)
+    :param s_time:
+    :param has_second: 秒までの精度か, デフォルトTrue
+    :return: 妥当ならTrue, それ以外はFalse
+    """
+    if len(s_time)==0:
+        return False
+
+    # 時刻はコロン区切り
+    times: List = s_time.split(':')
+    times_size = len(times)
+    if times_size < 2 or times_size > 3:
+        return False
+
+    # 秒ありなら3分割, 秒なしなら2分割
+    if (has_second and times_size != 3) or (not has_second and times_size != 2):
+        return False
+
+    # 本日でチェックする
+    today: date = date.today()
+    s_today: str = today.isoformat()
+    check_datetime: str = f"{s_today} {s_time}"
+    fmt_datetime: str
+    if has_second:
+        # 時分秒
+        fmt_datetime = FMT_DATETIME
+    else:
+        # 時分まで
+        fmt_datetime = FMT_DATETIME_HM
+    try:
+        datetime.strptime(check_datetime, fmt_datetime)
+        return True
+    except ValueError:
+        return False
+
+
 def dateCompare(s_date1: str, s_date2: str) -> DateCompEnum:
     """
     s_date1(小さい想定の日付文字列) と s_date2(大きい想定の日付文字列)を比較する

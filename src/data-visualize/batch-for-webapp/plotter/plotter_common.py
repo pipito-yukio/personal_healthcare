@@ -1,11 +1,15 @@
 import enum
 import logging
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+import pandas as pd
+from pandas.core.frame import DataFrame
 
 from matplotlib import rcParams
 from matplotlib.axes import Axes
+
+from plotter.dao import COL_INDEX
 
 """
 matplotlibの描画時に使用する関数群
@@ -30,6 +34,25 @@ class DrawPosition(enum.Enum):
     """ テキスト表示位置 """
     BOTTOM = 0
     TOP = 1
+
+
+def rebuildIndex(df_org: DataFrame, s_start_date: str, s_end_date: str) -> Tuple[bool, Optional[DataFrame]]:
+    """
+    DataFrameのインデックス再構築が必要なら再構築する
+    :param df_org: オリジナルのDataFrame
+    :param s_start_date: 検索開始日
+    :param s_end_date: 最終日 (検索終了日 | 当日)
+    :return: 再構築ならTuple[True, 再構築後のDataFrame], それ以外[False, None]
+    """
+    df_size: int = len(df_org)
+    date_range: pd.DatetimeIndex = pd.date_range(s_start_date, s_end_date)
+    range_size: int = len(date_range)
+    if df_size < range_size:
+        # 欠損データ有りの場合はインデックスを振り直す
+        result: pd.DataFrame = df_org.reindex(pd.date_range(date_range, name=COL_INDEX))
+        return True, result
+    else:
+        return False, None
 
 
 def makeTitleWithMonthRange(s_start_date: str, s_end_date: str) -> str:

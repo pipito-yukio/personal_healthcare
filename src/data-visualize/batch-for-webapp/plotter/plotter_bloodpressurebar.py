@@ -13,16 +13,16 @@ from matplotlib.patches import Patch
 import numpy as np
 import pandas as pd
 from pandas.core.frame import DataFrame, Series
-from pandas.core.indexes.datetimes import DatetimeIndex
 
 from sqlalchemy.orm import scoped_session
 
-from plotter.common.todaydata import TodayBloodPress
-from plotter.plotter_bloodpressure import calcBloodPressureStatistics
 from plotter.common.constants import BEFORE_2WEEK_PERIODS
 from plotter.common.statistics import BloodPressStatistics
+from plotter.common.todaydata import TodayBloodPress
+from plotter.plotter_bloodpressure import calcBloodPressureStatistics, decideTargetValues
+from plotter.plotparameter import BloodPressUserTarget, PhoneImageInfo
 from plotter.plotter_common import (
-    DrawPosition, drawTextOverValue, makeTitleWithMonthRange, pixelToInch
+    DrawPosition, drawTextOverValue, makeTitleWithMonthRange, pixelToInch, rebuildIndex
 )
 from plotter.dao import (
     COL_INDEX, COL_MORNING_MAX, COL_MORNING_MIN, COL_EVENING_MAX, COL_EVENING_MIN,
@@ -147,25 +147,6 @@ def addTodayData(df_org: DataFrame, val_today: TodayBloodPress,
         return False, None
 
 
-def rebuildIndex(df_org: DataFrame, s_start_date: str, s_end_date: str) -> Tuple[bool, Optional[DataFrame]]:
-    """
-    DataFrameのインデックス再構築が必要なら再構築する
-    :param df_org: オリジナルのDataFrame
-    :param s_start_date: 検索開始日
-    :param s_end_date: 最終日 (検索終了日 | 当日)
-    :return: 再構築ならTuple[True, 再構築後のDataFrame], それ以外[False, None]
-    """
-    df_size: int = len(df_org)
-    date_range: DatetimeIndex = pd.date_range(s_start_date, s_end_date)
-    range_size: int = len(date_range)
-    if df_size < range_size:
-        # 欠損データ有りの場合はインデックスを振り直す
-        result: DataFrame = df_org.reindex(pd.date_range(date_range, name=COL_INDEX))
-        return True, result
-    else:
-        return False, None
-
-
 def makeColListForPlotting(df: DataFrame) -> Tuple[List[str], np.ndarray, np.ndarray]:
     """
     X軸用ラベルリスト、AM/PM毎の測定値をマージしたnp.ndarrayを生成する
@@ -196,10 +177,9 @@ def makeColListForPlotting(df: DataFrame) -> Tuple[List[str], np.ndarray, np.nda
 
 def plot(sess: scoped_session,
          email_address: str, end_date: str,
-         phone_pix_width: int, phone_pix_height: int, phone_density: float,
+         phone_image_info: PhoneImageInfo,
          today_data: TodayBloodPress = None,
-         user_target_max: int = None,
-         user_target_min: int = None,
+         user_target: BloodPressUserTarget = None,
          suppress_show_over: bool = False,
          logger: logging.Logger = None, is_debug=False
          ) -> Tuple[BloodPressStatistics, Optional[str]]:
@@ -208,12 +188,9 @@ def plot(sess: scoped_session,
     :param sess: SQLAlchemy scoped_session object
     :param email_address:
     :param end_date: 検索終了年月日
-    :param phone_pix_width:
-    :param phone_pix_height:
-    :param phone_density:
+    :param phone_image_info: 携帯端末の画像領域サイズ情報
     :param today_data: 当日AM血圧測定データ(テーブル未登録データ), default None
-    :param user_target_max: ユーザー目標最高血圧値 ※スマホからリクエストで設定される場合がある (端末で設定している場合)
-    :param user_target_min: ユーザー目標最低血圧値 ※スマホからリクエストで設定される場合がある (端末で設定している場合)
+    :param user_target: 血圧値のユーザー目標値 ※スマホからリクエストで設定される場合がある (端末で設定している場合)
     :param suppress_show_over: 基準値オーバー時の値を出力しない ※デフォルトFalseで出力する
     :param logger:
     :param is_debug:
@@ -221,10 +198,13 @@ def plot(sess: scoped_session,
     :raise: DatabaseError
     """
     # 目標値設定: 未設定ならデフォルト値設定
-    if user_target_max is None:
-        user_target_max = TARGET_PRESS_MAX
-    if user_target_min is None:
-        user_target_min = TARGET_PRESS_MIN
+    target_max: float
+    target_min: float
+    target_max, target_min = decideTargetValues(
+        TARGET_PRESS_MAX, TARGET_PRESS_MIN, user_target=user_target
+    )
+    if logger is not None and is_debug:
+        logger.debug(f"target_max: {target_max}, target_min: {target_min}")
 
     # 14日前の開始日を求める
     start_date: str = du.add_day_string(end_date, add_days=BEFORE_2WEEK_PERIODS)
@@ -298,7 +278,7 @@ def plot(sess: scoped_session,
 
     # 携帯用の描画領域サイズ(ピクセル)をインチに変換
     fig_width_inch, fig_height_inch = pixelToInch(
-        phone_pix_width, phone_pix_height, phone_density,
+        phone_image_info.px_width, phone_image_info.px_height, phone_image_info.density,
         logger=logger, is_debug=is_debug
     )
 
@@ -322,9 +302,9 @@ def plot(sess: scoped_session,
         bottom=press_min_values, color=bar_colors, **BAR_LINE_STYLE
     )
     # 目標血圧 (正常値): 最高血圧
-    ax.axhline(y=user_target_max, **TARGET_MAX_STYLE)
+    ax.axhline(y=target_max, **TARGET_MAX_STYLE)
     # 目標血圧 (正常値): 最低血圧
-    ax.axhline(y=user_target_min, **TARGET_MIN_STYLE)
+    ax.axhline(y=target_min, **TARGET_MIN_STYLE)
     ax.set_ylabel(Y_PRESSURE_LABEL)
     ax.set_title(plot_title, fontdict=TITLE_FONT_STYLE)
     # 最大値を+1することにより最大値が表示される
@@ -344,9 +324,9 @@ def plot(sess: scoped_session,
     if not suppress_show_over:
         # 基準値をオーバーした値を出力
         # 最高血圧: 基準値を超えた値のみを上端に表示
-        drawTextOverValue(ax, press_max_values, user_target_max)
+        drawTextOverValue(ax, press_max_values, target_max)
         # 最低血圧: 基準値を超えた値のみを下端に表示
-        drawTextOverValue(ax, press_min_values, user_target_min, draw_pos=DrawPosition.TOP)
+        drawTextOverValue(ax, press_min_values, target_min, draw_pos=DrawPosition.TOP)
     # 棒グラフ(AM/PM毎のカラー)の凡例を描画
     ax.legend(handles=[LEGEND_AM, LEGEND_PM], **LEGEND_STYLE)
     # 脈拍はプロットしない

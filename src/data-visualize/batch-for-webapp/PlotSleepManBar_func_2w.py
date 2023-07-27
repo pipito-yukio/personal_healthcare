@@ -1,8 +1,7 @@
 import argparse
-import base64
 import logging
 import os
-from typing import List
+from typing import List, Optional
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.url import URL
@@ -11,7 +10,9 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 
 from plotter.common.constants import BEFORE_2WEEK_PERIODS
 from plotter.common.todaydata import TodaySleepMan
+from plotter.plotter_sleepman import getTodayData
 from plotter.plotter_sleepmanbar import plot, SleepManStatistics
+from plotter.plotparameter import PhoneImageInfo
 import util.date_util as du
 from util.file_util import save_text
 from util.dbconn_util import getSQLAlchemyConnWithDict
@@ -59,7 +60,7 @@ if __name__ == '__main__':
     parser.add_argument("--end-date", type=str, required=True,
                         help="検索終了日 ISO-8601形式")
     # 当日データ (base64エンコード) ※未登録
-    parser.add_argument("--today-data", type=str, required=True,
+    parser.add_argument("--today-data", type=str, required=False,
                         help="当日データのbase64エンコード済み文字列")
     # ホスト名 ※任意 (例) raspi-4
     parser.add_argument("--db-host", type=str, help="Other database hostname.")
@@ -72,21 +73,24 @@ if __name__ == '__main__':
         app_logger.warning("Invalid day format!")
         exit(1)
 
-    # リクエストの当日データはカンマ区切り
-    encoded_today_data: str = args.today_data
-    # base64 decode return bytes
-    b_data: bytes = base64.b64decode(encoded_today_data)
-    # byte to string
-    raw_data: str = b_data.decode()
-    app_logger.info(f"raw_data: {raw_data}")
-    parts: List = raw_data.split(",")
-    # 睡眠スコアと夜間トイレ回数のみ整数変換
-    today_data: TodaySleepMan = TodaySleepMan(
-        measurement_day=parts[0], wakeup_time=parts[1],
-        midnight_toilet_visits=int(parts[2]), sleep_score=int(parts[3]),
-        sleeping_time=parts[4], deep_sleeping_time=parts[5]
+    # 携帯巻末の画像領域サイズ
+    phone_image_info: PhoneImageInfo = PhoneImageInfo(
+        px_width=PHONE_PX_WIDTH, px_height=PHONE_PX_HEIGHT, density=PHONE_DENSITY
     )
+    # リクエストの当日データ
+    encoded_today_data: str = args.today_data
+    app_logger.info(f"encoded_today_data: {encoded_today_data}")
+    today_data: Optional[TodaySleepMan]
+    if encoded_today_data is not None:
+        try:
+            today_data = getTodayData(encoded_today_data, logger=app_logger, is_debug=True)
+        except ValueError:
+            app_logger.warning("Encoded todayData is invalid format!")
+            exit(1)
+    else:
+        today_data = None
     app_logger.info(f"today_data: {today_data}")
+
     # 14日前の開始日を求める
     start_date: str = du.add_day_string(end_date, add_days=BEFORE_2WEEK_PERIODS)
     app_logger.info(f"start_date: {start_date}, end_date: {end_date}")
@@ -114,7 +118,7 @@ if __name__ == '__main__':
     try:
         statistics, html_img_src = plot(
             sess_obj, args.mail_address, start_date, end_date,
-            PHONE_PX_WIDTH, PHONE_PX_HEIGHT, PHONE_DENSITY,
+            phone_image_info,
             today_data=today_data,
             logger=app_logger, is_debug=True
         )

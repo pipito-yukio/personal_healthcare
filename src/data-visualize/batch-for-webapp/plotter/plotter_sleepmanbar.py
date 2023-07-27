@@ -19,7 +19,10 @@ from plotter.common.funcs import toMinute
 from plotter.common.statistics import SleepManStatistics
 from plotter.common.todaydata import TodaySleepMan
 from plotter.common.sleepmanutil import calcBedTime, minuteToFormatTime
-from plotter import pixelToInch, makeTitleWithMonthRange
+from plotter.plotter_common import (
+    makeTitleWithMonthRange, pixelToInch, rebuildIndex
+)
+from plotter.plotparameter import PhoneImageInfo
 from plotter.dao import (
     COL_INDEX, COL_WAKEUP, COL_SLEEP_SCORE, COL_SLEEPING, COL_DEEP_SLEEPING, COL_TOILET_VISITS,
     SleepManDao
@@ -193,38 +196,6 @@ def addTodayData(df_org: DataFrame, val_today: TodaySleepMan,
         return False, None
 
 
-def rebuildIndex(df_org: DataFrame, s_start_date: str,
-                 val_end_day: int = None,
-                 val_today: TodaySleepMan = None) -> Tuple[bool, Optional[DataFrame]]:
-    """
-    DataFrameのインデックス再構築が必要なら再構築する
-    :param df_org: オリジナルのDataFrame
-    :param s_start_date: 検索開始日
-    :param val_end_day: 月間データなら末日, それ以外はNone
-    :param val_today: 当日データオブジェクト デフォルトNone
-    :return: 再構築ならTuple[True, 再構築後のDataFrame], それ以外[False, None]
-    """
-    df_size: int = len(df_org)
-    # 指定範囲の日数
-    days_range: int
-    if val_today is None:
-        # 月間データ: 月末日未満の場合
-        days_range = val_end_day
-    else:
-        # 過去2週+当日データ: 範囲日数未満の場合
-        diff_days: int = du.diffInDays(s_start_date, val_today.measurement_day)
-        days_range = diff_days + 1
-    # 再インデックス判定
-    if df_size < days_range:
-        # 欠損データ有りの場合はインデックスを振り直す
-        result: DataFrame = df_org.reindex(
-            pd.date_range(start=s_start_date, periods=days_range, name=COL_INDEX)
-        )
-        return True, result
-    else:
-        return False, None
-
-
 def makeDateTextWithJpWeekday(iso_date: str) -> str:
     """
     X軸の日付ラベル文字列を生成する\n
@@ -290,7 +261,7 @@ def drawRectBackground(axes: Axes,
 
 def plot(sess: scoped_session,
          email_address: str, start_date: str, end_date: str,
-         phone_pix_width: int, phone_pix_height: int, phone_density: float,
+         phone_image_info: PhoneImageInfo,
          today_data: TodaySleepMan = None,
          logger: logging.Logger = None, is_debug=False) -> Tuple[SleepManStatistics, Optional[str]]:
     """
@@ -299,18 +270,13 @@ def plot(sess: scoped_session,
     :param email_address:
     :param start_date: 検索開始年月日
     :param end_date: 検索終了年月日
-    :param phone_pix_width:
-    :param phone_pix_height:
-    :param phone_density:
+    :param phone_image_info: 携帯端末の画像領域サイズ情報
     :param today_data: 当日睡眠管理データ(未登録), default None
     :param logger:
     :param is_debug:
     :return: tuple(統計情報, プロット画像のbase64文字列)
     :raise: DatabaseError
     """
-    # 検索終了年月日から日を取り出す
-    end_dates: List = end_date.split('-')
-    end_day: int = int(end_dates[2])
     # データベースから検索データ取得
     dao: SleepManDao = SleepManDao(
         email_address, start_date, end_date, parse_dates=[COL_INDEX],
@@ -381,7 +347,7 @@ def plot(sess: scoped_session,
     # 再インデックス処理
     has_rebuild: bool
     rebuild_df: DataFrame
-    has_rebuild, rebuild_df = rebuildIndex(df_data, start_date, end_day, today_data)
+    has_rebuild, rebuild_df = rebuildIndex(df_data, start_date, end_date)
     if has_rebuild:
         df_data = rebuild_df
         logger.debug(f"rebuild.df_data.size: {df_data.shape}")
@@ -390,7 +356,7 @@ def plot(sess: scoped_session,
 
     # 携帯用の描画領域サイズ(ピクセル)をインチに変換
     fig_width_inch, fig_height_inch = pixelToInch(
-        phone_pix_width, phone_pix_height, phone_density,
+        phone_image_info.px_width, phone_image_info.px_height, phone_image_info.density,
         logger=logger, is_debug=is_debug
     )
 
@@ -464,22 +430,22 @@ def plot(sess: scoped_session,
     # 非常に良い
     drawRectBackground(ax_main, SLEEP_TIME_MAX,
                        SLEEP_TIME_MAX * RATE_SCORE_BEST,
-                       X_LIM_MARGIN, end_day + X_LIM_MARGIN,
+                       X_LIM_MARGIN, plot_size + X_LIM_MARGIN,
                        facecolor=COLOR_SCORE_BEST)
     # 良い
     drawRectBackground(ax_main, SLEEP_TIME_MAX * RATE_SCORE_BEST,
                        SLEEP_TIME_MAX * RATE_SCORE_GOOD,
-                       X_LIM_MARGIN, end_day + X_LIM_MARGIN,
+                       X_LIM_MARGIN, plot_size + X_LIM_MARGIN,
                        facecolor=COLOR_SCORE_GOOD)
     # やや低い
     drawRectBackground(ax_main, SLEEP_TIME_MAX * RATE_SCORE_GOOD,
                        SLEEP_TIME_MAX * RATE_SCORE_BAD,
-                       X_LIM_MARGIN, end_day + X_LIM_MARGIN,
+                       X_LIM_MARGIN, plot_size + X_LIM_MARGIN,
                        facecolor=COLOR_SCORE_WORN, alpha=0.1)
     # 低い
     drawRectBackground(ax_main, SLEEP_TIME_MAX * RATE_SCORE_BAD,
                        SLEEP_TIME_MIN,
-                       X_LIM_MARGIN, end_day + X_LIM_MARGIN,
+                       X_LIM_MARGIN, plot_size + X_LIM_MARGIN,
                        facecolor=COLOR_SCORE_BAD, alpha=0.1)
 
     # 上端プロット領域

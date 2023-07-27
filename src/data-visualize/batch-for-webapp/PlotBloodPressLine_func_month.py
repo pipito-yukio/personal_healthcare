@@ -9,6 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 
 from plotter.plotter_bloodpressureline import plot, BloodPressStatistics
+from plotter.plotparameter import PhoneImageInfo, BloodPressUserTarget
 import util.date_util as du
 from util.file_util import save_text
 from util.dbconn_util import getSQLAlchemyConnWithDict
@@ -77,9 +78,12 @@ if __name__ == '__main__':
         app_logger.warning("Invalid day format!")
         exit(1)
 
+    # 携帯巻末の画像領域サイズ
+    phone_image_info: PhoneImageInfo = PhoneImageInfo(
+        px_width=PHONE_PX_WIDTH, px_height=PHONE_PX_HEIGHT, density=PHONE_DENSITY
+    )
     # ユーザ目標値
-    user_target_max: int = args.user_target_max
-    user_target_min: int = args.user_target_min
+    user_target: BloodPressUserTarget = BloodPressUserTarget(args.user_target_max, args.user_target_min)
     # その他オプション
     suppress_show_over: bool = args.suppress_show_over
     # 検索年月の月末日
@@ -110,8 +114,10 @@ if __name__ == '__main__':
     try:
         statistics, html_img_src = plot(
             sess_obj, args.mail_address, start_date, end_date,
-            PHONE_PX_WIDTH, PHONE_PX_HEIGHT, PHONE_DENSITY,
-            user_target_max=user_target_max, user_target_min=user_target_min,
+            phone_image_info,
+            is_yearmonth=True,
+            today_data=None,
+            user_target=user_target,
             suppress_show_over=suppress_show_over,
             logger=app_logger, is_debug=True
         )
