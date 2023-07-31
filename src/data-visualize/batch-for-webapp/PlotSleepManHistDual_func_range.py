@@ -8,7 +8,7 @@ from sqlalchemy.engine.url import URL
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 
-import plotter.plotter_sleepmanhistdual as sm_hist
+import plotter.plotter_sleepmanhistdual as sm_histdual
 from plotter.plotter_sleepmanbar import SleepManStatistics
 from plotter.plotparameter import PhoneImageInfo, getPhoneImageInfoFromHeader
 import util.date_util as du
@@ -115,7 +115,7 @@ if __name__ == '__main__':
     # 指定条件のグラフ生成
     html_img_src: str
     try:
-        statistics, html_img_src = sm_hist.plot(
+        statistics, html_img_src = sm_histdual.plot(
             sess_obj, args.mail_address, start_date, end_date,
             phone_image_info,
             logger=app_logger, is_debug=True

@@ -9,6 +9,7 @@ from sqlalchemy.engine.url import URL
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 
+import plotter.common.constants as plotter_const
 from plotter.common.todaydata import TodayBloodPress
 from plotter.plotparameter import (
     PhoneImageInfo, BloodPressUserTarget,
@@ -120,6 +121,11 @@ if __name__ == '__main__':
         today_data = None
     app_logger.info(f"today_data: {today_data}")
 
+    # 14日前の開始日を求める
+    start_date: str = du.add_day_string(
+        end_date, add_days=plotter_const.BEFORE_2WEEK_PERIODS)
+    app_logger.info(f"start_date: {start_date}, end_date: {end_date}")
+
     # データベースホスト ※未指定ならローカル
     db_host = args.db_host
     connDict: dict = getSQLAlchemyConnWithDict(DB_CONF, hostname=db_host)
@@ -142,7 +148,7 @@ if __name__ == '__main__':
     html_img_src: str
     try:
         statistics, html_img_src = plot(
-            sess_obj, args.mail_address, end_date,
+            sess_obj, args.mail_address, start_date, end_date,
             phone_image_info,
             today_data=today_data,
             user_target=user_target,

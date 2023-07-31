@@ -9,7 +9,7 @@ from sqlalchemy.engine.url import URL
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 
-from plotter.common.constants import BEFORE_2WEEK_PERIODS
+import plotter.common.constants as plotter_const
 from plotter.common.todaydata import TodayBloodPress
 from plotter.plotter_bloodpressure import getTodayData
 from plotter.plotter_bloodpressureline import plot, BloodPressStatistics
@@ -125,7 +125,8 @@ if __name__ == '__main__':
     app_logger.info(f"today_data: {today_data}")
 
     # 14日前の開始日を求める
-    start_date: str = du.add_day_string(end_date, add_days=BEFORE_2WEEK_PERIODS)
+    start_date: str = du.add_day_string(
+        end_date, add_days=plotter_const.BEFORE_2WEEK_PERIODS)
     app_logger.info(f"start_date: {start_date}, end_date: {end_date}")
 
     # データベースホスト ※未指定ならローカル

@@ -147,7 +147,7 @@ def makeColListForPlotting(df: DataFrame) -> Tuple[List[str], np.ndarray, np.nda
 
 
 def plot(sess: scoped_session,
-         email_address: str, end_date: str,
+         email_address: str, start_date: str, end_date: str,
          phone_image_info: PhoneImageInfo,
          today_data: TodayBloodPress = None,
          user_target: BloodPressUserTarget = None,
@@ -158,6 +158,7 @@ def plot(sess: scoped_session,
     指定された検索条件の睡眠管理データプロット画像のbase64文字列を取得する
     :param sess: SQLAlchemy scoped_session object
     :param email_address:
+    :param start_date: 検索開始年月日
     :param end_date: 検索終了年月日
     :param phone_image_info: 携帯端末の画像領域サイズ情報
     :param today_data: 当日AM血圧測定データ(テーブル未登録データ), default None
@@ -176,12 +177,6 @@ def plot(sess: scoped_session,
     )
     if logger is not None and is_debug:
         logger.debug(f"target_max: {target_max}, target_min: {target_min}")
-
-    # 14日前の開始日を求める
-    start_date: str = du.add_day_string(
-        end_date, add_days=plotter_const.BEFORE_2WEEK_PERIODS)
-    if logger is not None and is_debug:
-        logger.debug(f"start_date: {start_date}, end_date: {end_date}")
 
     dao: BloodPressureDao = BloodPressureDao(
         email_address, start_date, end_date, parse_dates=[COL_INDEX],
