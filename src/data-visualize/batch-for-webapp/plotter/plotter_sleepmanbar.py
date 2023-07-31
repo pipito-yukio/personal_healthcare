@@ -1,10 +1,7 @@
-import base64
 import logging
 from datetime import datetime
-from io import BytesIO
 from typing import Dict, List, Optional, Tuple
 
-import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
@@ -19,8 +16,9 @@ from plotter.common.funcs import toMinute
 from plotter.common.statistics import SleepManStatistics
 from plotter.common.todaydata import TodaySleepMan
 from plotter.common.sleepmanutil import calcBedTime, minuteToFormatTime
+from plotter.pandas_common import rebuildIndex
 from plotter.plotter_common import (
-    makeTitleWithMonthRange, pixelToInch, rebuildIndex
+    makeTitleWithMonthRange, pixelToInch, getHtmlImgSrcFromFigure
 )
 from plotter.plotparameter import PhoneImageInfo
 from plotter.dao import (
@@ -139,7 +137,7 @@ SCATTER_TOILET_VISITS_STYLE: Dict = {'color': 'blue', 's': 8.}
 AXES_GRID_STYLE: Dict = {'axis': 'y', 'linestyle': 'dashed', 'linewidth': 0.7,
                          'alpha': 0.75}
 # 上段プロット領域:下段プロット領域比
-GRID_SPEC_HEIGHT_RATIO: List[int] = [1, 5]
+GRID_SPEC_HEIGHT_RATIO: List[int] = [1, 6]
 # 凡例位置 (上端,右側) ※睡眠スコア値が上端にプロットされることはまれのためプロットが隠れることが無い
 LEGEND_LOC: str = 'upper right'
 
@@ -347,7 +345,9 @@ def plot(sess: scoped_session,
     # 再インデックス処理
     has_rebuild: bool
     rebuild_df: DataFrame
-    has_rebuild, rebuild_df = rebuildIndex(df_data, start_date, end_date)
+    has_rebuild, rebuild_df = rebuildIndex(
+        df_data, index_name=COL_INDEX, s_start_date=start_date, s_end_date=end_date
+    )
     if has_rebuild:
         df_data = rebuild_df
         logger.debug(f"rebuild.df_data.size: {df_data.shape}")
@@ -361,18 +361,13 @@ def plot(sess: scoped_session,
     )
 
     # 描画領域作成
-    fig: Figure
+    fig: Figure = Figure(figsize=(fig_width_inch, fig_height_inch), constrained_layout=True)
     #  (1)上段描画領域: 夜間トイレ回数 (Y軸), 就寝時間 (X軸)
     ax_top: Axes
     #  (2)下段描画領域: 睡眠管理データ
     ax_main: Axes
-    # https://stackoverflow.com/questions/34268742/how-to-use-gridspec-with-subplots
-    #  How to use `GridSpec()` with `subplots()`
-    # 上段エリア (補助プロット): 1, 下段エリア (メインプロット): 5
-    # 上段エリアのX軸に就寝時間を出力するため sharex=False (デフォルト) とする
-    fig, (ax_top, ax_main) = plt.subplots(
-        2, 1, gridspec_kw={'height_ratios': GRID_SPEC_HEIGHT_RATIO}, layout='constrained',
-        figsize=(fig_width_inch, fig_height_inch)
+    (ax_top, ax_main) = fig.subplots(
+        2, 1, gridspec_kw={'height_ratios': GRID_SPEC_HEIGHT_RATIO}
     )
     if is_debug:
         logger.debug(f"fig: {fig}, ax_top: {ax_top}, ax_main: {ax_main}")
@@ -463,12 +458,7 @@ def plot(sess: scoped_session,
     ax_top.set_xlim(X_LIM_MARGIN, plot_size + X_LIM_MARGIN)
     ax_top.set_xticks(x_indexes, top_x_ticks, **TOP_X_TICKS_STYLE)
 
-    # 画像をバイトストリームに溜め込みそれをbase64エンコードしてレスポンスとして返す
-    buf = BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight")
-    data = base64.b64encode(buf.getbuffer()).decode("ascii")
-    if logger is not None and is_debug:
-        logger.debug(f"data.len: {len(data)}")
-    img_src = f"data:image/png;base64,{data}"
+    # HTML用のimgSrc(base64エンコード済み)を取得
+    img_src: str = getHtmlImgSrcFromFigure(fig)
     # 統計情報と画像のTupleを返却
     return statistics, img_src

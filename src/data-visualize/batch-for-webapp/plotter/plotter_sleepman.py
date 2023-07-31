@@ -1,8 +1,9 @@
 import base64
 import binascii
 import logging
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
+from plotter.common.statistics import SleepManStatistics
 from plotter.common.todaydata import TodaySleepMan
 import util.date_util as du
 import util.numeric_util as nu
@@ -85,3 +86,14 @@ def getTodayData(encoded_today_data: str,
         sleeping_time=s_sleeping_time, deep_sleeping_time=s_deep__sleeping_time
     )
     return result
+
+
+def flattenStatistics(stat: SleepManStatistics) -> Tuple[str, int]:
+    """
+    睡眠管理統計情報の平均値(カンマ区切り)とレコード件数に分解したものを取得する
+    :param stat: 睡眠管理統計情報オブジェクト
+    :return: Tuple[平均値文字列(カンマ区切り), レコード件数]
+    """
+    # 平均値をカンマ区切りで連結
+    flatten: str = f"{stat.sleeping_mean},{stat.deep_sleeping_mean}"
+    return flatten, stat.record_size

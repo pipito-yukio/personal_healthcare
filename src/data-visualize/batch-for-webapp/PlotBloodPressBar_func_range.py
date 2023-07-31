@@ -2,6 +2,7 @@ import argparse
 import logging
 import os
 from typing import List, Optional
+from urllib import parse
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.url import URL
@@ -9,11 +10,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 
 from plotter.common.todaydata import TodayBloodPress
-from plotter.plotparameter import PhoneImageInfo, BloodPressUserTarget
+from plotter.plotparameter import (
+    PhoneImageInfo, BloodPressUserTarget,
+    getPhoneImageInfoFromHeader, getBloodPressUserTargetFromParameter
+)
 from plotter.plotter_bloodpressure import getTodayData
 from plotter.plotter_bloodpressurebar import plot, BloodPressStatistics
 import util.date_util as du
-from util.file_util import save_text
+import util.file_util as fu
 from util.dbconn_util import getSQLAlchemyConnWithDict
 
 """
@@ -30,11 +34,6 @@ LOG_FMT = '%(levelname)s %(message)s'
 
 # 健康管理データベース接続情報
 DB_CONF: str = os.path.join(os.path.expanduser("~/bin/conf"), "db_healthcare.json")
-
-# スマートフォンの描画領域サイズ (ピクセル): Google pixel 4a
-PHONE_PX_WIDTH: int = 980
-PHONE_PX_HEIGHT: int = 1200
-PHONE_DENSITY: float = 2.75
 
 OUT_HTML = """
 <!DOCTYPE html>
@@ -57,14 +56,15 @@ if __name__ == '__main__':
     # 検索最終日
     parser.add_argument("--end-date", type=str, required=False,
                         help="検索終了日 ISO-8601形式")
+    # スマートフォンの描画領域サイズ ※必須
+    parser.add_argument("--phone-image-info", type=str, required=True,
+                        help="スマートフォンの描画領域サイズ['幅,高さ,密度'] (例) '1064x1704x2.75'")
     # 当日データ (base64エンコード) ※未登録
     parser.add_argument("--today-data", type=str, required=False,
                         help="当日データのbase64エンコード済み文字列")
-    # 携帯端末のユーザー目標最大血圧値、最低血圧値
-    parser.add_argument("--user-target-max", type=int, required=False,
-                        help="ユーザー目標最大血圧値")
-    parser.add_argument("--user-target-min", type=int, required=False,
-                        help="ユーザー目標最低血圧値")
+    # 携帯端末のユーザー目標血圧値 ※urlエンコード済み文字列
+    parser.add_argument("--user-target", type=str, required=False,
+                        help="ユーザー目標血圧値 ※urlエンコード済み")
     # ホスト名 ※任意 (例) raspi-4
     parser.add_argument("--db-host", type=str, help="Other database hostname.")
     # 基準値オーバー数値の出力を抑止するか
@@ -81,12 +81,32 @@ if __name__ == '__main__':
         app_logger.warning(f"{end_date} is invalid date.")
         exit(1)
 
-    # 携帯巻末の画像領域サイズ
-    phone_image_info: PhoneImageInfo = PhoneImageInfo(
-        px_width=PHONE_PX_WIDTH, px_height=PHONE_PX_HEIGHT, density=PHONE_DENSITY
-    )
-    # ユーザ目標値
-    user_target: BloodPressUserTarget = BloodPressUserTarget(args.user_target_max, args.user_target_min)
+    # 携帯巻末の画像領域サイズチェック ※必須
+    phone_image_info: PhoneImageInfo
+    try:
+        phone_image_info = getPhoneImageInfoFromHeader(args.phone_image_info)
+        app_logger.info(f"{phone_image_info}")
+    except ValueError as err:
+        # 必須項目のため端末側にリクエストエラーを通知する必要がある
+        app_logger.warning(f"Invalid phone_image_info: {err}")
+        exit(1)
+
+    # ユーザ目標値 ※任意
+    encoded_user_target: str = args.user_target
+    user_target: Optional[BloodPressUserTarget]
+    if encoded_user_target is not None:
+        # urldecode
+        s_user_target: str = parse.unquote_plus(encoded_user_target)
+        try:
+            user_target = getBloodPressUserTargetFromParameter(s_user_target)
+        except ValueError as err:
+            # 値がある場合は端末側にリクエストエラーを通知する必要がある
+            app_logger.warning(f"Invalid user_target: {err}")
+            exit(1)
+    else:
+        user_target = None
+    app_logger.info(f"{user_target}")
+
     # その他オプション
     suppress_show_over: bool = args.suppress_show_over
 
@@ -141,4 +161,4 @@ if __name__ == '__main__':
     save_name = f"{script_names[0]}.html"
     save_path = os.path.join("output", save_name)
     app_logger.info(save_path)
-    save_text(save_path, html)
+    fu.save_text(save_path, html)

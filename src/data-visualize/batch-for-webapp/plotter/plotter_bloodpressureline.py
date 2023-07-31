@@ -1,11 +1,7 @@
-import base64
 import logging
-import os
 from datetime import datetime
-from io import BytesIO
 from typing import Dict, List, Optional, Tuple
 
-import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
@@ -17,9 +13,10 @@ from sqlalchemy.orm import scoped_session
 
 from plotter.common.statistics import BloodPressStatistics
 from plotter.common.todaydata import TodayBloodPress
+from plotter.pandas_common import rebuildIndex
 from plotter.plotter_bloodpressure import calcBloodPressureStatistics, decideTargetValues
 from plotter.plotter_common import (
-    DrawPosition, makeTitleWithMonthRange, pixelToInch, rebuildIndex
+    DrawPosition, makeTitleWithMonthRange, pixelToInch, getHtmlImgSrcFromFigure
 )
 from plotter.plotparameter import BloodPressUserTarget, PhoneImageInfo
 from plotter.dao import (
@@ -27,9 +24,12 @@ from plotter.dao import (
     COL_EVENING_MAX, COL_EVENING_MIN, COL_EVENING_PULSE,
     BloodPressureDao, SelectColumnsType
 )
+from plotter.plotter_bloodpressure import (
+    BLOOD_PRESS_MAX, BLOOD_PRESS_MIN, TARGET_PRESS_MAX, TARGET_PRESS_MIN, 
+    PULSE_MAX, PULSE_MIN, X_AXIS_ROTATION
+)
 import util.dataclass_util as dcu
 import util.date_util as du
-import util.file_util as fu
 from util.date_util import DateCompEnum
 
 """
@@ -38,34 +38,6 @@ from util.date_util import DateCompEnum
  (1) 過去2週間前 + 当日AM血圧測定データ(テーブル未登録): 14+1=15件数
  (2) 月間: 開始測定日, 終了測定日
 """
-
-# プロット可変設定
-PLOT_CONF: str = os.path.join("plotter", "conf", "plot_bloodpress.json")
-
-# 血圧値最小値
-DEF_BLOOD_PRESS_MAX: float = 180.
-DEF_BLOOD_PRESS_MIN: float = 40.
-DEF_PULSE_MAX: float = 110.
-DEF_PULSE_MIN: float = 40.
-# 家庭血圧: 75歳未満 (120 - 75)
-# 最高血圧の正常血圧: 115未満
-# 最低血圧の正常血圧: 75未満
-# (*) 最高血圧の正常高値血圧: 115〜124
-# (*) 最低血圧の正常高値血圧: 75未満
-DEF_TARGET_PRESS_MAX: float = 125.
-DEF_TARGET_PRESS_MIN: float = 75.
-# 設定値の上書き
-plot_conf: Dict = fu.read_json(PLOT_CONF)
-y_axis_bp: Dict = plot_conf["y_axis"]["blood_press"]
-y_axis_pr: Dict = plot_conf["y_axis"]["pulse_rate"]
-x_axis_rotation: float = plot_conf["x_axis"]["rotation"]
-bp_value: Dict = plot_conf["value"]["blood_press"]
-BLOOD_PRESS_MAX: float = y_axis_bp.get('max', DEF_BLOOD_PRESS_MAX)
-BLOOD_PRESS_MIN: float = y_axis_bp.get('min', DEF_BLOOD_PRESS_MIN)
-PULSE_MAX: float = y_axis_pr.get('max', DEF_PULSE_MAX)
-PULSE_MIN: float = y_axis_pr.get('min', DEF_PULSE_MIN)
-TARGET_PRESS_MAX: float = bp_value.get("target_max", DEF_TARGET_PRESS_MAX)
-TARGET_PRESS_MIN: float = bp_value.get("target_min", DEF_TARGET_PRESS_MIN)
 
 # X軸の日付間隔: 4日間隔 (1,5,...,25,末日)
 PLOT_DAY_INTERVAL: int = 4
@@ -116,7 +88,7 @@ PLOT_PM_MAX_STYLE: Dict = {'color': COLOR_PM_MAX, **PLOT_BASE_STYLE}
 PLOT_PM_MIN_STYLE: Dict = {'color': COLOR_PM_MIN, **PLOT_BASE_STYLE}
 PLOT_PM_PULSE_STYLE: Dict = {'color': COLOR_PM_MAX, **PLOT_BASE_STYLE}
 # X軸のラベル(日+曜日)スタイル
-X_TICKS_STYLE: Dict = {'fontsize': 10, 'fontweight': 'bold', 'rotation': x_axis_rotation}
+X_TICKS_STYLE: Dict = {'fontsize': 10, 'fontweight': 'bold', 'rotation': X_AXIS_ROTATION}
 Y_TICKS_STYLE: Dict = {'fontsize': 8.5}
 # 血圧の基準線の線スタイル
 TARGET_LINE_STYLE: Dict = {'linestyle': 'dashdot', 'linewidth': 1.0}
@@ -256,7 +228,8 @@ def drawTextOverValue(axes: Axes, values: np.ndarray, std_value: float,
                       draw_pos: DrawPosition = DrawPosition.BOTTOM,
                       draw_pos_margin: float = DRAW_POS_MARGIN) -> None:
     """1
-    基準値を超えた値を対応グラフの上部に表示する
+    基準値を超えた値を対応グラフの上部に表示する\n
+    ※ PM測定値の出力位置をAM措定値+1/2分右側にずらす
     :param axes: プロット領域
     :param values: 値のnp.ndarray
     :param measure_pm: PMの測定値がTrueなら出力位置をずらす
@@ -287,7 +260,9 @@ def drawTextOverValue(axes: Axes, values: np.ndarray, std_value: float,
             else:
                 draw_margin = val - draw_pos_margin
                 draw_style = DRAW_TEXT_TOP_STYLE
-            axes.text(x_pos, draw_margin, str(val), **draw_style)
+            # 数値を小数点なして出力する ※整数でも、浮動小数点数でもOK
+            # AM/PM測定値がないデータ(NaN)が含まれる列(Series)は全てfloatになる
+            axes.text(x_pos, draw_margin, f"{val:.0f}", **draw_style)
 
 
 def plot(sess: scoped_session,
@@ -364,7 +339,9 @@ def plot(sess: scoped_session,
     # 再インデックス処理
     has_rebuild: bool
     rebuild_df: DataFrame
-    has_rebuild, rebuild_df = rebuildIndex(df_data, start_date, end_date)
+    has_rebuild, rebuild_df = rebuildIndex(
+        df_data, index_name=COL_INDEX, s_start_date=start_date, s_end_date=end_date
+    )
     if has_rebuild:
         df_data = rebuild_df
         logger.debug(f"rebuild.df_data.size: {df_data.shape}")
@@ -378,15 +355,13 @@ def plot(sess: scoped_session,
     )
 
     # 描画領域作成
-    fig: Figure
+    fig: Figure = Figure(figsize=(fig_width_inch, fig_height_inch), constrained_layout=True)
     #  (1)上段描画領域: 血圧測定値
     ax_press: Axes
     #  (2)下段描画領域: 脈拍測定値
     ax_pulse: Axes
-    fig, (ax_press, ax_pulse) = plt.subplots(
-        # sharex=True is warning, type=str
-        2, 1, sharex='all', gridspec_kw={'height_ratios': [7, 3]}, layout='constrained',
-        figsize=(fig_width_inch, fig_height_inch)
+    (ax_press, ax_pulse) = fig.subplots(
+        2, 1, sharex=True, gridspec_kw={'height_ratios': [7, 3]}
     )
     if is_debug:
         logger.debug(f"fig: {fig}, ax_press: {ax_press}, ax_pulse: {ax_pulse}")
@@ -462,12 +437,7 @@ def plot(sess: scoped_session,
     ax_pulse.set_ylabel(Y_LABEL_PULSE)
     ax_pulse.legend(**LEGEND_STYLE)
 
-    # 画像をバイトストリームに溜め込みそれをbase64エンコードしてレスポンスとして返す
-    buf = BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight")
-    data = base64.b64encode(buf.getbuffer()).decode("ascii")
-    if logger is not None and is_debug:
-        logger.debug(f"data.len: {len(data)}")
-    img_src = f"data:image/png;base64,{data}"
+    # HTML用のimgSrc(base64エンコード済み)を取得
+    img_src: str = getHtmlImgSrcFromFigure(fig)
     # 統計情報と画像のTupleを返却
     return statistics, img_src

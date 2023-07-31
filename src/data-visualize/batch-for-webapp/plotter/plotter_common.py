@@ -1,25 +1,27 @@
+import base64
 import enum
 import logging
-from typing import Dict, List, Optional, Tuple
+from io import BytesIO
+from typing import Dict, List, Tuple
 
 import numpy as np
-import pandas as pd
-from pandas.core.frame import DataFrame
-
-from matplotlib import rcParams
+from plotter import font_conf
 from matplotlib.axes import Axes
-
-from plotter.dao import COL_INDEX
+from matplotlib.figure import Figure
+from matplotlib import rcParams
+rcParams['font.family'] = font_conf['font.family']
+font_family_font: str = 'font.' + font_conf['font.family']
+rcParams[font_family_font] = font_conf['japanese.font']
 
 """
 matplotlibの描画時に使用する関数群
 """
 
+
 # 期間タイトルフォーマット
 FMT_MEASUREMENT_RANGE: str = "【期間】{}〜{}"
-
+# テキスト表示位置マージン
 DRAW_POS_MARGIN: float = 0.5
-
 # 基準値を超えた値の表示文字列スタイル
 DRAW_TEXT_BASE_STYLE: Dict = {'color': 'red', 'fontsize': 8, 'fontweight': 'demibold',
                               'horizontalalignment': 'center'}
@@ -28,31 +30,16 @@ DRAW_TEXT_STYLE: Dict = {**DRAW_TEXT_BASE_STYLE, 'verticalalignment': 'bottom'}
 #  (2) 縦揃え: 上段 ※棒の下
 DRAW_TEXT_TOP_STYLE: Dict = {**DRAW_TEXT_BASE_STYLE, 'verticalalignment': 'top'}
 
+# HTMLのimgソースbase64エンコード文字列フォーマット
+FMT_IMG_SRC_BASE64: str = "data:image/png;base64,{}"
+SAVEFIG_DICT: Dict = {}
+
 
 # matplotlib描画用
 class DrawPosition(enum.Enum):
     """ テキスト表示位置 """
     BOTTOM = 0
     TOP = 1
-
-
-def rebuildIndex(df_org: DataFrame, s_start_date: str, s_end_date: str) -> Tuple[bool, Optional[DataFrame]]:
-    """
-    DataFrameのインデックス再構築が必要なら再構築する
-    :param df_org: オリジナルのDataFrame
-    :param s_start_date: 検索開始日
-    :param s_end_date: 最終日 (検索終了日 | 当日)
-    :return: 再構築ならTuple[True, 再構築後のDataFrame], それ以外[False, None]
-    """
-    df_size: int = len(df_org)
-    date_range: pd.DatetimeIndex = pd.date_range(s_start_date, s_end_date)
-    range_size: int = len(date_range)
-    if df_size < range_size:
-        # 欠損データ有りの場合はインデックスを振り直す
-        result: pd.DataFrame = df_org.reindex(pd.date_range(date_range, name=COL_INDEX))
-        return True, result
-    else:
-        return False, None
 
 
 def makeTitleWithMonthRange(s_start_date: str, s_end_date: str) -> str:
@@ -99,9 +86,8 @@ def drawTextOverValue(axes: Axes, values: np.ndarray, std_value: float,
             else:
                 draw_margin = val - draw_pos_margin
                 draw_style = DRAW_TEXT_TOP_STYLE
-            # 数値を整数化
-            int_val: int = round(val)
-            axes.text(x_idx, draw_margin, str(int_val), **draw_style)
+            # 数値を小数点なして出力する ※整数でも、浮動小数点数でもOK
+            axes.text(x_idx, draw_margin, f"{val:.0f}", **draw_style)
 
 
 def pixelToInch(width_px: int, height_px: int, density: float,
@@ -124,3 +110,22 @@ def pixelToInch(width_px: int, height_px: int, density: float,
         logger.debug(f"px[{density}]: {px}")
         logger.debug(f"fig_width_inch: {inch_width}, fig_height_inch: {inch_height}")
     return inch_width, inch_height
+
+
+def getHtmlImgSrcFromFigure(
+        figure: Figure,
+        logger: logging.Logger = None, is_debug: bool = False) -> str:
+    """
+    プロット画像のbase64エンコード文字列を取得する
+    :param figure: Figure
+    :param logger:
+    :param is_debug:
+    :return: プロット画像のbase64エンコード文字列
+    """
+    # 画像をバイトストリームに溜め込みそれをbase64エンコード文字列に変換する
+    buf = BytesIO()
+    figure.savefig(buf, format="png", bbox_inches="tight")
+    data = base64.b64encode(buf.getbuffer()).decode("ascii")
+    if logger is not None and is_debug:
+        logger.debug(f"data.len: {len(data)}")
+    return f"data:image/png;base64,{data}"

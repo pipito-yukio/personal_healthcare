@@ -9,9 +9,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 
 from plotter.plotter_sleepmanbar import plot, SleepManStatistics
-from plotter.plotparameter import PhoneImageInfo
+from plotter.plotparameter import PhoneImageInfo, getPhoneImageInfoFromHeader
 import util.date_util as du
-from util.file_util import save_text
+import util.file_util as fu
 from util.dbconn_util import getSQLAlchemyConnWithDict
 
 """
@@ -28,11 +28,6 @@ LOG_FMT = '%(levelname)s %(message)s'
 
 # 健康管理データベース接続情報
 DB_CONF: str = os.path.join(os.path.expanduser("~/bin/conf"), "db_healthcare.json")
-
-# スマートフォンの描画領域サイズ (ピクセル): Google pixel 4a
-PHONE_PX_WIDTH: int = 1064
-PHONE_PX_HEIGHT: int = 1704
-PHONE_DENSITY: float = 2.75
 
 OUT_HTML = """
 <!DOCTYPE html>
@@ -56,6 +51,9 @@ if __name__ == '__main__':
     # プロット対象年月
     parser.add_argument("--year-month", type=str, required=True,
                         help="年月 (例) 2023-04")
+    # スマートフォンの描画領域サイズ ※必須
+    parser.add_argument("--phone-image-info", type=str, required=True,
+                        help="スマートフォンの描画領域サイズ['幅,高さ,密度'] (例) '1064x1704x2.75'")
     # ホスト名 ※任意 (例) raspi-4
     parser.add_argument("--db-host", type=str, help="Other database hostname.")
     args: argparse.Namespace = parser.parse_args()
@@ -69,10 +67,15 @@ if __name__ == '__main__':
         app_logger.warning("Invalid day format!")
         exit(1)
 
-    # 携帯巻末の画像領域サイズ
-    phone_image_info: PhoneImageInfo = PhoneImageInfo(
-        px_width=PHONE_PX_WIDTH, px_height=PHONE_PX_HEIGHT, density=PHONE_DENSITY
-    )
+    # 携帯巻末の画像領域サイズチェック
+    phone_image_info: PhoneImageInfo
+    try:
+        phone_image_info = getPhoneImageInfoFromHeader(args.phone_image_info)
+        app_logger.info(f"{phone_image_info}")
+    except ValueError as err:
+        app_logger.warning(f"Invalid phone_image_info: {err}")
+        exit(1)
+
     # 検索年月の月末日
     end_day: int = du.calcEndOfMonth(year_month)
     # 検索年月の終了日文字列
@@ -100,7 +103,7 @@ if __name__ == '__main__':
     html_img_src: str
     try:
         statistics, html_img_src = plot(
-            sess_obj,args.mail_address, start_date, end_date,
+            sess_obj, args.mail_address, start_date, end_date,
             phone_image_info,
             today_data=None,
             logger=app_logger, is_debug=True
@@ -117,4 +120,4 @@ if __name__ == '__main__':
     save_name = f"{script_names[0]}.html"
     save_path = os.path.join("output", save_name)
     app_logger.info(save_path)
-    save_text(save_path, html)
+    fu.save_text(save_path, html)

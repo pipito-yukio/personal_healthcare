@@ -2,3 +2,4 @@
 
 # 過去14日 (指定日を-1日したもの)
 BEFORE_2WEEK_PERIODS: int = -13
+

@@ -1,28 +1,33 @@
 import argparse
 import logging
 import os
-from typing import List, Optional
-from urllib import parse
+from typing import List
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.url import URL
 from sqlalchemy import create_engine
-from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.orm import sessionmaker, scoped_session
 
-from plotter.plotter_bloodpressureline import plot, BloodPressStatistics
-from plotter.plotparameter import (
-    PhoneImageInfo, BloodPressUserTarget,
-    getPhoneImageInfoFromHeader, getBloodPressUserTargetFromParameter
-)
+import plotter.plotter_sleepmanhistdual as sm_hist
+from plotter.plotter_sleepmanbar import SleepManStatistics
+from plotter.plotparameter import PhoneImageInfo, getPhoneImageInfoFromHeader
 import util.date_util as du
-import  util.file_util as fu
+import util.file_util as fu
 from util.dbconn_util import getSQLAlchemyConnWithDict
 
 """
-■ Webアプリ用部品クラス作成用バッチスクリプト
-(2) 血圧測定データの折れ線グラフプロットスクリプト
- [期間] 月間
-  Webアプリ用部品クラスを呼び出す
+特定期間の睡眠スコアが下記条件に対応する並列のヒストグラムを描画する
+[結合するテーブル]
+  (A) 睡眠管理テーブル
+  (B) 夜間頻尿要因テーブル
+[フィルター条件]
+  (A) 睡眠スコア >=80
+  (B) 睡眠スコア <75
+[プロット列]
+  (1) 夜間トイレ回数 (SQLで取得)
+  (2) 睡眠時刻 (計算項目): 起床時刻(SQLで取得) - 睡眠時間(SQLで取得)
+  (3) 深い睡眠時間 (SQLで取得): 分に変換
+  (4) 睡眠時間 (SQLで取得)
 """
 
 # スクリプト名
@@ -42,6 +47,10 @@ OUT_HTML = """
 </html>
 """
 
+# スマートフォンの描画領域サイズ (ピクセル): Google pixel 4a
+# '1064x1704x2.75'
+
+
 if __name__ == '__main__':
     logging.basicConfig(format=LOG_FMT)
     app_logger = logging.getLogger(__name__)
@@ -51,65 +60,39 @@ if __name__ == '__main__':
     # メールアドレス (例) user1@examples.com
     parser.add_argument("--mail-address", type=str, required=True,
                         help="Healthcare Database Person mailAddress.")
-    # 年月
-    parser.add_argument("--year-month", type=str, required=True,
-                        help="年月 (例) 2023-04")
+    # 検索開始日
+    parser.add_argument("--start-date", type=str, required=True,
+                        help="2023-04-01")
+    # 検索終了日
+    parser.add_argument("--end-date", type=str, required=True,
+                        help="2023-04-30")
     # スマートフォンの描画領域サイズ ※必須
     parser.add_argument("--phone-image-info", type=str, required=True,
                         help="スマートフォンの描画領域サイズ['幅,高さ,密度'] (例) '1064x1704x2.75'")
-    # 携帯端末のユーザー目標血圧値 ※urlエンコード済み文字列
-    parser.add_argument("--user-target", type=str, required=False,
-                        help="ユーザー目標血圧値 ※urlエンコード済み")
     # ホスト名 ※任意 (例) raspi-4
     parser.add_argument("--db-host", type=str, help="Other database hostname.")
-    # 基準値オーバー数値の出力を抑止するか
-    # action - コマンドラインにこの引数があったときの基本のアクション
-    # 引数があれば True, なければ False
-    parser.add_argument("--suppress-show-over", action="store_true", help="Suppress value with standard over.")
-    parser.add_argument("--warning-over", action="store_false", help="Show value with warning over.")
     args: argparse.Namespace = parser.parse_args()
-    app_logger.info(args)
 
-    year_month: str = args.year_month
-    # 指定年月の開始日
-    start_date: str = f"{year_month}-01"
+    # 検索範囲
+    start_date = args.start_date
+    end_date = args.end_date
     # 日付文字列チェック
-    if not du.check_str_date(start_date):
-        app_logger.warning("Invalid day format!")
-        exit(1)
+    for i_date in [start_date, end_date]:
+        if not du.check_str_date(i_date):
+            app_logger.warning(f"Invalid date format ('YYYY-mm-dd'): {i_date}")
+            exit(1)
 
-    # 携帯巻末の画像領域サイズチェック ※必須
+    # 携帯巻末の画像領域サイズチェック
     phone_image_info: PhoneImageInfo
     try:
         phone_image_info = getPhoneImageInfoFromHeader(args.phone_image_info)
         app_logger.info(f"{phone_image_info}")
     except ValueError as err:
-        # 必須項目のため端末側にリクエストエラーを通知する必要がある
         app_logger.warning(f"Invalid phone_image_info: {err}")
         exit(1)
 
-    # ユーザ目標値 ※任意
-    encoded_user_target: str = args.user_target
-    user_target: Optional[BloodPressUserTarget]
-    if encoded_user_target is not None:
-        # urldecode
-        s_user_target: str = parse.unquote_plus(encoded_user_target)
-        try:
-            user_target = getBloodPressUserTargetFromParameter(s_user_target)
-        except ValueError as err:
-            # 値がある場合は端末側にリクエストエラーを通知する必要がある
-            app_logger.warning(f"Invalid user_target: {err}")
-            exit(1)
-    else:
-        user_target = None
-    app_logger.info(f"{user_target}")
-
-    # その他オプション
-    suppress_show_over: bool = args.suppress_show_over
-    # 検索年月の月末日
-    end_day: int = du.calcEndOfMonth(year_month)
-    # 検索年月の終了日文字列
-    end_date: str = f"{year_month}-{end_day:#02d}"
+    # 選択クエリーの主キー: メールアドレス
+    mail_address: str = args.mail_address
 
     # データベースホスト ※未指定ならローカル
     db_host = args.db_host
@@ -128,17 +111,13 @@ if __name__ == '__main__':
     app_logger.info(f"scoped_session: {sess_obj}")
 
     # 指定条件の統計情報
-    statistics: BloodPressStatistics
+    statistics: SleepManStatistics
     # 指定条件のグラフ生成
     html_img_src: str
     try:
-        statistics, html_img_src = plot(
+        statistics, html_img_src = sm_hist.plot(
             sess_obj, args.mail_address, start_date, end_date,
             phone_image_info,
-            is_yearmonth=True,
-            today_data=None,
-            user_target=user_target,
-            suppress_show_over=suppress_show_over,
             logger=app_logger, is_debug=True
         )
     except Exception as err:

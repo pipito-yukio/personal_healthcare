@@ -1,10 +1,11 @@
 import base64
 import binascii
 import logging
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from pandas.core.frame import DataFrame
 
+from plotter import plot_bloodpress_conf
 from plotter.common.statistics import BloodPressStatistics
 from plotter.common.todaydata import TodayBloodPress
 from plotter.dao import (
@@ -12,23 +13,51 @@ from plotter.dao import (
 )
 from plotter.plotparameter import BloodPressUserTarget
 import util.date_util as du
+import util.file_util as fu
 import util.numeric_util as nu
 
 """
 血圧測定データプロットに関する共通関数
 """
 
+# 血圧測定プロット可変設定
+# 血圧値最小値
+DEF_BLOOD_PRESS_MAX: float = 180.
+DEF_BLOOD_PRESS_MIN: float = 40.
+DEF_PULSE_MAX: float = 110.
+DEF_PULSE_MIN: float = 40.
+# 家庭血圧: 75歳未満 (120 - 75)
+# 最高血圧の正常血圧: 115未満
+# 最低血圧の正常血圧: 75未満
+# (*) 最高血圧の正常高値血圧: 115〜124
+# (*) 最低血圧の正常高値血圧: 75未満
+DEF_TARGET_PRESS_MAX: float = 125.
+DEF_TARGET_PRESS_MIN: float = 75.
+# 設定値の上書き
+
+_y_axis_bp: Dict = plot_bloodpress_conf["y_axis"]["blood_press"]
+_y_axis_pr: Dict = plot_bloodpress_conf["y_axis"]["pulse_rate"]
+_bp_value: Dict = plot_bloodpress_conf["value"]["blood_press"]
+BLOOD_PRESS_MAX: float = _y_axis_bp.get('max', DEF_BLOOD_PRESS_MAX)
+BLOOD_PRESS_MIN: float = _y_axis_bp.get('min', DEF_BLOOD_PRESS_MIN)
+PULSE_MAX: float = _y_axis_pr.get('max', DEF_PULSE_MAX)
+PULSE_MIN: float = _y_axis_pr.get('min', DEF_PULSE_MIN)
+TARGET_PRESS_MAX: float = _bp_value.get("target_max", DEF_TARGET_PRESS_MAX)
+TARGET_PRESS_MIN: float = _bp_value.get("target_min", DEF_TARGET_PRESS_MIN)
+# 傾斜角度
+X_AXIS_ROTATION: float = plot_bloodpress_conf["x_axis"]["rotation"]
+
 # 有効なカラム件数:
-VALID_COLUMN_CNT: int = 4
+_VALID_COLUMN_CNT: int = 4
 
 # 血圧値の許容範囲
-ALLOW_PRESS_MAX_UPPER: int = 200
-ALLOW_PRESS_MAX_LOWER: int = 70
-ALLOW_PRESS_MIN_UPPER: int = 140
-ALLOW_PRESS_MIN_LOWER: int = 20
+_ALLOW_PRESS_MAX_UPPER: int = 200
+_ALLOW_PRESS_MAX_LOWER: int = 70
+_ALLOW_PRESS_MIN_UPPER: int = 140
+_ALLOW_PRESS_MIN_LOWER: int = 20
 # 脈拍のの許容範囲
-ALLOW_PULSE_MAX: int = 150
-ALLOW_PULSE_MIN: int = 20
+_ALLOW_PULSE_MAX: int = 150
+_ALLOW_PULSE_MIN: int = 20
 
 
 def getTodayData(encoded_today_data: str,
@@ -56,7 +85,7 @@ def getTodayData(encoded_today_data: str,
         logger.debug(f"raw_data: {raw_data}")
     parts: List = raw_data.split(",")
     # カンマ区切りの件数チェック
-    if len(parts) != VALID_COLUMN_CNT:
+    if len(parts) != _VALID_COLUMN_CNT:
         raise ValueError
 
     # 測定日付チェック
@@ -72,7 +101,7 @@ def getTodayData(encoded_today_data: str,
         raise ValueError
 
     # 範囲チェック
-    if press_max < ALLOW_PRESS_MAX_LOWER or press_max > ALLOW_PRESS_MAX_UPPER:
+    if press_max < _ALLOW_PRESS_MAX_LOWER or press_max > _ALLOW_PRESS_MAX_UPPER:
         raise ValueError
 
     # AM最低血圧値
@@ -81,7 +110,7 @@ def getTodayData(encoded_today_data: str,
     if press_min is None:
         raise ValueError
 
-    if press_min < ALLOW_PRESS_MIN_LOWER or press_min > ALLOW_PRESS_MIN_UPPER:
+    if press_min < _ALLOW_PRESS_MIN_LOWER or press_min > _ALLOW_PRESS_MIN_UPPER:
         raise ValueError
 
     # AM脈拍
@@ -90,7 +119,7 @@ def getTodayData(encoded_today_data: str,
     if pulse_rate is None:
         raise ValueError
 
-    if pulse_rate < ALLOW_PULSE_MIN or pulse_rate > ALLOW_PULSE_MAX:
+    if pulse_rate < _ALLOW_PULSE_MIN or pulse_rate > _ALLOW_PULSE_MAX:
         raise ValueError
 
     # 血圧測定データの当日データ
@@ -160,3 +189,14 @@ def calcBloodPressureStatistics(
         am_max_mean, am_min_mean, pm_max_mean, pm_min_mean, df_all.shape[0]
     )
     return statistics
+
+
+def flattenStatistics(stat: BloodPressStatistics) -> Tuple[str, int]:
+    """
+    血圧測定統計情報の平均値(カンマ区切り)とレコード件数に分解したものを取得する
+    :param stat: 血圧測定統計情報オブジェクト
+    :return: Tuple[平均値文字列(カンマ区切り), レコード件数]
+    """
+    # 平均値をカンマ区切りで連結
+    flatten: str = f"{stat.am_max_mean},{stat.am_min_mean},{stat.pm_max_mean},{stat.pm_min_mean}"
+    return flatten, stat.record_size

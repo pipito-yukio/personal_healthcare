@@ -12,9 +12,9 @@ from plotter.common.constants import BEFORE_2WEEK_PERIODS
 from plotter.common.todaydata import TodaySleepMan
 from plotter.plotter_sleepman import getTodayData
 from plotter.plotter_sleepmanbar import plot, SleepManStatistics
-from plotter.plotparameter import PhoneImageInfo
+from plotter.plotparameter import PhoneImageInfo, getPhoneImageInfoFromHeader
 import util.date_util as du
-from util.file_util import save_text
+import  util.file_util as fu
 from util.dbconn_util import getSQLAlchemyConnWithDict
 
 """
@@ -31,11 +31,6 @@ LOG_FMT = '%(levelname)s %(message)s'
 
 # 健康管理データベース接続情報
 DB_CONF: str = os.path.join(os.path.expanduser("~/bin/conf"), "db_healthcare.json")
-
-# スマートフォンの描画領域サイズ (ピクセル): Google pixel 4a
-PHONE_PX_WIDTH: int = 1064
-PHONE_PX_HEIGHT: int = 1704
-PHONE_DENSITY: float = 2.75
 
 OUT_HTML = """
 <!DOCTYPE html>
@@ -59,7 +54,10 @@ if __name__ == '__main__':
     # 検索最終日 ※登録済みデータの最終レコードを想定
     parser.add_argument("--end-date", type=str, required=True,
                         help="検索終了日 ISO-8601形式")
-    # 当日データ (base64エンコード) ※未登録
+    # スマートフォンの描画領域サイズ ※必須
+    parser.add_argument("--phone-image-info", type=str, required=True,
+                        help="スマートフォンの描画領域サイズ['幅,高さ,密度'] (例) '1064x1704x2.75'")
+    # 当日データ (base64エンコード): 未登録データで任意
     parser.add_argument("--today-data", type=str, required=False,
                         help="当日データのbase64エンコード済み文字列")
     # ホスト名 ※任意 (例) raspi-4
@@ -73,10 +71,15 @@ if __name__ == '__main__':
         app_logger.warning("Invalid day format!")
         exit(1)
 
-    # 携帯巻末の画像領域サイズ
-    phone_image_info: PhoneImageInfo = PhoneImageInfo(
-        px_width=PHONE_PX_WIDTH, px_height=PHONE_PX_HEIGHT, density=PHONE_DENSITY
-    )
+    # 携帯巻末の画像領域サイズチェック
+    phone_image_info: PhoneImageInfo
+    try:
+        phone_image_info = getPhoneImageInfoFromHeader(args.phone_image_info)
+        app_logger.info(f"{phone_image_info}")
+    except ValueError as err:
+        app_logger.warning(f"Invalid phone_image_info: {err}")
+        exit(1)
+
     # リクエストの当日データ
     encoded_today_data: str = args.today_data
     app_logger.info(f"encoded_today_data: {encoded_today_data}")
@@ -134,4 +137,4 @@ if __name__ == '__main__':
     save_name = f"{script_names[0]}.html"
     save_path = os.path.join("output", save_name)
     app_logger.info(save_path)
-    save_text(save_path, html)
+    fu.save_text(save_path, html)
