@@ -5,17 +5,13 @@ import static com.examples.android.healthcare.functions.MyLogging.DEBUG_OUT;
 import android.os.Handler;
 import android.util.Log;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
-import com.examples.android.healthcare.data.GetCurrentDataResult;
-import com.examples.android.healthcare.data.RegisterResult;
 import com.examples.android.healthcare.data.ResponseStatus;
+import com.examples.android.healthcare.data.ResponseWarningStatus;
 
-import java.io.BufferedOutputStream;
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -125,9 +121,7 @@ public abstract class HealthcareRepository<T> {
                 String respText = getResponseText(conn.getErrorStream());
                 DEBUG_OUT.accept(TAG, "NG: " + respText);
                 // ウォーニング時のJSONはデータ部が存在しないのでウォーニング専用ハースを実行
-                T result = parseWarningJson(respText);
-                // ResponseStatusのみ, GET用Dataクラス == null
-                ResponseStatus status = ((GetCurrentDataResult) result).getStatus();
+                ResponseStatus status = getWarningStatus(respText);
                 DEBUG_OUT.accept(TAG, "NG.ResponseStatus: " + respText);
                 return new Result.Warning<>(status);
             }
@@ -186,9 +180,7 @@ public abstract class HealthcareRepository<T> {
                 String respText = getResponseText(conn.getErrorStream());
                 DEBUG_OUT.accept(TAG, "NG: " + respText);
                 // ウォーニング時のJSONはデータ部が存在しないのでウォーニング専用ハースを実行
-                T result = parseWarningJson(respText);
-                // ResponseStatusのみ, Post用Dataクラス == null
-                ResponseStatus status = ((RegisterResult) result).getStatus();
+                ResponseStatus status = getWarningStatus(respText);
                 DEBUG_OUT.accept(TAG, "NG.ResponseStatus: " + respText);
                 return new Result.Warning<>(status);
             }
@@ -216,19 +208,46 @@ public abstract class HealthcareRepository<T> {
     }
 
     /**
-     *
-     * @param pathIdx パスインデックス (1 - m)
-     * @return サブクラスが提供するパス
-     */
-    public abstract String getRequestPath(int pathIdx);
-
-    /**
      * 入力ストリームからJSON文字列を取得
      * @param is 入力ストリーム
      * @return JSON文字列
      * @throws IOException IO例外
      */
-    public abstract String getResponseText(InputStream is) throws IOException;
+    public String getResponseText(InputStream is) throws IOException {
+        StringBuilder sb;
+        try (BufferedReader bf = new BufferedReader
+                (new InputStreamReader(is, StandardCharsets.UTF_8))) {
+            String line;
+            sb = new StringBuilder();
+            while ((line = bf.readLine()) != null) {
+                sb.append(line);
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * ウォーニング時のレスポンスオブジェクトを取得する
+     * <pre>ウォーニング時にサーバーが返却するレスポンス例
+     {"status": {"code": 400,"message": "461,User is not found."}}
+     * </pre>
+     * @param jsonText ウォーニング用JSON文字列
+     * @return レスポンスオブジェクト<br/>
+     *   ResponseStatusオブジェクトのみがセットされDataオブジェクトはnullがセットされる
+     * @throws JsonParseException パース例外
+     */
+    public ResponseStatus getWarningStatus(String jsonText) throws JsonParseException {
+        Gson gson = new GsonBuilder().serializeNulls().create();
+        ResponseWarningStatus warningStatus = gson.fromJson(jsonText, ResponseWarningStatus.class);
+        return warningStatus.getStatus();
+    }
+
+    /**
+     * リクエストパスを取得する
+     * @param pathIdx パスインデックス (1 - m)
+     * @return サブクラスが提供するパス
+     */
+    public abstract String getRequestPath(int pathIdx);
 
     /**
      * HTTP 200(OK) レスポンス時のJSON文字列をパースしてJavaオブジェクトを生成
@@ -238,11 +257,4 @@ public abstract class HealthcareRepository<T> {
      */
     public abstract T parseResultJson(String jsonText) throws JsonParseException;
 
-    /**
-     * HTTP 4xx, 50x系レスポンス時のJSON文字列をパースしてJavaオブジェクトを生成
-     * @param jsonText ウォーニング用JSON文字列
-     * @return サブグラスが定義するウォーニング用Javaオブジェクトを生成
-     * @throws JsonParseException GSONのパース例外
-     */
-    public abstract T parseWarningJson(String jsonText) throws JsonParseException;
 }

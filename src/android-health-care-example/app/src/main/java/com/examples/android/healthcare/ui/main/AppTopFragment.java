@@ -7,7 +7,6 @@ import static com.examples.android.healthcare.functions.AppTopUtil.UPD_KEY_BLOOD
 import static com.examples.android.healthcare.functions.AppTopUtil.UPD_KEY_NOCT_FACT;
 
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
@@ -32,16 +31,16 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
-import androidx.preference.PreferenceManager;
 import androidx.viewbinding.BuildConfig;
 
+import com.examples.android.healthcare.tasks.RequestParamBuilder;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.examples.android.healthcare.ActivityUtil;
 import com.examples.android.healthcare.HealthcareApplication;
 import com.examples.android.healthcare.SharedPrefUtil;
 import com.examples.android.healthcare.R;
 
-import com.examples.android.healthcare.SettingsActivity;
 import com.examples.android.healthcare.constants.JsonTemplate;
 import com.examples.android.healthcare.constants.RequestDevice;
 import com.examples.android.healthcare.data.BloodPressure;
@@ -88,6 +87,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+/**
+ * アプリデータ登録フラグメント
+ */
 public class AppTopFragment extends Fragment {
     private static final String TAG = AppTopFragment.class.getSimpleName();
 
@@ -573,6 +575,8 @@ public class AppTopFragment extends Fragment {
         }
         DialogFragment fragment = EditDialogFragement.newInstance(title, value,
                 editInputType, listener);
+        // https://developer.android.com/guide/navigation/navigation-conditional?hl=ja
+        // requireActivity() == このFragmentを所有するMainActivityが指定される
         fragment.show(requireActivity().getSupportFragmentManager(), "EditDialogFragment");
     };
 
@@ -888,7 +892,7 @@ public class AppTopFragment extends Fragment {
     private void setTodayValue(TextView v) {
         Date now = new Date();
         // TAG値用の日付生成
-        String tagValue = String.format(AppTopUtil.ISO_8601_DATE_FORMAT, now);
+        String tagValue = String.format(Locale.US, AppTopUtil.ISO_8601_DATE_FORMAT, now);
         updateDateView(v, tagValue);
     }
 
@@ -1245,9 +1249,8 @@ public class AppTopFragment extends Fragment {
         // 健康状態メモの編集可チェックボックス
         CheckBox chkEditable = mainView.findViewById(R.id.chkConditionMemoEditable);
         // 編集可否チェックボックスリスナー
-        chkEditable.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            setEditTextSetting(mEditConditionMemo, isChecked);
-        });
+        chkEditable.setOnCheckedChangeListener(
+                (buttonView, isChecked) -> setEditTextSetting(mEditConditionMemo, isChecked));
         // チェックボックスのリセット用配列
         mAllCheckBoxes = new CheckBox[] {
                 mChkCoffee, mChkTea, mChkAlcohol, mChkNutritionDrink, mChkSportsDrink, mChkDiuretic,
@@ -1437,21 +1440,23 @@ public class AppTopFragment extends Fragment {
             DEBUG_OUT.accept(TAG, "selected: " + selectedLocal + " ,now: " + mNowLocalDate);
             if (selectedLocal.isBefore(mNowLocalDate)) {
                 // 過去日の場合はプリファレンスから登録済み日付を取得する (未登録ならnull)
-                String regDate = SharedPrefUtil.getLatestRegisteredDate(
-                        Objects.requireNonNull(getContext()));
+                // https://developer.android.com/kotlin/common-patterns?hl=ja
+                // Android APIの変更
+                String regDate = SharedPrefUtil.getLatestRegisteredDate(requireContext());
                 DEBUG_OUT.accept(TAG, String.format("Compare: %s =< %s", selectedLocal, regDate));
                 // カレンダー選択日が最新の登録済み日付以下ならリクエストする
                 // 過去日で登録済み日付を超える選択日は未登録日付なのでリクエストしない
                 if (AppTopUtil.isLessRegisteredDate(selectedLocal, regDate)) {
-                    String emailAddress = getUserEmailWithThisSettings();
-                    if (!TextUtils.isEmpty(emailAddress)) {
+                    String email = SharedPrefUtil.getEmailAddressInMainPrefScreen(requireContext());
+                    if (!TextUtils.isEmpty(email)) {
                         // 過去日は保存不可
                         mBtnSave.setEnabled(false);
                         // メールアドレスと選択した日付でサーバーから登録済みデータを取得
-                        sendGetCurrentDataRequest(emailAddress, tagValue);
+                        sendGetCurrentDataRequest(email, tagValue);
                     } else {
                         // メールアドレスの設定が必要
-                        showConfirmDialogWithEmailAddress();
+                        ActivityUtil.showConfirmDialogWithEmailAddress(
+                                (AppCompatActivity) requireActivity());
                     }
                 } else {
                     // 過去日でも新規登録なので新規登録モードにリセット
@@ -1637,10 +1642,10 @@ public class AppTopFragment extends Fragment {
             DEBUG_OUT.accept(TAG, "saved(" + fileName + "):\n"  + json);
             try {
                 // Jsonデータをファイル保存
-                FileManager.saveText(Objects.requireNonNull(getContext()), fileName, json);
+                FileManager.saveText(requireContext(), fileName, json);
                 // 日付をプリファレンスに保存する
-                SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInAppTop(
-                        Objects.requireNonNull(getContext())
+                SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
+                        requireContext()
                 );
                 SharedPreferences.Editor editor = sharedPref.edit();
                 editor.putString(prefKey, dateValue);
@@ -1701,7 +1706,7 @@ public class AppTopFragment extends Fragment {
      */
     private String generateJsonTextForUpdate() {
         // メールアドレス(必須)
-        String emailAddress = getUserEmailWithThisSettings();
+        String email = SharedPrefUtil.getEmailAddressInMainPrefScreen(requireContext());
         // 測定日付(必須)
         String iso8601DateValue = toStringOfTextViewBySelfTag(mInpMeasurementDate);
         // JSON整形なし
@@ -1779,7 +1784,7 @@ public class AppTopFragment extends Fragment {
         }
 
         // 更新用リクエスト用のJSON文字列をテンプレートから生成
-        String result = JsonTemplate.createUpdateJson(emailAddress, iso8601DateValue,
+        String result = JsonTemplate.createUpdateJson(email, iso8601DateValue,
                 healthcareDataJson, weatherDataJson);
         DEBUG_OUT.accept(TAG, result);
         return result;
@@ -1865,33 +1870,6 @@ public class AppTopFragment extends Fragment {
     }
 
     /**
-     * メールアドレス必須ダイアログ
-     * <ol>
-     * <li>OKボタン押下: メールアドレス設定アクティビィティに遷移する</li>
-     * <li>取消しボタン押下: 何もしない</li>
-     * </ol>
-     */
-    private void showConfirmDialogWithEmailAddress() {
-        ConfirmOkCancelListener listener = new ConfirmOkCancelListener() {
-            @Override
-            public void onOk() {
-                Intent settingsIntent = new Intent(requireActivity(), SettingsActivity.class);
-                startActivity(settingsIntent);
-            }
-
-            @Override
-            public void onCancel() {
-                // No operation.
-            }
-        };
-        ConfirmDialogFragment fragment = ConfirmDialogFragment.newInstance(
-                getString(R.string.warning_required_dialog_title),
-                getString(R.string.warning_need_email_address),
-                listener);
-        fragment.show(requireActivity().getSupportFragmentManager(), "ConfirmDialogFragment");
-    }
-
-    /**
      * ウォーニングメッセージを取得
      * @param status レスポンスステータス
      * @return ウォーニングメッセージ
@@ -1924,16 +1902,16 @@ public class AppTopFragment extends Fragment {
      */
     private void sendRegisterData() {
         // ネットワークデバイスが無効なら送信しない
-        RequestDevice device =  NetworkUtil.getActiveNetworkDevice(
-                Objects.requireNonNull(getContext()));
+        RequestDevice device =  NetworkUtil.getActiveNetworkDevice(requireContext());
         if (device == RequestDevice.NONE) {
             showDialogNetworkUnavailable();
             return;
         }
 
         // メールアドレスチェック
-        if (TextUtils.isEmpty(getUserEmailWithThisSettings())) {
-            showConfirmDialogWithEmailAddress();
+        if (TextUtils.isEmpty(SharedPrefUtil.getEmailAddressInMainPrefScreen(requireContext()))) {
+            ActivityUtil.showConfirmDialogWithEmailAddress(
+                    (AppCompatActivity) requireActivity());
             return;
         }
 
@@ -1982,7 +1960,7 @@ public class AppTopFragment extends Fragment {
                             if (result instanceof Result.Success) {
                                 // 更新前のプリファレンスから最新登録日付を取得する
                                 String before = SharedPrefUtil.getLatestRegisteredDate(
-                                        Objects.requireNonNull(getContext()));
+                                        requireContext());
                                 // 測定日付から登録日付を取得
                                 String after = toStringOfTextViewBySelfTag(mInpMeasurementDate);
                                 // 登録済みプリファレンスの上書き保存
@@ -2061,7 +2039,7 @@ public class AppTopFragment extends Fragment {
      * @param pastDay 過去の測定日付
      */
     private void sendGetCurrentDataRequest(String emailAddress, String pastDay) {
-        RequestDevice device =  NetworkUtil.getActiveNetworkDevice(getContext());
+        RequestDevice device =  NetworkUtil.getActiveNetworkDevice(requireContext());
         if (device == RequestDevice.NONE) {
             showDialogNetworkUnavailable();
             return;
@@ -2075,7 +2053,8 @@ public class AppTopFragment extends Fragment {
         HealthcareRepository<GetCurrentDataResult> repository = new GetCurrentDataRepository();
         String requestUrlWithPath = requestUrl + repository.getRequestPath(0);
         // リクエストパラメータ: 主キー項目(メールアドレス, 測定日付)
-        String requestParams = AppTopUtil.getRequestParams(emailAddress, pastDay);
+        RequestParamBuilder builder = new RequestParamBuilder(emailAddress);
+        String requestParams = builder.addMeasurementDay(pastDay).build();
         repository.makeGetRequest(0, requestUrl, requestParams, headers,
                 app.mEexecutor, app.mHandler, (result) -> {
                     // リクエストURLをAppBarに表示
@@ -2136,8 +2115,7 @@ public class AppTopFragment extends Fragment {
     private void loadJsonFromFile(JsonFileSaveTiming jsonFileType, String jsonFileName) {
         mHandler.post(() -> {
             try {
-                String json = FileManager.readText(Objects.requireNonNull(getContext()),
-                        jsonFileName);
+                String json = FileManager.readText(requireContext(), jsonFileName);
                 DEBUG_OUT.accept(TAG, "restore.json: " + json);
                 Gson gson = new Gson();
                 RegisterData data = gson.fromJson(json, RegisterData.class);
@@ -2169,7 +2147,7 @@ public class AppTopFragment extends Fragment {
      */
     private void restoreWidgetsFromJson() {
         // 一時保存日を取得
-        String savedDate = SharedPrefUtil.getLastSavedDate(Objects.requireNonNull(getContext()));
+        String savedDate = SharedPrefUtil.getLastSavedDate(requireContext());
         DEBUG_OUT.accept(TAG, "restore.lastSavedDate: " + savedDate);
         if (!TextUtils.isEmpty(savedDate)) {
             // JSONファイルから復元
@@ -2180,8 +2158,7 @@ public class AppTopFragment extends Fragment {
         }
 
         // 最新登録日を取得
-        String latestDate = SharedPrefUtil.getLatestRegisteredDate(
-                Objects.requireNonNull(getContext()));
+        String latestDate = SharedPrefUtil.getLatestRegisteredDate(requireContext());
         if (!TextUtils.isEmpty(latestDate)) {
             LocalDate latestLocal = LocalDate.parse(latestDate, DateTimeFormatter.ISO_LOCAL_DATE);
             DEBUG_OUT.accept(TAG, "latestDateLocal: " + latestLocal);
@@ -2204,7 +2181,7 @@ public class AppTopFragment extends Fragment {
      */
     private RegisterData generateRegisterData(){
         // メールアドレス(必須) ※健康管理アプリ設定のメールアドレス
-        String emailAddress = getUserEmailWithThisSettings();
+        String email = SharedPrefUtil.getEmailAddressInMainPrefScreen(requireContext());
         // 測定日付(必須)
         String iso8601DateValue = toStringOfTextViewBySelfTag(mInpMeasurementDate);
         // 睡眠管理
@@ -2230,7 +2207,7 @@ public class AppTopFragment extends Fragment {
         // 天候データコンテナ
         WeatherData weatherData = new WeatherData(weather);
         // 登録用データオブジェクト生成
-        return new RegisterData(emailAddress, iso8601DateValue, healthcareData, weatherData);
+        return new RegisterData(email, iso8601DateValue, healthcareData, weatherData);
     }
 
     /**
@@ -2246,18 +2223,30 @@ public class AppTopFragment extends Fragment {
      *    キー付きTAG値
      *  </li>
      *  <li>深い睡眠: スマートバンドの実測値<br/>
-     *    初期値と同じならはnull(※)、それ以外はキー付きTAG値
+     *    睡眠スコア未入力([改]2023-08-06)で初期値と同じならはnull(※)、それ以外はキー付きTAG値<br/>
+     *    ※深い睡眠が"00:00"も有りうるので睡眠スコアが入力されていれば初期値でも"00:00"を設定する
      *  </li>
      * </ol>
      *  (※)スマートバンドの電池切れなど測定不能のケースを考慮
      * @return 睡眠管理オブジェクト
      */
     private SleepManagement newSleepManagement() {
+        // 2023-08-06 スマートバンドで深い睡眠が"00:00"のケースが見つかる
+        // [原因] テーブル上ではNULLなので、睡眠時間が入力されていても棒がプロットされない
+        Integer sleepSocre = toIntegerOfNumberView(mInpSleepScore);
+        String deepSleepingTime = toStringOfTimeView(mInpDeepSleepingTime);
+        String realDeepSleep;
+        // [BUG修正] 睡眠スコア入力済みで深い睡眠がnullなら初期値"00:00"を深い睡眠に設定
+        if (sleepSocre != null && deepSleepingTime == null) {
+            realDeepSleep = getString(R.string.init_tag_time_value);
+        } else {
+            realDeepSleep = deepSleepingTime;
+        }
         SleepManagement result = new SleepManagement(
            toStringOfTimeView(mInpWakeupTime) /* 起床時刻 */,
-           toIntegerOfNumberView(mInpSleepScore) /* 睡眠スコア */,
-           toStringOfTimeView(mInpSleepingTime) /*睡眠時間 ※変更必須*/,
-           toStringOfTimeView(mInpDeepSleepingTime) /* 深い睡眠 */
+           sleepSocre /* 睡眠スコア */,
+           toStringOfTimeView(mInpSleepingTime) /*睡眠時間 ※必須に変更*/,
+           realDeepSleep /* 深い睡眠 */
         );
         DEBUG_OUT.accept(TAG, "newSleepManagement: " + result);
         return result;
@@ -2341,7 +2330,7 @@ public class AppTopFragment extends Fragment {
     private BodyTemperature newBodyTemperature() {
         // 体温 (任意)
         String sTemper = toStringOfTextView(mInpBodyTemper);
-        Double temper = (!TextUtils.isEmpty(sTemper)) ? Double.parseDouble(sTemper) : null;
+        Double temper = (sTemper != null) ? Double.parseDouble(sTemper) : null;
         // 体温測定時刻 (任意)
         String bodyMeasurementTime = toStringOfTimeView(mInpBodyTemperTime);
         return new BodyTemperature(bodyMeasurementTime, temper);
@@ -2556,8 +2545,7 @@ public class AppTopFragment extends Fragment {
      * 一時JSONファイルを削除する
      */
     private void deleteSavedFile() {
-        String lastDate = SharedPrefUtil.getLastSavedDate(
-                Objects.requireNonNull(getContext()));
+        String lastDate = SharedPrefUtil.getLastSavedDate(requireContext());
         String fileName =getString(R.string.last_saved_json_file);
         DEBUG_OUT.accept(TAG, "delete.lastDate: " + lastDate);
         if (TextUtils.isEmpty(lastDate)) {
@@ -2586,24 +2574,12 @@ public class AppTopFragment extends Fragment {
                 DEBUG_OUT.accept(TAG, "Not delete: " + jsonFile);
             }
             // プリファレンス取得
-            SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInAppTop(
-                    Objects.requireNonNull(getContext()));
+            SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(requireContext());
             SharedPreferences.Editor editor = sharedPref.edit();
             // キーを削除
             editor.remove(getString(R.string.sharedpref_saved_key));
             editor.commit();
         });
-    }
-
-    /**
-     * メール設定からメールアドレスを取得する
-     * @return メールアドレス
-     */
-    private String getUserEmailWithThisSettings() {
-        // https://developer.android.com/guide/topics/ui/settings/use-saved-values?hl=ja
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(
-                requireActivity());
-        return prefs.getString(getString(R.string.pref_emailaddress_key), null);
     }
 
     /**
@@ -2697,9 +2673,10 @@ public class AppTopFragment extends Fragment {
     private void showActionBarGetting(RequestDevice device) {
         ActionBar bar = ((AppCompatActivity)requireActivity()).getSupportActionBar();
         // AppBarタイトル: ネットワーク接続種別
+        assert bar != null;
         if (device == RequestDevice.MOBILE) {
             TelephonyManager manager =
-                    (TelephonyManager) getContext().getSystemService(Context.TELEPHONY_SERVICE);
+                    (TelephonyManager) requireContext().getSystemService(Context.TELEPHONY_SERVICE);
             // モバイル接続の場合はキャリア名にかっこ付きで表示
             String operatorName = manager.getNetworkOperatorName();
             bar.setTitle(device.getMessage() + " (" + operatorName +")");
@@ -2716,6 +2693,7 @@ public class AppTopFragment extends Fragment {
      */
     private void showActionBarResult(String reqUrlWithPath) {
         ActionBar bar = ((AppCompatActivity)requireActivity()).getSupportActionBar();
+        assert bar != null;
         bar.setSubtitle(reqUrlWithPath);
     }
 

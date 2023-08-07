@@ -103,7 +103,9 @@
     <string name="sharedpref_registered_key">last_registered_date</string>
     <!-- データ取得日付 -->
     <string name="sharedpref_get_current_key">get_current_date</string>
-    <!-- 保存JSONファイル名フォーマット(日付) -->
+    <!-- 初回登録日 -->
+    <string name="sharedpref_first_register_day_key">first_register_day</string>
+    <!-- 保存JSONファイル名 -->
     <string name="last_saved_json_file">last_saved.json</string>
     <!-- 登録済みJSONファイル名 -->
     <string name="latest_registered_json_file">latest_resitered.json</string>

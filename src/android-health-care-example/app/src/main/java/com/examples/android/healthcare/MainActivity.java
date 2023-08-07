@@ -20,18 +20,18 @@ import androidx.navigation.ui.AppBarConfiguration;
 import android.view.Menu;
 import android.view.MenuItem;
 
+/**
+ * アプリケーションメイン画面
+ */
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = MainActivity.class.getSimpleName();
 
-    private static final int FRAGMENT_APPTOP = 0;
-    private AppBarConfiguration appBarConfiguration;
-    private ActivityMainBinding binding;
+    private static final int FRAGMENT_APP_TOP = 0;
+//    private AppBarConfiguration appBarConfiguration;
 
     MultiScreenFragmentAdapter mFragmentAdapter;
     ViewPager2 mViewPager2;
     ViewPager2.OnPageChangeCallback mOnPageChangeCallback;
-//    private AppBarConfiguration appBarConfiguration;
-//    private ActivityMainBinding binding;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -85,7 +85,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (mOnPageChangeCallback != null) {
             int currentItem = mViewPager2.getCurrentItem();
-            if (currentItem == FRAGMENT_APPTOP) {
+            if (currentItem == FRAGMENT_APP_TOP) {
                 // 登録画面でバックキー押下なら最近の画面に残さない
                 // https://developer.android.com/guide/components/activities/recents?hl=ja#java
                 // 最近の画面

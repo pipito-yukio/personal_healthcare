@@ -21,13 +21,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class HealthcareApplication extends Application {
-    private static final String LOG_TAG = "WeatherApplication";
+    private static final String LOG_TAG = "HealthcareApplication";
     // Json file in assets for request.
     private static final String REQUEST_INFO_FILE = "request_info.json";
     private Map<String, String> mRequestUrls;
     private Map<String, String> mRequestHeaders;
     public ExecutorService mEexecutor = Executors.newFixedThreadPool(1);
     public Handler mHandler = HandlerCompat.createAsync(Looper.getMainLooper());
+    // 端末の画像領域サイズのヘッダーキー
+    public static final String REQUEST_IMAGE_SIZE_KEY = "X-Request-Image-Size";
 
     @Override
     public void onCreate() {

@@ -4,9 +4,6 @@ import android.text.TextUtils;
 
 import com.examples.android.healthcare.data.ResponseStatus;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.Calendar;
 import java.util.Map;
@@ -49,8 +46,6 @@ public class AppTopUtil {
     public static final String ISO_8601_DATE_FORMAT = "%tY-%<tm-%<td";
     // 体温表示フォーマット
     public static final String FMT_BODY_TEMPER = "%.1f";
-    // GETリクエストURLフォーマット
-    private static final String FMT_GET_CURRENT_DATA_PARAM = "?emailAddress=%s&measurementDay=%s";
 
     /**
      * 日付文字列をハイフンで分割して年月日の整数配列を取得する
@@ -84,25 +79,6 @@ public class AppTopUtil {
         // LocalDate.of(year, month:1 - 12, dayOfMonth)
         return LocalDate.of(cal.get(Calendar.YEAR),
                 cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH));
-    }
-
-    /**
-     * カレンダー選択年月日とが異なるかチェック
-     * @param calendarObj カレンダーオブジェクト年月日
-     * @param selectedYear 選択された年
-     * @param selectedMonth 選択された月
-     * @param selectedDayOfMonth 選択された日
-     * @return 異なったらtrue
-     */
-    public static boolean changeDateByDatePicker(Calendar calendarObj,
-            int selectedYear, int selectedMonth, int selectedDayOfMonth) {
-        // LocalDateのmonth=[1 - 12]
-        // 変更前のカレンダーオブジェクトから古いLocalDateを取得
-        LocalDate oldDate = localDateOfCalendar(calendarObj);
-        // 変更予定のLocalDateを取得
-        LocalDate newDate = LocalDate.of(
-                selectedYear, selectedMonth + 1, selectedDayOfMonth);
-        return !newDate.isEqual(oldDate);
     }
 
     /**
@@ -238,33 +214,6 @@ public class AppTopUtil {
             }
         }
         return message;
-    }
-
-    /**
-     * リクエストパラメータをエンコードする
-     * @param rawParam エンコード前のリクエストパラメータ
-     * @return エンコード後のリクエストパラメータ
-     */
-    public static String urlEncoded(String rawParam) {
-        try {
-            return URLEncoder.encode(rawParam, StandardCharsets.UTF_8.toString());
-        } catch (UnsupportedEncodingException e) {
-            return rawParam;
-        }
-    }
-
-    /**
-     * URLエンコード済みGET取得リクエストパラメータ文字列を取得する
-     * <p>?emailAddress=[encoded]&measurementDay=[encoded]</p>
-     * @param emailAddress メールアドレス (必須)
-     * @param measurementDay 登録日付文字列 (必須)
-     * @return URLエンコード済みGET取得リクエストパラメータ文字列
-     */
-    public static String getRequestParams(String emailAddress, String measurementDay) {
-        String encodedEmail = urlEncoded(emailAddress);
-        String encodedDay = urlEncoded(measurementDay);
-        return String.format(FMT_GET_CURRENT_DATA_PARAM,
-                encodedEmail, encodedDay);
     }
 
 }
