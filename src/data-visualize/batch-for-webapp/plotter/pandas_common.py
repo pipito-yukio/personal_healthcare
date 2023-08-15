@@ -24,7 +24,7 @@ def rebuildIndex(
     range_size: int = len(date_range)
     if df_size < range_size:
         # 欠損データ有りの場合はインデックスを振り直す
-        result: pd.DataFrame = df_org.reindex(pd.date_range(date_range, name=index_name))
+        result: pd.DataFrame = df_org.reindex(date_range)
         return True, result
     else:
         return False, None
