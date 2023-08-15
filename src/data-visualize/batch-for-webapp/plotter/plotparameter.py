@@ -47,7 +47,7 @@ def getPhoneImageInfoFromHeader(s_info: str) -> Optional[PhoneImageInfo]:
 def getBloodPressUserTargetFromParameter(s_target: str) -> Optional[BloodPressUserTarget]:
     """
     ユーザー指定の目標基準値文字列から血圧測定プロット用の目標基準値を取得する
-    [形式] カンマ区切り (例) '130,80'
+    [形式] カンマ区切り (例) '130,80' ※いずれか一方が未設定の場合 (例) '130,-1"も許容する
     :param s_target: リクエストパラメータから取得した目標基準値文字列 "最高血圧,最低血圧" 
     :return: エラーがなければ血圧測定プロット時の目標基準値オブジェクト
     :exception: ValueError

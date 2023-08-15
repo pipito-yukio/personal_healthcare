@@ -58,6 +58,8 @@ _ALLOW_PRESS_MIN_LOWER: int = 20
 # 脈拍のの許容範囲
 _ALLOW_PULSE_MAX: int = 150
 _ALLOW_PULSE_MIN: int = 20
+# ユーザー目標値が未設定
+USER_TARGET_NONE: int = -1
 
 
 def getTodayData(encoded_today_data: str,
@@ -136,17 +138,17 @@ def decideTargetValues(default_max: float, default_min: float,
     目標値 (最高血圧, 最低血圧)を決定する ※ユーザー目標値を優先する
     :param default_max: システム設定の最高血圧目標値
     :param default_min: システム設定の最低血圧目標値
-    :param user_target: ユーザー目標値
-    :return: ユーザー目標値 (最高血圧, 最低血圧)
+    :param user_target: ユーザー目標値 ※いずれか一方が未設定(=-1)の場合も許容
+    :return: ユーザー目標値 (最高血圧, 最低血圧) ※いずれか一方が未設定未設定の場合はデフォルト値
     """
     result_max: float
     result_min: float
     if user_target is not None:
-        if user_target.pressure_max is not None:
+        if user_target.pressure_max is not None and user_target.pressure_max != USER_TARGET_NONE:
             result_max = 1. * user_target.pressure_max
         else:
             result_max = default_max
-        if user_target.pressure_min is not None:
+        if user_target.pressure_min is not None and user_target.pressure_min != USER_TARGET_NONE:
             result_min = 1. * user_target.pressure_min
         else:
             result_min = default_min
