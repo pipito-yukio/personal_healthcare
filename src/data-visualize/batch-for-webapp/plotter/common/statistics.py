@@ -24,9 +24,9 @@ class BloodPressStatistics:
     am_max_mean: int
     # 午前の平均最低血圧
     am_min_mean: int
-    # 午前の平均最高血圧
+    # 午後の平均最高血圧
     pm_max_mean: int
-    # 午前の平均最低血圧
+    # 午後の平均最低血圧
     pm_min_mean: int
     # レコード件数
     record_size: int
