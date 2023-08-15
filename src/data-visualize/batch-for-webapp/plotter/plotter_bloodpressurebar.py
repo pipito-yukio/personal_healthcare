@@ -12,7 +12,6 @@ from pandas.core.frame import DataFrame, Series
 
 from sqlalchemy.orm import scoped_session
 
-import plotter.common.constants as plotter_const
 from plotter.common.statistics import BloodPressStatistics
 from plotter.common.todaydata import TodayBloodPress
 from plotter.pandas_common import rebuildIndex
