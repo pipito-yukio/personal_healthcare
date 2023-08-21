@@ -51,16 +51,19 @@ def getTodayData(encoded_today_data: str,
         raise ValueError
 
     # 時刻チェック
+    # 起床時刻 ※必須
     s_wakeup_time: str = parts[1]
+    # 睡眠時間 ※必須
     s_sleeping_time: str = parts[4]
-    s_deep__sleeping_time: str = parts[5]
-    for s_time in [s_wakeup_time, s_sleeping_time, s_deep__sleeping_time]:
+    # 深い睡眠 ※未設定(測定不能)の場合は "00:00"
+    s_deep_sleeping_time: str = parts[5]
+    for s_time in [s_wakeup_time, s_sleeping_time, s_deep_sleeping_time]:
         # 時刻文字列は "時:分"
         if not du.check_str_time(s_time, has_second=False):
             raise ValueError
 
     # 整数値チェック
-    # 夜間トイレ回数
+    # 夜間トイレ回数 ※一時保存で必須
     s_toilet_visits: str = parts[2]
     toilet_visits: Optional[int] = nu.convert_integer(s_toilet_visits)
     if toilet_visits is None:
@@ -70,20 +73,24 @@ def getTodayData(encoded_today_data: str,
     if toilet_visits < 0 or toilet_visits > MAX_VISITS:
         raise ValueError
 
-    # 睡眠スコア
+    # 睡眠スコア ※未設定の場合があり得る
     s_sleep_score: str = parts[3]
     sleep_score: Optional[int] = nu.convert_integer(s_sleep_score)
     if sleep_score is None:
         raise ValueError
 
     # 睡眠スコア範囲: 0-100
-    if sleep_score < 0 or sleep_score > 100:
-        raise ValueError
+    if sleep_score == -1:
+        # 2023-08-17: 未設定の場合 Androidアプリが -1 を設定する
+        sleep_score = None
+    else:
+        if sleep_score < 0 or sleep_score > 100:
+            raise ValueError
 
     result: TodaySleepMan = TodaySleepMan(
         measurement_day=s_date, wakeup_time=s_wakeup_time,
         midnight_toilet_visits=toilet_visits, sleep_score=sleep_score,
-        sleeping_time=s_sleeping_time, deep_sleeping_time=s_deep__sleeping_time
+        sleeping_time=s_sleeping_time, deep_sleeping_time=s_deep_sleeping_time
     )
     return result
 
