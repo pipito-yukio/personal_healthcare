@@ -88,7 +88,7 @@ PLOT_PM_MAX_STYLE: Dict = {'color': COLOR_PM_MAX, **PLOT_BASE_STYLE}
 PLOT_PM_MIN_STYLE: Dict = {'color': COLOR_PM_MIN, **PLOT_BASE_STYLE}
 PLOT_PM_PULSE_STYLE: Dict = {'color': COLOR_PM_MAX, **PLOT_BASE_STYLE}
 # X軸のラベル(日+曜日)スタイル
-X_TICKS_STYLE: Dict = {'fontsize': 10, 'fontweight': 'bold', 'rotation': X_AXIS_ROTATION}
+X_TICKS_STYLE: Dict = {'fontsize': 10, 'fontweight': 'normal', 'rotation': X_AXIS_ROTATION}
 Y_TICKS_STYLE: Dict = {'fontsize': 8.5}
 # 血圧の基準線の線スタイル
 TARGET_LINE_STYLE: Dict = {'linestyle': 'dashdot', 'linewidth': 1.0}
@@ -106,7 +106,7 @@ AXES_GRID_STYLE: Dict = {'axis': 'y', 'linestyle': 'dashed', 'linewidth': 0.7,
                          'alpha': 0.75}
 
 # タイトルスタイル
-TITLE_STYLE: Dict = {'fontsize': 11, 'fontweight': 'medium'}
+TITLE_STYLE: Dict = {'fontsize': 11, 'fontweight': 'normal'}
 # 凡例スタイル
 LEGEND_STYLE: Dict = {'loc': 'upper right', 'fontsize': 8}
 

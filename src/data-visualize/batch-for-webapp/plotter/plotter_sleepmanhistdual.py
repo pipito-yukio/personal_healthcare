@@ -85,7 +85,7 @@ BAR_COLOR_WARN: str = 'orangered'
 AXES_GRID_STYLE: Dict = {'axis': 'y', 'linestyle': 'dashed', 'linewidth': 0.7,
                          'alpha': 0.75}
 # X軸のラベルスタイル
-X_TICKS_STYLE: Dict = {'fontsize': 8, 'fontweight': 'heavy', 'rotation': 90}
+X_TICKS_STYLE: Dict = {'fontsize': 8, 'fontweight': 'normal', 'rotation': 90}
 # プロット領域のラベルスタイル
 LABEL_STYLE: Dict = {'fontsize': 9}
 # タイトルスタイル

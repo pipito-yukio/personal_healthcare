@@ -103,17 +103,17 @@ TOILET_VISITS_MAX: int = 7
 SCORE_LINE_STYLE: Dict = {'color': SCORE_LINE_COLOR, 'linewidth': 1.0}
 # 睡眠スコア折れ線グラフスタイル
 SCORE_TICKS_STYLE: Dict = {'color': SCORE_LINE_COLOR, 'fontsize': 9,
-                           'fontweight': 'demibold'}
+                           'fontweight': 'normal'}
 # 棒グラフの外郭線スタイル
 BAR_LINE_STYLE: Dict = {'edgecolor': 'black', 'linewidth': 0.7}
 # X軸のラベル(日+曜日)スタイル
-X_TICKS_STYLE: Dict = {'fontsize': 9, 'fontweight': 'heavy', 'rotation': 90}
+X_TICKS_STYLE: Dict = {'fontsize': 9, 'fontweight': 'normal', 'rotation': 90}
 # 上段: X軸のラベル(起床時間)スタイル
-TOP_X_TICKS_STYLE: Dict = {'fontsize': 9, 'fontweight': 'heavy', 'rotation': 90}
+TOP_X_TICKS_STYLE: Dict = {'fontsize': 9, 'fontweight': 'normal', 'rotation': 90}
 # 棒グラフの上部に出力する睡眠時間(時:分)のフォントスタイル
 TIME_TICKS_STYLE: Dict = {'fontsize': 9}
 # 睡眠時間用(時:分)スタイル: 黒
-PLOT_TEXT_STYLE: Dict = {'fontsize': 8, 'fontweight': 'demibold',
+PLOT_TEXT_STYLE: Dict = {'fontsize': 8, 'fontweight': 'normal',
                          'horizontalalignment': 'center', 'verticalalignment': 'bottom'}
 # タイトルスタイル
 TITLE_STYLE: Dict = {'fontsize': 11}

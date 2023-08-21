@@ -62,9 +62,9 @@ TARGET_MIN_STYLE: Dict = {'color': 'crimson', **TARGET_LINE_STYLE}
 AXES_GRID_STYLE: Dict = {'axis': 'y', 'linestyle': 'dashed', 'linewidth': 0.7,
                          'alpha': 0.75}
 # タイトルフォントスタイル
-TITLE_FONT_STYLE: Dict = {'fontsize': 10, 'fontweight': 'medium'}
+TITLE_FONT_STYLE: Dict = {'fontsize': 10, 'fontweight': 'normal'}
 # X軸のラベル(日+曜日)スタイル
-X_TICKS_STYLE: Dict = {'fontsize': 10, 'fontweight': 'bold', 'rotation': X_AXIS_ROTATION}
+X_TICKS_STYLE: Dict = {'fontsize': 10, 'fontweight': 'normal', 'rotation': X_AXIS_ROTATION}
 # 軸ラベルスタイル: y軸に設定
 Y_TICK_LABEL_PARAMS: Dict = {'axis': 'y', 'labelsize': 9}
 # 凡例スタイル
