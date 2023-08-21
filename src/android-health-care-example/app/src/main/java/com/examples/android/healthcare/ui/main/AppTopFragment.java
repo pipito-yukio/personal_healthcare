@@ -100,8 +100,24 @@ public class AppTopFragment extends Fragment {
     private static final Integer TAG_ID_BLOOD_PRESSURE_MIN = 3;
     private static final Integer TAG_ID_PULSE_RATE = 4;
 
-    public static AppTopFragment newInstance() {
-        return new AppTopFragment();
+    // https://developer.android.com/guide/components/fragments?hl=ja
+    //  フラグメント
+    /**
+     * コンストラクタ
+     * @param fragPosIdx フラグメント位置インデックス
+     * @return このフラグメント
+     */
+    public static AppTopFragment newInstance(int fragPosIdx) {
+        AppTopFragment frag = new AppTopFragment();
+        Bundle args = new Bundle();
+        args.putInt(FragmentUtil.FRAGMENT_POS_KEY, fragPosIdx);
+        frag.setArguments(args);
+        return frag;
+    }
+
+    public int getFragmentPosition() {
+        assert getArguments() != null;
+        return getArguments().getInt(FragmentUtil.FRAGMENT_POS_KEY, 0);
     }
 
     // 保存ボタン
@@ -152,6 +168,8 @@ public class AppTopFragment extends Fragment {
     private TextView mUnitBloodPressureMax;
     private TextView mUnitBloodPressureMin;
     private TextView mUnitPulseRate;
+    // ラジオグループ
+    private RadioGroup mRadioGroup;
     // 血圧測定: 午前・午後ラジオボタン
     private RadioButton mRadioMorning;
     private RadioButton mRadioEvening;
@@ -221,7 +239,7 @@ public class AppTopFragment extends Fragment {
      * @param dateText 日付文字列
      * @param showFmt 表示フォーマット
      */
-    private void showStatusWithPreocessDate(String dateText, String showFmt) {
+    private void showStatusWithProcessDate(String dateText, String showFmt) {
         if (mWarningStatus.getVisibility() == View.VISIBLE) {
             mWarningStatus.setVisibility(View.GONE);
             mTextStatus.setVisibility(View.VISIBLE);
@@ -404,8 +422,8 @@ public class AppTopFragment extends Fragment {
 
     /**
      * 自分自身のIDをキーにTextViwのTagから値を取得する
-     * @param tv TextViwe
-     * @return TextViweに格納しているTag値
+     * @param tv TextView
+     * @return TextViewに格納しているTag値
      */
     private String toStringOfTextViewBySelfTag(TextView tv) {
         return (String) tv.getTag(tv.getId());
@@ -442,7 +460,7 @@ public class AppTopFragment extends Fragment {
 
     //-- START TextViewのリストア系メソッド
     /**
-     * 時刻系入力ウィジット(TextViwe)を引数の時刻文字列で復元(表示)する
+     * 時刻系入力ウィジット(TextView)を引数の時刻文字列で復元(表示)する
      * @param restoreTime 時刻文字列 (null可)
      * @param tv 設定するTextView
      * @param showTimeFormat 表示時刻フォーマット
@@ -457,7 +475,7 @@ public class AppTopFragment extends Fragment {
     }
 
     /**
-     * 整数系入力ウィジット(TextViwe)に引数の整数オブジェクト復元(表示)する
+     * 整数系入力ウィジット(TextView)に引数の整数オブジェクト復元(表示)する
      * @param restoreNumber 整数オブジェクト (null可)
      * @param tv 設定するTextView
      */
@@ -480,7 +498,7 @@ public class AppTopFragment extends Fragment {
     };
 
     // RadioGroup: 午前/午後ラジオボタンの切替えイベント
-    private final RadioGroup.OnCheckedChangeListener mRadioChangedListener =
+    private final RadioGroup.OnCheckedChangeListener mRGrpChangedListener =
             new RadioGroup.OnCheckedChangeListener() {
         @Override
         public void onCheckedChanged(RadioGroup group, int checkedId) {
@@ -718,7 +736,7 @@ public class AppTopFragment extends Fragment {
                     beforeValue = sleepMan.getDeepSleepingTime();
                     tvLabel =  getString(R.string.lbl_deep_sleeping_time);
                 }
-                DEBUG_OUT.accept(TAG, "SleepManagment.viewId(" + viewId
+                DEBUG_OUT.accept(TAG, "SleepManagement.viewId(" + viewId
                         + "): after: " + setValue + ",before: " + beforeValue);
                 if (!TextUtils.equals(setValue, beforeValue)) {
                     String status = String.format(getString(R.string.status_onchange_with_item),
@@ -1118,7 +1136,7 @@ public class AppTopFragment extends Fragment {
      * </ol>
      * @param mainView フラグメントビュー
      */
-    private void initWidetsOfSleepManagement(View mainView) {
+    private void initWidgetsOfSleepManagement(View mainView) {
         // 1.起床時間
         mInpWakeupTime = mainView.findViewById(R.id.inpWakeupTime);
         // 2.夜間トイレ回数
@@ -1176,9 +1194,9 @@ public class AppTopFragment extends Fragment {
      * @param mainView フラグメントビュー
      */
     private void initWidgetsOfBloodPressure(View mainView) {
+        // ラジオグループ ※リスナー設定はonResume
+        mRadioGroup = mainView.findViewById(R.id.radioGroupBloodPressure);
         // ラジオボタン: 午前 / 午後
-        RadioGroup radioGroup = mainView.findViewById(R.id.radioGroupBloodPressure);
-        radioGroup.setOnCheckedChangeListener(mRadioChangedListener);
         mRadioMorning = mainView.findViewById(R.id.radioMorning);
         mRadioEvening = mainView.findViewById(R.id.radioEvening);
         mSelectedRadioId = mRadioMorning.getId();
@@ -1312,8 +1330,6 @@ public class AppTopFragment extends Fragment {
         mInpBodyTemperTime.setOnClickListener(mTimePickerViewClickListener);
         // BLEインポート
 //        mBtnBleImport = mainView.findViewById(R.id.btnBleImport);
-        //TODO 当面運用していないためリスナーを未定義とする
-        // mBtnBleImport.setOnClickListener();
     }
 
     /**
@@ -1329,19 +1345,20 @@ public class AppTopFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        View mainView = inflater.inflate(
-                R.layout.fragment_top_main, container, false);
+        DEBUG_OUT.accept(TAG, "onCreateView()");
 
         // 時刻フォーマット文字列取得
         mFmtShowTime = getString(R.string.format_show_time);
         mFmtShowRangeTime = getString(R.string.format_show_range_time);
+        View mainView = inflater.inflate(
+                R.layout.fragment_top_main, container, false);
         // 測定日付
         mInpMeasurementDate = mainView.findViewById(R.id.inpMeasurementDate);
         mInpMeasurementDate.setOnClickListener(mDatePickerViewClickListener);
         // 当日設定
         setTodayValue(mInpMeasurementDate);
         // 睡眠管理ウィジット初期化
-        initWidetsOfSleepManagement(mainView);
+        initWidgetsOfSleepManagement(mainView);
         // 血圧管理ウィジット初期化
         initWidgetsOfBloodPressure(mainView);
         // 体温インポート
@@ -1377,17 +1394,6 @@ public class AppTopFragment extends Fragment {
     }
 
     @Override
-    public void onPause() {
-        super.onPause();
-        DEBUG_OUT.accept(TAG, "onPause()");
-
-        // 更新チェック用リスナー削除
-        if (mRegisterDataForUpdate != null) {
-            terminateUpdateMonitor();
-        }
-    }
-
-    @Override
     public void onResume() {
         super.onResume();
         DEBUG_OUT.accept(TAG, "onResume()");
@@ -1398,6 +1404,27 @@ public class AppTopFragment extends Fragment {
         if (mRegisterDataForUpdate != null) {
             startUpdateMonitor();
         }
+        // ラジオグループのリスナー設定
+        mRadioGroup.setOnCheckedChangeListener(mRGrpChangedListener);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        DEBUG_OUT.accept(TAG, "onPause()");
+
+        // 更新チェック用リスナー削除
+        if (mRegisterDataForUpdate != null) {
+            terminateUpdateMonitor();
+        }
+        // ラジオグループのリスナー解除
+        mRadioGroup.setOnCheckedChangeListener(null);
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        DEBUG_OUT.accept(TAG, "onStop()");
     }
 
     /**
@@ -1456,7 +1483,7 @@ public class AppTopFragment extends Fragment {
                     } else {
                         // メールアドレスの設定が必要
                         ActivityUtil.showConfirmDialogWithEmailAddress(
-                                (AppCompatActivity) requireActivity());
+                                (AppCompatActivity) requireActivity(), getFragmentPosition());
                     }
                 } else {
                     // 過去日でも新規登録なので新規登録モードにリセット
@@ -1498,7 +1525,7 @@ public class AppTopFragment extends Fragment {
      * @param tagId TAGキーID
      * @return 引数データ
      */
-    private TimePickerFragment.TimeHolder getTimeHoler(View v, int tagId) {
+    private TimePickerFragment.TimeHolder getTimeHolder(View v, int tagId) {
         String tagValue = (String) v.getTag(tagId);
         TimePickerFragment.TimeHolder holder;
         if (!tagValue.equals(getString(R.string.init_tag_time_value))) {
@@ -1524,7 +1551,7 @@ public class AppTopFragment extends Fragment {
      * @param v 対象のビュー
      */
     private void showTimePicker(View v) {
-        TimePickerFragment.TimeHolder holder = getTimeHoler(v, v.getId());
+        TimePickerFragment.TimeHolder holder = getTimeHolder(v, v.getId());
         DialogFragment newFragment = new TimePickerFragment(
                 requireActivity(), holder, (view, hourOfDay, minute) -> {
             // 時刻フォーマット文字列
@@ -1552,7 +1579,7 @@ public class AppTopFragment extends Fragment {
      * @param v  血圧の測定時刻入力ウィジット
      */
     private void showBloodPressureTimePicker(View v) {
-        TimePickerFragment.TimeHolder holder = getTimeHoler(v, mSelectedRadioId);
+        TimePickerFragment.TimeHolder holder = getTimeHolder(v, mSelectedRadioId);
         DialogFragment newFragment = new TimePickerFragment(
                 requireActivity(), holder, (view, hourOfDay, minute) -> {
             // Tag値用のフォーマット
@@ -1590,18 +1617,17 @@ public class AppTopFragment extends Fragment {
                 String sNumber = String.valueOf(number);
                 inpView.setText(sNumber);
                 // 血圧入力項目は午前/午後それぞれのタグに値を保持する
-                switch (inpView.getId()) {
-                    case R.id.inpBloodPressureMax:
-                    case R.id.inpBloodPressureMin:
-                    case R.id.inpPulseRate:
-                        // タグには数値オブジェクトを入れる
-                        inpView.setTag(mSelectedRadioId, number);
-                        // 血圧測定数値ピッカー入力ウィジットの変更通知
-                        mOnBloodPressNumberChanged.onChanged(inpView, mSelectedRadioId, sNumber);
-                        break;
-                    default:
-                        // 上記以外の数値ピッカー入力ウィジットの変更通知
-                        mOnNumberViewChanged.onChanged(inpView, sNumber);
+                int inpViewId = inpView.getId();
+                if (inpViewId == R.id.inpBloodPressureMax
+                        || inpViewId == R.id.inpBloodPressureMin
+                        || inpViewId == R.id.inpPulseRate) {
+                    // タグには数値オブジェクトを入れる
+                    inpView.setTag(mSelectedRadioId, number);
+                    // 血圧測定数値ピッカー入力ウィジットの変更通知
+                    mOnBloodPressNumberChanged.onChanged(inpView, mSelectedRadioId, sNumber);
+                } else {
+                    // 上記以外の数値ピッカー入力ウィジットの変更通知
+                    mOnNumberViewChanged.onChanged(inpView, sNumber);
                 }
             }
             @Override
@@ -1840,7 +1866,7 @@ public class AppTopFragment extends Fragment {
     /**
      * 送信確認ダイアログ表示 (登録|更新)
      */
-    private void showConfimOkCancelDialog(ConfirmOkCancelListener listener) {
+    private void showConfirmOkCancelDialog(ConfirmOkCancelListener listener) {
         String message = String.format(
                 getString(R.string.confirm_message_with_send), mCurrentPostRequest.getName());
         ConfirmDialogFragment confirm = ConfirmDialogFragment.newInstance(
@@ -1911,7 +1937,7 @@ public class AppTopFragment extends Fragment {
         // メールアドレスチェック
         if (TextUtils.isEmpty(SharedPrefUtil.getEmailAddressInMainPrefScreen(requireContext()))) {
             ActivityUtil.showConfirmDialogWithEmailAddress(
-                    (AppCompatActivity) requireActivity());
+                    (AppCompatActivity) requireActivity(), getFragmentPosition());
             return;
         }
 
@@ -1953,7 +1979,7 @@ public class AppTopFragment extends Fragment {
                 DEBUG_OUT.accept(TAG, "requestUrlWithPath: " + requestUrlWithPath);
                 repository.makeRegisterRequest(urlNum, requestUrl, jsonText, headers,
                         app.mEexecutor, app.mHandler, (result) -> {
-                            // ボタン状態を戻す
+                            // ボタン復帰
                             mBtnSend.setEnabled(true);
                             // リクエストURLをAppBarに表示
                             showActionBarResult(requestUrlWithPath);
@@ -2030,7 +2056,7 @@ public class AppTopFragment extends Fragment {
             }
         };
         // 送信確認ダイアログ表示
-        showConfimOkCancelDialog(listener);
+        showConfirmOkCancelDialog(listener);
     }
 
     /**
@@ -2051,17 +2077,19 @@ public class AppTopFragment extends Fragment {
         Map<String, String> headers = app.getRequestHeaders();
         // GETリクエスト送信: 登録済みデータの取得
         HealthcareRepository<GetCurrentDataResult> repository = new GetCurrentDataRepository();
+        // for DEBUG
         String requestUrlWithPath = requestUrl + repository.getRequestPath(0);
+        DEBUG_OUT.accept(TAG, "requestUrlPath: " + requestUrlWithPath);
         // リクエストパラメータ: 主キー項目(メールアドレス, 測定日付)
         RequestParamBuilder builder = new RequestParamBuilder(emailAddress);
         String requestParams = builder.addMeasurementDay(pastDay).build();
         repository.makeGetRequest(0, requestUrl, requestParams, headers,
                 app.mEexecutor, app.mHandler, (result) -> {
+                    // ボタン復帰
+                    mBtnSend.setEnabled(true);
                     // リクエストURLをAppBarに表示
                     showActionBarResult(requestUrlWithPath);
 
-                    // 送信ボタンを戻す
-                    mBtnSend.setEnabled(true);
                     if (result instanceof Result.Success) {
                         GetCurrentDataResult dataResult =
                                 ((Result.Success<GetCurrentDataResult>) result).get();
@@ -2153,7 +2181,7 @@ public class AppTopFragment extends Fragment {
             // JSONファイルから復元
             loadJsonFromFile(JsonFileSaveTiming.SAVE, getString(R.string.last_saved_json_file));
             // ステータスに一時保存日付を表示
-            showStatusWithPreocessDate(savedDate, getString(R.string.status_saved_datefmt));
+            showStatusWithProcessDate(savedDate, getString(R.string.status_saved_datefmt));
             return;
         }
 
@@ -2169,7 +2197,7 @@ public class AppTopFragment extends Fragment {
                         getString(R.string.latest_registered_json_file));
             } // else {過去または翌日なら復元せず初期値のまま}
             // ステータスの最新登録日を表示
-            showStatusWithPreocessDate(latestDate,
+            showStatusWithProcessDate(latestDate,
                     getString(R.string.status_last_registered_datefmt));
         }
     }
@@ -2233,18 +2261,18 @@ public class AppTopFragment extends Fragment {
     private SleepManagement newSleepManagement() {
         // 2023-08-06 スマートバンドで深い睡眠が"00:00"のケースが見つかる
         // [原因] テーブル上ではNULLなので、睡眠時間が入力されていても棒がプロットされない
-        Integer sleepSocre = toIntegerOfNumberView(mInpSleepScore);
+        Integer sleepScore = toIntegerOfNumberView(mInpSleepScore);
         String deepSleepingTime = toStringOfTimeView(mInpDeepSleepingTime);
         String realDeepSleep;
         // [BUG修正] 睡眠スコア入力済みで深い睡眠がnullなら初期値"00:00"を深い睡眠に設定
-        if (sleepSocre != null && deepSleepingTime == null) {
+        if (sleepScore != null && deepSleepingTime == null) {
             realDeepSleep = getString(R.string.init_tag_time_value);
         } else {
             realDeepSleep = deepSleepingTime;
         }
         SleepManagement result = new SleepManagement(
            toStringOfTimeView(mInpWakeupTime) /* 起床時刻 */,
-           sleepSocre /* 睡眠スコア */,
+           sleepScore /* 睡眠スコア */,
            toStringOfTimeView(mInpSleepingTime) /*睡眠時間 ※必須に変更*/,
            realDeepSleep /* 深い睡眠 */
         );
@@ -2707,33 +2735,30 @@ public class AppTopFragment extends Fragment {
     private boolean isUpdateNocturiaFactors(NocturiaFactors orgFactors,
                                             CompoundButton cb, boolean isChecked) {
         boolean result;
-        switch (cb.getId()) {
-            case R.id.chkCoffee:
-                result = AppTopUtil.isDifferentFlagValue(orgFactors.hasCoffee(), isChecked);
-                break;
-            case R.id.chkTea:
-                result = AppTopUtil.isDifferentFlagValue(orgFactors.hasTea(), isChecked);
-                break;
-            case R.id.chkAlcohol:
-                result = AppTopUtil.isDifferentFlagValue(orgFactors.hasAlcohol(), isChecked);
-                break;
-            case R.id.chkNutritionDrink:
-                result = AppTopUtil.isDifferentFlagValue(orgFactors.hasNutritionDrink(), isChecked);
-                break;
-            case R.id.chkSportsDrink:
-                result = AppTopUtil.isDifferentFlagValue(orgFactors.hasSportsDrink(), isChecked);
-                break;
-            case R.id.chkDiuretic:
-                result = AppTopUtil.isDifferentFlagValue(orgFactors.hasDiuretic(), isChecked);
-                break;
-            case R.id.chkTakeMedicine:
-                result = AppTopUtil.isDifferentFlagValue(orgFactors.isTakeMedicine(), isChecked);
-                break;
-            case R.id.chkTakeBathing:
-                result = AppTopUtil.isDifferentFlagValue(orgFactors.isTakeBathing(), isChecked);
-                break;
-            default:
-                result = false;
+        // https://web.archive.org/web/20230203152426/http://tools.android.com/tips/non-constant-fields
+        //  Non-constant Fields in Case Labels
+        //  Resource IDs will be non-final by default in Android Gradle Plugin version 8.0,
+        //    avoid using them in switch case statements
+        // switch-case to if-else
+        int cbId = cb.getId();
+        if (cbId == R.id.chkCoffee) {
+            result = AppTopUtil.isDifferentFlagValue(orgFactors.hasCoffee(), isChecked);
+        } else if (cbId == R.id.chkTea) {
+            result = AppTopUtil.isDifferentFlagValue(orgFactors.hasTea(), isChecked);
+        } else if (cbId == R.id.chkAlcohol) {
+            result = AppTopUtil.isDifferentFlagValue(orgFactors.hasAlcohol(), isChecked);
+        } else if (cbId == R.id.chkNutritionDrink) {
+            result = AppTopUtil.isDifferentFlagValue(orgFactors.hasNutritionDrink(), isChecked);
+        } else if (cbId == R.id.chkSportsDrink) {
+            result = AppTopUtil.isDifferentFlagValue(orgFactors.hasSportsDrink(), isChecked);
+        } else if (cbId == R.id.chkDiuretic) {
+            result = AppTopUtil.isDifferentFlagValue(orgFactors.hasDiuretic(), isChecked);
+        } else if (cbId == R.id.chkTakeMedicine) {
+            result = AppTopUtil.isDifferentFlagValue(orgFactors.isTakeMedicine(), isChecked);
+        } else if (cbId == R.id.chkTakeBathing) {
+            result = AppTopUtil.isDifferentFlagValue(orgFactors.isTakeBathing(), isChecked);
+        } else {
+            result = false;
         }
         return result;
     }

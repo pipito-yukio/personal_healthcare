@@ -54,32 +54,7 @@ public class SharedPrefUtil {
     }
 
     /**
-     * 初回登録日をプリファレンスから取得する
-     * @param context Activityコンテキスト
-     * @return 設定済みなら初回登録日
-     */
-    public static String getFirstRegisterDay(Context context) {
-        SharedPreferences sharedPref = getSharedPrefInMainActivity(context);
-        String key = context.getString(R.string.sharedpref_first_register_day_key);
-        return sharedPref.getString(key, null);
-    }
-
-    /**
-     * 初回登録日をプリファレンスに保存する
-     * @param context Activityコンテキスト
-     * @param value 初回登録日
-     */
-    public static void saveFirstRegisterDay(Context context, String value) {
-        SharedPreferences sharedPref = getSharedPrefInMainActivity(context);
-        SharedPreferences.Editor editor = sharedPref.edit();
-        // 特に急がないので commitしない
-        editor.putString(context.getString(R.string.sharedpref_first_register_day_key),
-                value);
-        editor.apply();
-    }
-
-    /**
-     * メールアドレスをPreferenceScreenから取得する
+     * メールアドレスを取得する
      * @param context Activityコンテキスト
      * @return 設定済みならメールアドレス
      */

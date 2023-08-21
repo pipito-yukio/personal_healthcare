@@ -5,17 +5,11 @@ import static com.examples.android.healthcare.functions.MyLogging.DEBUG_OUT;
 import android.content.Intent;
 import android.os.Bundle;
 
-import com.examples.android.healthcare.databinding.ActivityMainBinding;
 import com.examples.android.healthcare.ui.main.AppTopFragment;
 import com.examples.android.healthcare.ui.main.MultiScreenFragmentAdapter;
 
 import androidx.appcompat.app.AppCompatActivity;
-
-import android.text.TextUtils;
-import android.util.Log;
-
 import androidx.viewpager2.widget.ViewPager2;
-import androidx.navigation.ui.AppBarConfiguration;
 
 import android.view.Menu;
 import android.view.MenuItem;
@@ -26,6 +20,7 @@ import android.view.MenuItem;
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = MainActivity.class.getSimpleName();
 
+    // トップ登録データ入力画面
     private static final int FRAGMENT_APP_TOP = 0;
 //    private AppBarConfiguration appBarConfiguration;
 
@@ -45,7 +40,7 @@ public class MainActivity extends AppCompatActivity {
         );
 
         // トップ画面フラグメント
-        mFragmentAdapter.addFragment(AppTopFragment.newInstance());
+        mFragmentAdapter.addFragment(AppTopFragment.newInstance(FRAGMENT_APP_TOP));
         mViewPager2.setOrientation(ViewPager2.ORIENTATION_HORIZONTAL);
         mViewPager2.setAdapter(mFragmentAdapter);
     }
@@ -60,7 +55,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageSelected(int position) {
                 super.onPageSelected(position);
-                Log.d(TAG, "position: " + position);
+                DEBUG_OUT.accept(TAG, "position: " + position);
             }
         };
         // ページャにコールバックを登録
@@ -84,6 +79,8 @@ public class MainActivity extends AppCompatActivity {
         DEBUG_OUT.accept(TAG, "onBackPressed()");
 
         if (mOnPageChangeCallback != null) {
+            // https://developer.android.com/develop/ui/views/animations/screen-slide-2
+            //  Slide between fragments using ViewPager2
             int currentItem = mViewPager2.getCurrentItem();
             if (currentItem == FRAGMENT_APP_TOP) {
                 // 登録画面でバックキー押下なら最近の画面に残さない

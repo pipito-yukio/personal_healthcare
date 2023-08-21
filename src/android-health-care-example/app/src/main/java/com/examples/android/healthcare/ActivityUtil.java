@@ -9,13 +9,16 @@ import com.examples.android.healthcare.dialogs.CustomDialogs;
 public class ActivityUtil {
     /**
      * メールアドレス必須ダイアログ
+     * <p>トップフラグメント画面以外で使用</p>
      * <ol>
      * <li>OKボタン押下: メールアドレス設定アクティビィティに遷移する</li>
      * <li>取消しボタン押下: 何もしない</li>
      * </ol>
      * @param activity AppCompatActivity
+     * @param fragmentPosition フラグメント位置 (0開始)
      */
-    public static void showConfirmDialogWithEmailAddress(AppCompatActivity activity) {
+    public static void showConfirmDialogWithEmailAddress(AppCompatActivity activity,
+                                                         int fragmentPosition) {
         CustomDialogs.ConfirmDialogFragment.ConfirmOkCancelListener listener =
                 new CustomDialogs.ConfirmDialogFragment.ConfirmOkCancelListener() {
                     @Override
@@ -26,7 +29,10 @@ public class ActivityUtil {
 
                     @Override
                     public void onCancel() {
-                        // No operation.
+                        // トップフラグメント以外でメールアドレスを設定しない場合はトップ画面に戻る
+                        if (fragmentPosition > 0) {
+                            activity.onBackPressed();
+                        }
                     }
                 };
         CustomDialogs.ConfirmDialogFragment fragment =
