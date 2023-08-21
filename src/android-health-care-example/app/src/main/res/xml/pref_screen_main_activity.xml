@@ -2,16 +2,46 @@
 <androidx.preference.PreferenceScreen
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <Preference
-        app:key="healthcare_request_user"
-        app:title="@string/pref_app_top_frag_title"
-        app:summary="@string/pref_app_top_frag_edit_main_summary"/>
+    <PreferenceCategory
+        app:key="category_request"
+        app:title="@string/pref_category_request_required_title">
+        <Preference
+            app:key="healthcare_request_user"
+            app:title="@string/pref_app_top_frag_title"
+            app:summary="@string/pref_app_top_frag_edit_main_summary"/>
+        <EditTextPreference
+            app:key="@string/pref_key_emailaddress"
+            app:title="@string/pref_app_top_frag_edit_mail_title"
+            app:useSimpleSummaryProvider="true"
+            app:dialogTitle="@string/pref_app_top_frag_dialog_title"
+            />
+    </PreferenceCategory>
 
-    <EditTextPreference
-        app:key="@string/pref_emailaddress_key"
-        app:title="@string/pref_app_top_frag_edit_mail_title"
-        app:useSimpleSummaryProvider="true"
-        app:dialogTitle="@string/pref_app_top_frag_dialog_title"
-        />
+    <PreferenceCategory
+        app:key="category_graph"
+        app:title="@string/pref_category_graph_title">
+        <Preference
+            app:key="graph_bp_target"
+            app:title="@string/pref_graph_bloodpress_title"
+            app:summary="@string/pref_graph_bloodpress_summary"/>
+
+        <ListPreference
+            app:key="@string/pref_key_bp_target_max"
+            app:title="@string/pref_bp_target_max_title"
+            app:useSimpleSummaryProvider="true"
+            app:entries="@array/bp_target_max_entiries"
+            app:entryValues="@array/bp_target_max_entory_values"
+            app:dialogTitle="@string/pref_bp_target_max_dialog_title"
+            />
+
+        <ListPreference
+            app:key="@string/pref_key_bp_target_min"
+            app:title="@string/pref_bp_target_min_title"
+            app:useSimpleSummaryProvider="true"
+            app:entries="@array/bp_target_min_entiries"
+            app:entryValues="@array/bp_target_min_entory_values"
+            app:dialogTitle="@string/pref_bp_target_min_dialog_title"
+            />
+    </PreferenceCategory>
 
 </androidx.preference.PreferenceScreen>

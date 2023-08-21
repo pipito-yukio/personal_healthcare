@@ -1,6 +1,7 @@
 <resources>
     <dimen name="measurement_day_padding">10dp</dimen>
     <dimen name="space_height">16dp</dimen>
+    <dimen name="space_img_frag_stat_height">6dp</dimen>
     <dimen name="card_elevation">3dp</dimen>
 
     <dimen name="text_margin_start">5dp</dimen>
@@ -11,13 +12,20 @@
     <dimen name="check_margin_end">5dp</dimen>
     <dimen name="radiogroup_margin_top">2dp</dimen>
     <dimen name="radiogroup_padding">2dp</dimen>
-    <dimen name="radio_margin_start">10dp</dimen>
+    <dimen name="radio_margin_start">5dp</dimen>
     <dimen name="padding_scrollview_top_bottom">5dp</dimen>
     <dimen name="padding_frame_top_bottom">2dp</dimen>
     <dimen name="padding_frame_left_right">5dp</dimen>
     <dimen name="unit_margin_start">5dp</dimen>
     <!-- 数値ピッカーダイアログ用TextView上端マージン -->
     <dimen name="inptextview_margin_top">8dp</dimen>
+    <!-- 画像表示フラグメントの統計情報用 -->
+    <dimen name="frag_top_radio_group_padding">2dp</dimen>
+    <dimen name="frag_stat_padding">4dp</dimen>
+    <dimen name="frag_stat_margin_rec_size">6dp</dimen>
+    <dimen name="frag_stat_margin_top">5dp</dimen>
+    <dimen name="frag_stat_margin_left">10dp</dimen>
+    <dimen name="frag_stat_margin_start2">4dp</dimen>
     <!-- 個別コントロール -->
     <dimen name="temper_margin_start">10dp</dimen>
     <dimen name="inp_midnighttoiletcount_width">40dp</dimen>
@@ -31,7 +39,11 @@
     <dimen name="alertdialog_numberpicker_width">128dp</dimen>
     <dimen name="alertdialog_numberpicker_margin_start">10dp</dimen>
     <!-- for ConstraintLayout -->
-    <dimen name="guideline_bigin">90dp</dimen>
+    <dimen name="guideline_begin">90dp</dimen>
     <!-- EditText area -->
     <dimen name="edit_area_height">90sp</dimen>
+    <!-- RadioButton small size -->
+    <dimen name="radio_small">0.90</dimen>
+    <!-- CheckBox size -->
+    <dimen name="check_small">0.90</dimen>
 </resources>

@@ -10,4 +10,28 @@
         <item>463,測定日付未設定</item>
         <item>559,データベースエラー</item>
     </string-array>
+    <string-array name="bp_target_max_entiries">
+        <item>(設定しない)</item>
+        <item>130</item>
+        <item>135</item>
+        <item>140</item>
+    </string-array>
+    <string-array name="bp_target_max_entory_values">
+        <item>-1</item>
+        <item>130</item>
+        <item>135</item>
+        <item>140</item>
+    </string-array>
+    <string-array name="bp_target_min_entiries">
+        <item>(設定しない)</item>
+        <item>80</item>
+        <item>85</item>
+        <item>90</item>
+    </string-array>
+    <string-array name="bp_target_min_entory_values">
+        <item>-1</item>
+        <item>80</item>
+        <item>85</item>
+        <item>90</item>
+    </string-array>
 </resources>

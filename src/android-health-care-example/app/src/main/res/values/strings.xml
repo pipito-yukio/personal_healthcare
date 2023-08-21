@@ -53,7 +53,7 @@
 
     <!-- 測定日付のテキスト幅設定目的 -->
     <string name="init_show_date_value">2023 年 01 月 01 日</string>
-    <string name="init_tag_date_value">2023-01-01</string>
+    <string name="init_tag_date_value">2023&#8211;01&#8211;01</string>
     <!-- TextViweの初期値 -->
     <string name="init_show_time_value">00 時 00 分</string>
     <string name="init_show_range_time_value">00 時間 00 分</string>
@@ -95,20 +95,55 @@
     <string name="status_saved_datefmt">保存中(%04d年%02d月%02d日)</string>
     <string name="status_registered_datefmt">登録済み(%04d年%02d月%02d日)</string>
     <string name="status_last_registered_datefmt">最新登録日(%04d年%02d月%02d日)</string>
+    <string name="dummy_status_text">ステータスライン</string>
     <!-- SharedPreference 保存キー -->
-    <string name="sharedpref_app_top_fragment">appTopFragment</string>
+    <string name="pref_app_top_fragment">appTopFragment</string>
     <!-- 最終保存日 -->
-    <string name="sharedpref_saved_key">last_saved_date</string>
+    <string name="pref_saved_key">last_saved_date</string>
     <!-- 最新登録日 -->
-    <string name="sharedpref_registered_key">last_registered_date</string>
+    <string name="pref_registered_key">last_registered_date</string>
     <!-- データ取得日付 -->
     <string name="sharedpref_get_current_key">get_current_date</string>
     <!-- 初回登録日 -->
-    <string name="sharedpref_first_register_day_key">first_register_day</string>
+    <string name="pref_first_register_day_key">first_register_day</string>
     <!-- 保存JSONファイル名 -->
     <string name="last_saved_json_file">last_saved.json</string>
     <!-- 登録済みJSONファイル名 -->
-    <string name="latest_registered_json_file">latest_resitered.json</string>
+    <string name="latest_registered_json_file">latest_registered.json</string>
+    <!-- 画像保存ファイル名 -->
+    <!-- 睡眠管理データ可視化プリファレンス -->
+    <!-- 画像ファイル名 -->
+    <string name="file_name_bp_line_ym">img_bp_line_ym.png</string>
+    <string name="file_name_bp_line_2w">img_bp_line_2w.png</string>
+    <string name="file_name_bp_bar_2w">img_bp_bar_2w.png</string>
+    <!-- プリファレンス保存キー -->
+    <string name="pref_key_bp_line_ym">img_bp_line_ym</string>
+    <string name="pref_key_bp_line_2w">img_bp_line_2w</string>
+    <string name="pref_key_bp_bar_2w">img_bp_bar_2w</string>
+    <!-- ラジオボタンの状態を保持するキー -->
+    <string name="pref_key_bp_stop_saved">frag_bp_stop_saved</string>
+    <string name="pref_key_bp_radio_ym">frag_bp_radio_ym</string>
+    <string name="pref_key_bp_radio_line">frag_bp_radio_line</string>
+    <!-- 統計情報(JSON文字列)の状態を保持するキー -->
+    <string name="pref_stat_bp_line_ym">frag_stat_bp_line_ym</string>
+    <string name="pref_stat_bp_line_2w">frag_stat_bp_line_2w</string>
+    <string name="pref_stat_bp_bar_2w">frag_stat_bp_bar_2w</string>
+    <!-- スピナーの選択された年月文字列(リクエストした場合に保存)を保持するキー -->
+    <string name="pref_key_bp_spinner_selected">frag_bp_spinner_selected</string>
+    <!-- 睡眠管理データ可視化プリファレンス -->
+    <string name="file_name_sm_bar_ym">img_sm_bar_ym.png</string>
+    <string name="file_name_sm_bar_2w">img_sm_bar_2w.png</string>
+    <string name="file_name_sm_hist_range">img_sm_hist_range.png</string>
+    <string name="pref_key_sm_bar_ym">img_sm_bar_ym</string>
+    <string name="pref_key_sm_bar_2w">img_sm_bar_2w</string>
+    <string name="pref_key_sm_hist_range">img_sm_hist_range</string>
+    <string name="pref_key_sm_stop_saved">frag_sm_stop_saved</string>
+    <string name="pref_key_sm_radio_ym">frag_sm_radio_ym</string>
+    <string name="pref_key_sm_radio_bar">frag_sm_radio_bar</string>
+    <string name="pref_stat_sm_bar_ym">frag_stat_sm_bar_ym</string>
+    <string name="pref_stat_sm_bar_2w">frag_stat_sm_bar_2w</string>
+    <string name="pref_stat_sm_hist_range">frag_stat_sm_hist_range</string>
+    <string name="pref_key_sm_spinner_selected">frag_sm_spinner_selected</string>
 
     <!-- ウォーニングメッセージ -->
     <string name="warning_need_email_address">ユーザ設定でメールアドレスを入力してください</string>
@@ -117,7 +152,7 @@
     <string name="warning_code_message">[%d] %s</string>
     <string name="warning_network_not_available">ネットワークが利用できません！</string>
     <string name="warning_register_with_2_reason">データ%sエラー (%s)</string>
-    <string name="warning_currentdata_with_reason">データ取得エラー (%s)</string>
+    <string name="warning_getdata_with_reason">データ取得エラー (%s)</string>
     <string name="exception_with_reason">サーバーエラー (%s)</string>
     <!-- ダイアログフラグメント -->
     <string name="confirm_dialog_title">送信確認</string>
@@ -137,11 +172,50 @@
     <string name="warning_data_already_resistered">データ登録済み</string>
     <string name="warning_unkown_with_reason">不明なエラー: %s</string>
 
-    <!-- Preference Titles -->
-    <string name="pref_app_top_frag_title">健康管理リクエスト用ユーザー設定</string>
-    <string name="pref_app_top_frag_edit_mail_title">メール設定</string>
-    <string name="pref_app_top_frag_dialog_title">メールアドレスの入力</string>
-    <string name="pref_app_top_frag_edit_main_summary">サーバーリクエストのためのメールアドレス設定</string>
-    <string name="pref_emailaddress_key">healthcare_user_email</string>
+    <!-- AppTopFragment -->
+    <string name="app_top_frag_title">健康管理データ登録</string>
+    <!-- AppBloodPressFramgent -->
+    <string name="imgfrag_bp_app_title">血圧測定データグラフ表示</string>
+    <!-- 統計情報 -->
+    <string name="label_frag_bp_statistics">統計情報 (平均血圧: mmHg)</string>
+    <string name="label_frag_stat_rec_size">件数</string>
+    <string name="label_frag_bp_measure_am">午前測定</string>
+    <string name="label_frag_bp_measure_pm">午後測定</string>
+    <string name="value_frag_stat_rec_count_blank">----</string>
+    <!-- AppSleepManFramgent -->
+    <string name="imgfrag_sm_app_title">睡眠管理データグラフ表示</string>
+    <string name="label_frag_sm_statistics">統計情報 (平均睡眠時間)</string>
+    <string name="value_frag_sm_stat_sleeping_blank">--:--</string>
+    <string name="value_frag_sm_stat_deep_blank">---</string>
+    <!-- 画像取得Framgent共通-->
+    <string name="img_content_description">Matplotlib output image</string>
+    <string name="imgfrag_radio_lbl_2w">２週間</string>
+    <string name="imgfrag_radio_lbl_ym">月間</string>
+    <string name="imgfrag_chk_lbl_today">本日含む</string>
+    <string name="imgfrag_radio_lbl_graph_line">折線グラフ</string>
+    <string name="imgfrag_radio_lbl_graph_bar">棒グラフ</string>
+    <string name="imgfrag_radio_lbl_graph_hist">ヒストグラム</string>
+    <string name="imgfrag_spiner_ym_prompt">年月選択</string>
+    <string name="imgfrag_btn_lbl_ima_request">最新取得</string>
+    <string name="imgfrag_chk_lbl_save">画像保存</string>
+
+    <!-- SettingsActivity preference Titles -->
+    <string name="pref_app_top_frag_title">ユーザー設定</string>
+    <string name="pref_app_top_frag_edit_mail_title">メールアドレスの設定</string>
+    <string name="pref_app_top_frag_dialog_title">メールアドレス</string>
+    <string name="pref_app_top_frag_edit_main_summary">サーバー処理のためのユーザー情報設定</string>
     <string name="title_activity_app_top_settings">健康管理アプリ設定画面</string>
+    <!-- SettingsActivity preference key entries -->
+    <string name="pref_key_emailaddress">healthcare_user_email</string>
+    <string name="pref_key_bp_target_max">bp_target_max</string>
+    <string name="pref_key_bp_target_min">bp_target_min</string>
+    <!-- Preference Graph Category  -->
+    <string name="pref_category_request_required_title">リクエスト必須設定</string>
+    <string name="pref_category_graph_title">可視化画像設定</string>
+    <string name="pref_graph_bloodpress_title">最高血圧・最低血圧のユーザー目標値 (任意)</string>
+    <string name="pref_graph_bloodpress_summary">サーバーでは最高血圧は125, 最低血圧は75に目標値を設定しています。\nこの値を上書きする場合は設定します。</string>
+    <string name="pref_bp_target_max_title">最高血圧 (mmHg)</string>
+    <string name="pref_bp_target_min_title">最低血圧 (mmHg)</string>
+    <string name="pref_bp_target_max_dialog_title">ユーザ目標値選択 (最高血圧)</string>
+    <string name="pref_bp_target_min_dialog_title">ユーザ目標値選択 (最低血圧)</string>
 </resources>

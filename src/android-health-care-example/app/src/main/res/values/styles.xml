@@ -19,12 +19,13 @@
     <style name="StyleEditNumberDecimal" parent="StyleEditNumbered">
         <item name="android:inputType">number|numberDecimal</item>
     </style>
-    <!-- Material.Titleを適用したTextView -->
+    <!-- タイトル用のTextView: textSize=18sp, textColor=textColorPrimary
+    <dimen name="text_size_large_material">18sp</dimen>
+    -->
     <style name="BaseTextViewTitle" parent="@android:style/TextAppearance.Material.Title">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
     </style>
-    <!-- タイトル用のTextView -->
     <style name="StyledTextViewTitle" parent="BaseTextViewTitle">
     </style>
     <!-- 単位用のTextView -->
@@ -55,6 +56,24 @@
     <style name="WarningStatusView" parent="StatusView">
         <item name="android:textColor">?attr/warningFgColor</item>
         <item name="android:background">?attr/warningBgDrawable</item>
+    </style>
+    <!-- キャプション用のTextView: textSize=15sp, textColor=textColorSecondary
+    <dimen name="text_size_small_material">14sp</dimen>
+     -->
+    <style name="BaseTextViewCaption" parent="@android:style/TextAppearance.Material.Caption">
+        <item name="android:textSize">15sp</item>
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+    </style>
+    <style name="StyledTextViewCaption" parent="BaseTextViewCaption">
+    </style>
+    <!-- 値用のTextView: textSize=15sp, textColor=textColorSecondary -->
+    <style name="BaseTextViewValue" parent="@android:style/TextAppearance.Material.Body2">
+        <item name="android:textSize">15sp</item>
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+    </style>
+    <style name="StyledTextViewValue" parent="BaseTextViewValue">
     </style>
 
     <!-- ピッカー系TextView(時刻表示、数値入力): 色付きフレーム付き -->
@@ -93,6 +112,11 @@
     <!-- ConstraintLayout用のカードスタイル -->
     <style name="StyleConstraintLayout" parent="StyleCardContainer">
         <item name="android:orientation">vertical</item>
+    </style>
+    <!-- ラジオスタイル -->
+    <style name="StyleCompactRadio">
+        <item name="android:scaleX">1.0</item>
+        <item name="android:scaleY">1.0</item>
     </style>
     <!-- LinearLayoutt用のカードスタイル -->
     <style name="StyleLinearLayout" parent="StyleCardContainer">

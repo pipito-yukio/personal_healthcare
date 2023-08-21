@@ -5,6 +5,8 @@ import static com.examples.android.healthcare.functions.MyLogging.DEBUG_OUT;
 import android.content.Intent;
 import android.os.Bundle;
 
+import com.examples.android.healthcare.ui.main.AppBloodPressFragment;
+import com.examples.android.healthcare.ui.main.AppSleepManFragment;
 import com.examples.android.healthcare.ui.main.AppTopFragment;
 import com.examples.android.healthcare.ui.main.MultiScreenFragmentAdapter;
 
@@ -22,6 +24,10 @@ public class MainActivity extends AppCompatActivity {
 
     // トップ登録データ入力画面
     private static final int FRAGMENT_APP_TOP = 0;
+    // 血圧測定データグラフ表示画面
+    private static final int FRAGMENT_BLOOD_PRESS = 1;
+    // 睡眠管理データグラフ表示画面
+    private static final int FRAGMENT_SLEEP_MAN = 2;
 //    private AppBarConfiguration appBarConfiguration;
 
     MultiScreenFragmentAdapter mFragmentAdapter;
@@ -41,6 +47,10 @@ public class MainActivity extends AppCompatActivity {
 
         // トップ画面フラグメント
         mFragmentAdapter.addFragment(AppTopFragment.newInstance(FRAGMENT_APP_TOP));
+        // 血圧測定データ画像表示フラグメント
+        mFragmentAdapter.addFragment(AppBloodPressFragment.newInstance(FRAGMENT_BLOOD_PRESS));
+        // 睡眠管理データ画像表示フラグメント
+        mFragmentAdapter.addFragment(AppSleepManFragment.newInstance(FRAGMENT_SLEEP_MAN));
         mViewPager2.setOrientation(ViewPager2.ORIENTATION_HORIZONTAL);
         mViewPager2.setAdapter(mFragmentAdapter);
     }
@@ -91,9 +101,13 @@ public class MainActivity extends AppCompatActivity {
                 // AppTask クラスを使用したタスクの削除
                 DEBUG_OUT.accept(TAG, "finishAndRemoveTask()");
                 finishAndRemoveTask();
-            } else {
-                DEBUG_OUT.accept(TAG, "super.onBackPressed()");
-                super.onBackPressed();
+            } else if (currentItem > FRAGMENT_APP_TOP){
+                // 画像表示フラグメントの場合
+                DEBUG_OUT.accept(TAG, "Back previous fragment.");
+                // 一つ前に戻る
+                mViewPager2.setCurrentItem(mViewPager2.getCurrentItem() - 1);
+                // これはアプリが終了してしまう
+                // super.onBackPressed();
             }
         }
     }
