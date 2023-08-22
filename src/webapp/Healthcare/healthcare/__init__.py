@@ -34,6 +34,12 @@ app.config.from_object("healthcare.config")
 # セッション用の秘密キー
 app.secret_key = uuid.uuid4().bytes
 
+# 2023-07-28: 健康管理データの可視化機能追加により追加
+# HTMLテンプレートに使うメッセージキーをapp.configに読み込み
+app.config.from_pyfile(os.path.join(".", "messages/messages.conf"), silent=False)
+# リクエストヘッダに設定するキーをapp.configに読み込み
+app.config.from_pyfile(os.path.join(".", "messages/requestkeys.conf"), silent=False)
+
 # サーバホストとセッションのドメインが一致しないとブラウザにセッションIDが設定されない
 IP_HOST: str = os.environ.get("IP_HOST", "localhost")
 FLASK_PROD_PORT: str = os.environ.get("FLASK_PROD_PORT", "8080")

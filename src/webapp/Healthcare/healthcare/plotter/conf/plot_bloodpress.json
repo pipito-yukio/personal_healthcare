@@ -1,0 +1,21 @@
+{
+  "y_axis": {
+    "blood_press": {
+      "max": 170.0,
+      "min": 40.0
+    },
+    "pulse_rate": {
+      "max": 100.0,
+      "min": 40.0
+    }
+  },
+  "x_axis": {
+     "rotation": 70.0
+  },
+  "value": {
+    "blood_press" : {
+      "target_max": 125.0,
+      "target_min": 75.0
+    }
+  }
+}
