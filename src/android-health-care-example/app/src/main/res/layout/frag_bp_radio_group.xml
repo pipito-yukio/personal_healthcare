@@ -47,6 +47,7 @@
         android:layout_gravity="center"
         android:drawSelectorOnTop="true"
         android:prompt="@string/imgfrag_spiner_ym_prompt"
+        style="@android:style/Widget.Material.Spinner.Underlined"
         app:layout_constraintStart_toEndOf="@id/radioGroupBpDateRange"
         app:layout_constraintBottom_toBottomOf="@id/radioGroupBpDateRange"
         app:layout_constraintTop_toTopOf="@id/radioGroupBpDateRange"

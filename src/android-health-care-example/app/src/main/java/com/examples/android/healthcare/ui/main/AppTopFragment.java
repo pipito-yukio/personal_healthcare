@@ -25,14 +25,11 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.DialogFragment;
-import androidx.fragment.app.Fragment;
 import androidx.viewbinding.BuildConfig;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.examples.android.healthcare.ActivityUtil;
 import com.examples.android.healthcare.HealthcareApplication;
 import com.examples.android.healthcare.SharedPrefUtil;
 import com.examples.android.healthcare.R;
@@ -54,7 +51,6 @@ import com.examples.android.healthcare.data.WeatherData;
 import com.examples.android.healthcare.dialogs.CustomDialogs.EditDialogFragement;
 import com.examples.android.healthcare.dialogs.CustomDialogs.ConfirmDialogFragment;
 import com.examples.android.healthcare.dialogs.CustomDialogs.ConfirmDialogFragment.ConfirmOkCancelListener;
-import com.examples.android.healthcare.dialogs.CustomDialogs.MessageOkDialogFragment;
 import com.examples.android.healthcare.dialogs.PickerDialogs.DatePickerFragment;
 import com.examples.android.healthcare.dialogs.PickerDialogs.TimePickerFragment;
 import com.examples.android.healthcare.dialogs.PickerDialogs.NumberPickerDialog;
@@ -87,7 +83,7 @@ import java.util.stream.Collectors;
 /**
  * アプリデータ登録フラグメント
  */
-public class AppTopFragment extends Fragment {
+public class AppTopFragment extends AppBaseFragment {
     private static final String TAG = AppTopFragment.class.getSimpleName();
 
     // NumberPickerDialog判別用タグキー: ID
@@ -96,26 +92,6 @@ public class AppTopFragment extends Fragment {
     private static final Integer TAG_ID_BLOOD_PRESSURE_MAX = 2;
     private static final Integer TAG_ID_BLOOD_PRESSURE_MIN = 3;
     private static final Integer TAG_ID_PULSE_RATE = 4;
-
-    // https://developer.android.com/guide/components/fragments?hl=ja
-    //  フラグメント
-    /**
-     * コンストラクタ
-     * @param fragPosIdx フラグメント位置インデックス
-     * @return このフラグメント
-     */
-    public static AppTopFragment newInstance(int fragPosIdx) {
-        AppTopFragment frag = new AppTopFragment();
-        Bundle args = new Bundle();
-        args.putInt(FragmentUtil.FRAGMENT_POS_KEY, fragPosIdx);
-        frag.setArguments(args);
-        return frag;
-    }
-
-    public int getFragmentPosition() {
-        assert getArguments() != null;
-        return getArguments().getInt(FragmentUtil.FRAGMENT_POS_KEY, 0);
-    }
 
     // 保存ボタン
     private Button mBtnSave;
@@ -222,13 +198,39 @@ public class AppTopFragment extends Fragment {
     private RegisterData mRegisterDataForUpdate;
     // 更新チェック用マップ
     private final Map<String, Map<Integer, Boolean>> mUpdateCheckMap = new HashMap<>();
-    // リクエストウォーニングマップ
-    private final Map<Integer, String> mResponseWarningMap = new HashMap<>();
     // カレントのPostRequestオブジェクト: 登録か更新
     private PostRequest mCurrentPostRequest;
 
     // JSONファイル保存、プリファレンスコミット時に利用するハンドラー
     private final Handler mHandler = new Handler();
+
+    // https://developer.android.com/guide/components/fragments?hl=ja
+    //  フラグメント
+    /**
+     * コンストラクタ
+     * @param fragPosIdx フラグメント位置インデックス
+     * @return このフラグメント
+     */
+    public static AppTopFragment newInstance(int fragPosIdx) {
+        AppTopFragment frag = new AppTopFragment();
+        Bundle args = new Bundle();
+        args.putInt(FRAGMENT_POS_KEY, fragPosIdx);
+        frag.setArguments(args);
+        return frag;
+    }
+
+    //** START implements abstract methods **************************
+    @Override
+    public int getFragmentPosition() {
+        assert getArguments() != null;
+        return getArguments().getInt(FRAGMENT_POS_KEY, 0);
+    }
+
+    @Override
+    public String getFragmentTitle() {
+        return getString(R.string.app_top_frag_title);
+    }
+    //** END implements abstract methods ****************************
 
     //--- START: TextViewの更新メソッド ----
     /**
@@ -1026,18 +1028,6 @@ public class AppTopFragment extends Fragment {
     }
 
     /**
-     * レスポンス時のフォーニングメッセージ用マップの初期化
-     */
-    private void initResponseWarningMap() {
-        String[] warnings = getResources().getStringArray(R.array.warning_map);
-        for (String item : warnings) {
-            String[] items = item.split(",");
-            Integer respCode = Integer.valueOf(items[0]);
-            mResponseWarningMap.put(respCode, items[1]);
-        }
-    }
-
-    /**
      * 読込みデータの更新確認用マップの更新フラグリセット
      * <p>タイミング: 更新チェック用モニター開始時</p>
      */
@@ -1338,7 +1328,7 @@ public class AppTopFragment extends Fragment {
         mBtnSend.setText(setRequest.getName());
     }
 
-    @Nullable
+    @NonNull
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
@@ -1378,15 +1368,13 @@ public class AppTopFragment extends Fragment {
         mBtnSend.setOnClickListener(mBtnOnClickListener);
         // 送信ボタン文字列設定
         changePostRequestWithButton(PostRequest.REGISTER);
-        // ステータ
+        // ウォーニングステータス
         mTextStatus = mainView.findViewById(R.id.textStatus);
         mWarningStatus = mainView.findViewById(R.id.warningStatus);
         // 数値ピッカーダイアログ用配列初期化
         initArraysForNumberPicker();
         // 更新有無チェック用マップ初期化
         initUpdateCheckMap();
-        // レスボンス時ウォーニングメッセージマップ初期化
-        initResponseWarningMap();
         return mainView;
     }
 
@@ -1395,9 +1383,6 @@ public class AppTopFragment extends Fragment {
         super.onResume();
         DEBUG_OUT.accept(TAG, "onResume()");
 
-        // アプリバーにタイトル表示
-        FragmentUtil.setActionBarTitle((AppCompatActivity) requireActivity(),
-                getString(R.string.app_top_frag_title));
         // 当日のJsonファルがあればリストアする
         restoreWidgetsFromJson();
         // 更新チェック用リスナー設定
@@ -1482,8 +1467,7 @@ public class AppTopFragment extends Fragment {
                         sendGetCurrentDataRequest(email, tagValue);
                     } else {
                         // メールアドレスの設定が必要
-                        ActivityUtil.showConfirmDialogWithEmailAddress(
-                                (AppCompatActivity) requireActivity(), getFragmentPosition());
+                        showConfirmRequireEmailAddress();
                     }
                 } else {
                     // 過去日でも新規登録なので新規登録モードにリセット
@@ -1697,9 +1681,8 @@ public class AppTopFragment extends Fragment {
         if (!warnings.isEmpty()) {
             // メッセージダイアログ表示
             String warning = String.join("\n", warnings);
-            DialogFragment fragment = MessageOkDialogFragment.newInstance(
-                    getString(R.string.warning_required_dialog_title), warning);
-            fragment.show(requireActivity().getSupportFragmentManager(), "RequiredDialogFragment");
+            showMessageOkDialog(getString(R.string.warning_required_dialog_title),
+                    warning, "RequiredDialogFragment");
             return;
         }
 
@@ -1884,7 +1867,7 @@ public class AppTopFragment extends Fragment {
         String message;
         switch (status.getCode()) {
             case 400: // BadRequest: リクエストパラメータなどの不備
-                message = AppTopUtil.getWarningFromBadRequestStatus(status, mResponseWarningMap);
+                message = getWarningFromBadRequestStatus(status);
                 break;
             case 404: // NotFound: データ未登録
                 message = getString(R.string.warning_data_not_found);
@@ -1910,15 +1893,13 @@ public class AppTopFragment extends Fragment {
         // ネットワークデバイスが無効なら送信しない
         RequestDevice device =  NetworkUtil.getActiveNetworkDevice(requireContext());
         if (device == RequestDevice.NONE) {
-            FragmentUtil.showDialogNetworkUnavailable((AppCompatActivity) requireActivity(),
-                    getString(R.string.warning_network_not_available));
+            showDialogNetworkUnavailable();
             return;
         }
 
         // メールアドレスチェック
         if (TextUtils.isEmpty(SharedPrefUtil.getEmailAddressInSettings(requireContext()))) {
-            ActivityUtil.showConfirmDialogWithEmailAddress(
-                    (AppCompatActivity) requireActivity(), getFragmentPosition());
+            showConfirmRequireEmailAddress();
             return;
         }
 
@@ -1927,9 +1908,7 @@ public class AppTopFragment extends Fragment {
         if (!warnings.isEmpty()) {
             // メッセージダイアログ表示
             String warning = String.join("\n", warnings);
-            FragmentUtil.showMessageDialog(
-                    (AppCompatActivity) requireActivity(),
-                    getString(R.string.warning_required_dialog_title), warning,
+            showMessageOkDialog(getString(R.string.warning_required_dialog_title), warning,
                     "RequiredDialogFragment");
             return;
         }
@@ -1940,9 +1919,7 @@ public class AppTopFragment extends Fragment {
             public void onOk() {
                 // 送信ボタン不可
                 mBtnSend.setEnabled(false);
-                // アクションバーにネットワークデバイス状況を設定
-                FragmentUtil.showActionBarGetting((AppCompatActivity) requireActivity(),
-                        getString(R.string.msg_gettting_data));
+                setRequestStart(getString(R.string.msg_gettting_data));
 
                 // アプリケーション取得
                 HealthcareApplication app = (HealthcareApplication) requireActivity()
@@ -1966,8 +1943,7 @@ public class AppTopFragment extends Fragment {
                         app.mEexecutor, app.mHandler, (result) -> {
                             // ボタン復帰
                             mBtnSend.setEnabled(true);
-                            // アクションバーのサブタイトル更新
-                            FragmentUtil.showActionBarResult((AppCompatActivity) requireActivity(), device);
+                            setRequestComplete(device);
 
                             if (result instanceof Result.Success) {
                                 // 更新前のプリファレンスから最新登録日付を取得する
@@ -2021,19 +1997,15 @@ public class AppTopFragment extends Fragment {
                                 String warning = String.format(
                                         getString(R.string.warning_register_with_2_reason),
                                         mCurrentPostRequest.getName(), status.getMessage());
-                                FragmentUtil.showMessageDialog(
-                                        (AppCompatActivity) requireActivity(),
-                                        getString(R.string.error_response_dialog_title),
+                                showMessageOkDialog(getString(R.string.error_response_dialog_title),
                                         warning,"WarningDialogFragment");
                             } else {
                                 // 例外メッセージをダイアログに表示
                                 Exception exception = ((Result.Error<?>) result).getException();
                                 String message = String.format(
                                         getString(R.string.exception_with_reason), exception.getLocalizedMessage());
-                                FragmentUtil.showMessageDialog(
-                                        (AppCompatActivity) requireActivity(),
-                                        getString(R.string.error_response_dialog_title),message,
-                                        "ExceptionDialogFragment");
+                                showMessageOkDialog(getString(R.string.error_response_dialog_title),
+                                        message,"ExceptionDialogFragment");
                             }
                         });
             }
@@ -2057,13 +2029,12 @@ public class AppTopFragment extends Fragment {
     private void sendGetCurrentDataRequest(String emailAddress, String pastDay) {
         RequestDevice device =  NetworkUtil.getActiveNetworkDevice(requireContext());
         if (device == RequestDevice.NONE) {
-            FragmentUtil.setActionBarTitle((AppCompatActivity) requireActivity(),
-                    getString(R.string.warning_network_not_available));
+            showDialogNetworkUnavailable();
             return;
         }
 
-        FragmentUtil.showActionBarGetting((AppCompatActivity) requireActivity(),
-                getString(R.string.msg_gettting_data));
+        // リクエスト開始メッセージ設定
+        setRequestStart(getString(R.string.msg_gettting_data));
 
         HealthcareApplication app = (HealthcareApplication) requireActivity().getApplication();
         String requestUrl = app.getmRequestUrls().get(device.toString());
@@ -2080,8 +2051,8 @@ public class AppTopFragment extends Fragment {
                 app.mEexecutor, app.mHandler, (result) -> {
                     // ボタン復帰
                     mBtnSend.setEnabled(true);
-                    // アクションバーのサブタイトル更新
-                    FragmentUtil.showActionBarResult((AppCompatActivity) requireActivity(), device);
+                    // リクエスト完了時にネットワーク種別を表示
+                    setRequestComplete(device);
 
                     if (result instanceof Result.Success) {
                         GetCurrentDataResult dataResult =
@@ -2119,13 +2090,7 @@ public class AppTopFragment extends Fragment {
                         // 例外メッセージをダイアログに表示
                         Exception exception = ((Result.Error<?>) result).getException();
                         Log.w(TAG, "GET error:" + exception.toString());
-                        String errorMessage = String.format(
-                                getString(R.string.exception_with_reason),
-                                exception.getLocalizedMessage());
-                        FragmentUtil.showMessageDialog(
-                                (AppCompatActivity) requireActivity(),
-                                getString(R.string.error_response_dialog_title),
-                                errorMessage,"ExceptionDialogFragment");
+                        showDialogExceptionMessage(exception);
                     }
                 });
     }

@@ -1,14 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string-array name="warning_map">
-        <!-- レスポンスマップ用 -->
+        <!-- AppTopFragment: レスポンスマップ用 -->
         <item>450,ContentTypeエラー</item>
         <item>451,【HealthcareData】未設定</item>
         <item>460,JSONキー項目未設定</item>
         <item>461,メールアドレスのユーザが未登録</item>
         <item>462,メールアドレス未設定</item>
         <item>463,測定日付未設定</item>
+        <!-- 共通 -->
         <item>559,データベースエラー</item>
+        <!-- 画像取得系フラグメント -->
+        <item>471,年月が未設定</item>
+        <item>472,年月の形式エラー("YYYY-MM")</item>
+        <item>473,検索開始日が未設定</item>
+        <item>474,検索開始日の形式エラー(ISO8601)</item>
+        <item>475,検索終了日が未設定</item>
+        <item>476,検索終了日の形式エラー(ISO8601)</item>
+        <item>480,当日の血圧測定データー形式エラー</item>
+        <item>481,当日の睡眠管理データー形式エラー</item>
+        <item>482,血圧ユーザー目標形式エラー</item>
     </string-array>
     <string-array name="bp_target_max_entiries">
         <item>(設定しない)</item>

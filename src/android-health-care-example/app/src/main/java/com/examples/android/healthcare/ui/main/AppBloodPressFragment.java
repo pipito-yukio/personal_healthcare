@@ -10,8 +10,6 @@ import android.os.Bundle;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.fragment.app.Fragment;
 
 import android.os.Handler;
 import android.text.TextUtils;
@@ -32,7 +30,6 @@ import android.widget.TextView;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.examples.android.healthcare.ActivityUtil;
 import com.examples.android.healthcare.HealthcareApplication;
 import com.examples.android.healthcare.R;
 import com.examples.android.healthcare.SharedPrefUtil;
@@ -63,8 +60,8 @@ import java.util.Map;
  * 血圧測定データプロット画像表示フラグメント
  * create an instance of this fragment.
  */
-public class AppBloodPressFragment extends Fragment {
-    private static final String TAG = "AppBloodPressFragment";
+public class AppBloodPressFragment extends AppBaseFragment {
+    private static final String TAG = AppBloodPressFragment.class.getSimpleName();
     // 初期表示用イメージ
     private static final String NO_IMAGE_FILE = "NoImage_500x700.png";
     // 当日データフォーマット: "測定日,AM最高血圧,AM最低血圧,AM脈拍"
@@ -111,8 +108,6 @@ public class AppBloodPressFragment extends Fragment {
     private Spinner mSpinnerYM;
     // 画像保存チェック
     private CheckBox mChkSaveImg;
-    // ステータスピュー
-    private TextView mTvStatus;
     // 統計情報(平均値)用ウィジット
     // レコード件数
     private TextView mTvRecCount;
@@ -124,6 +119,8 @@ public class AppBloodPressFragment extends Fragment {
     private TextView mTvPmMeanMax;
     // PM測定最低血圧
     private TextView mTvPmMeanMin;
+    // ウォーニング用ステータス
+    private TextView mWarningStatus;
     // 血圧値初期値
     private String mInitMeanValue;
 
@@ -147,15 +144,23 @@ public class AppBloodPressFragment extends Fragment {
     public static AppBloodPressFragment newInstance(int fragPosIdx) {
         AppBloodPressFragment frag = new AppBloodPressFragment();
         Bundle args = new Bundle();
-        args.putInt(FragmentUtil.FRAGMENT_POS_KEY, fragPosIdx);
+        args.putInt(FRAGMENT_POS_KEY, fragPosIdx);
         frag.setArguments(args);
         return frag;
     }
 
+    //** START implements abstract methods **************************
+    @Override
     public int getFragmentPosition() {
         assert getArguments() != null;
-        return getArguments().getInt(FragmentUtil.FRAGMENT_POS_KEY, 1);
+        return getArguments().getInt(FRAGMENT_POS_KEY, 1);
     }
+
+    @Override
+    public String getFragmentTitle() {
+        return getString(R.string.imgfrag_bp_app_title);
+    }
+    //** END implements abstract methods ****************************
 
     /**
      * 血圧測定データ可視化リクエストパスインデックスを取得する
@@ -254,21 +259,39 @@ public class AppBloodPressFragment extends Fragment {
 
     //** START request with repository *****************************
     /**
+     * ウォーニングメッセージを取得
+     * @param status レスポンスステータス
+     * @return ウォーニングメッセージ
+     */
+    private String getResponseWarning(ResponseStatus status) {
+        String message;
+        switch (status.getCode()) {
+            case 400: // BadRequest: リクエストパラメータなどの不備
+                message = getWarningFromBadRequestStatus(status);
+                break;
+            case 404: // NotFound: データ未登録
+                message = getString(R.string.warning_data_not_found);
+                break;
+            default: // 50x系エラー
+                message = status.getMessage();
+        }
+        return message;
+    }
+
+    /**
      * 画像取得リクエスト
      */
     private void getImageRequest() {
         // ネットワークデバイスが無効なら送信しない
         RequestDevice device =  NetworkUtil.getActiveNetworkDevice(requireContext());
         if (device == RequestDevice.NONE) {
-            FragmentUtil.showDialogNetworkUnavailable((AppCompatActivity) requireActivity(),
-                    getString(R.string.warning_network_not_available));
+            showDialogNetworkUnavailable();
             return;
         }
 
         mBtnGetRequest.setEnabled(false);
         // アクションバーのサブタイトルに取得中メッセージ表示
-        FragmentUtil.showActionBarGetting((AppCompatActivity) requireActivity(),
-                getString(R.string.msg_gettting_graph));
+        setRequestStart(getString(R.string.msg_gettting_graph));
 
         // アプリケーション取得
         HealthcareApplication app = (HealthcareApplication) requireActivity().getApplication();
@@ -290,7 +313,7 @@ public class AppBloodPressFragment extends Fragment {
                     // ボタン復帰
                     mBtnGetRequest.setEnabled(true);
                     // アクションバーのサブタイトル更新
-                    FragmentUtil.showActionBarResult((AppCompatActivity) requireActivity(), device);
+                    setRequestComplete(device);
 
                     if (result instanceof Result.Success) {
                         GetImageDataResult imageResult =
@@ -320,26 +343,15 @@ public class AppBloodPressFragment extends Fragment {
                     } else if (result instanceof Result.Warning) {
                         ResponseStatus status =
                                 ((Result.Warning<?>) result).getResponseStatus();
-                        Log.w(TAG, "Warning:" + status);
-                        String warning = String.format(
-                                getString(R.string.warning_getdata_with_reason),
-                                status.getMessage());
-                        FragmentUtil.showMessageDialog(
-                                (AppCompatActivity) requireActivity(),
-                                getString(R.string.error_response_dialog_title),
-                                warning,"WarningDialogFragment");
+                        DEBUG_OUT.accept(TAG, "WarningStatus: " + status);
+                        showWarningInStatusView(mWarningStatus, getResponseWarning(status));
                         resetSuccessWidgets(urlPathIdx);
                         removeStatisticsKey(urlPathIdx);
                     } else if (result instanceof Result.Error) {
                         // 例外メッセージをダイアログに表示
                         Exception exception = ((Result.Error<?>) result).getException();
                         Log.w(TAG, "Error:" + exception);
-                        String message = String.format(
-                                getString(R.string.exception_with_reason), exception.getLocalizedMessage());
-                        FragmentUtil.showMessageDialog(
-                                (AppCompatActivity) requireActivity(),
-                                getString(R.string.error_response_dialog_title),message,
-                                "ExceptionDialogFragment");
+                        showDialogExceptionMessage(exception);
                         resetSuccessWidgets(urlPathIdx);
                         removeStatisticsKey(urlPathIdx);
                     }
@@ -356,7 +368,7 @@ public class AppBloodPressFragment extends Fragment {
             // 暗黙的にサーバーにリクエストする
             RequestDevice device =  NetworkUtil.getActiveNetworkDevice(requireContext());
             if (device == RequestDevice.NONE) {
-                showStatusNetworkUnavailable();
+                showNetworkUnavailableInStatus(mWarningStatus);
                 return;
             }
 
@@ -557,8 +569,8 @@ public class AppBloodPressFragment extends Fragment {
         mChkIncludeToday = mainView.findViewById(R.id.chkIncludeBpToday);
         // プロット画像表示
         mImgView = mainView.findViewById(R.id.imgBloodBress);
-        // ステータスビュー
-        mTvStatus = mainView.findViewById(R.id.tvFragBpStatus);
+        // ウォーニングステータス
+        mWarningStatus = mainView.findViewById(R.id.tvFragBpStatus);
         // 実行ボタン
         mBtnGetRequest = mainView.findViewById(R.id.btnBpGetRequest);
         mBtnGetRequest.setOnClickListener(mButtonRequestListener);
@@ -574,7 +586,7 @@ public class AppBloodPressFragment extends Fragment {
     //** End init widgets ***********************************************
 
     //** START life cycle events *****************************
-    @Nullable
+    @NonNull
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
@@ -614,16 +626,12 @@ public class AppBloodPressFragment extends Fragment {
         super.onResume();
         DEBUG_OUT.accept(TAG, "onResume()");
 
-        // アプリバーにタイトル表示
-        FragmentUtil.setActionBarTitle((AppCompatActivity) requireActivity(),
-                getString(R.string.imgfrag_bp_app_title));
         // メールアドレス必須
         String emailAddress = SharedPrefUtil.getEmailAddressInSettings(requireContext());
         DEBUG_OUT.accept(TAG, "check EmailAddress: " + emailAddress);
         if (TextUtils.isEmpty(emailAddress)) {
             // メールアドレス入力確認ダイアログ
-            ActivityUtil.showConfirmDialogWithEmailAddress(
-                    (AppCompatActivity) requireActivity(), getFragmentPosition());
+            showConfirmRequireEmailAddress();
             // ダイアログOKでメール入力した後、バックキーでこの画面に戻ってくる
             // ダイアログOKでメール入力した後、アプリバーの←でトップ画面に戻る
             // ダイアログCANCELならバックキー実行でトップ画面に遷移する
@@ -702,21 +710,13 @@ public class AppBloodPressFragment extends Fragment {
     }
     //** END life cycle events *****************************
 
-    private void showStatusNetworkUnavailable() {
-        mTvStatus.setText(getString(R.string.warning_network_not_available));
-        mTvStatus.setVisibility(View.VISIBLE);
-    }
-
     /**
      * ImageViewに取得した画像を表示するとともにファイルに保存
      * @param urlPathIdx URLパスインデックス
      * @param data ResponseImageData
      */
     private void showSuccess(UrlPathIndex urlPathIdx, ResponseImageData data) {
-        if (mTvStatus.getVisibility() == View.VISIBLE) {
-            mTvStatus.setText("");
-            mTvStatus.setVisibility(View.GONE);
-        }
+        hideStatusView(mWarningStatus);
         byte[] decoded = data.getImageBytes();
         if (decoded != null) {
             Bitmap bitmap = BitmapFactory.decodeByteArray(
@@ -860,7 +860,8 @@ public class AppBloodPressFragment extends Fragment {
                 // 復元した文字列に対応する位置
                 ArrayAdapter<String> adapter = (ArrayAdapter<String>) mSpinnerYM.getAdapter();
                 int pos = adapter.getPosition(ymVal);
-                if (pos > 1) {
+                DEBUG_OUT.accept(TAG,"Spinner.pos: " + pos);
+                if (pos > 0) {
                     mSpinnerYM.setSelection(pos);
                 }
             }

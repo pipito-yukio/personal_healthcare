@@ -2,11 +2,8 @@ package com.examples.android.healthcare.functions;
 
 import android.text.TextUtils;
 
-import com.examples.android.healthcare.data.ResponseStatus;
-
 import java.time.LocalDate;
 import java.util.Calendar;
-import java.util.Map;
 
 /**
  * Androidリソースに依存しないユーティリィティメソッド
@@ -190,30 +187,6 @@ public class AppTopUtil {
         }
         // 上記以外は異なる
         return true;
-    }
-
-    /**
-     * ウォニング時のレスポンスステータスとメッセージ変換用マップからステータス用の文字列を取得する
-     * <pre>(例) Flaskアプリ側のBadRequest時の"message"の形式: errorCode + カンマ + エラー内容
-     * {"status": { "code": 400, "message": "461,User is not found."}}
-     * </pre>
-     * @param responseStatus ウォニング時のレスポンスステータス
-     * @param responseWarningMap メッセージ変換用マップ ※日本語メッセージに変換
-     * @return ステータス用の文字列
-     */
-    public static String getWarningFromBadRequestStatus(ResponseStatus responseStatus,
-                                                        Map<Integer, String> responseWarningMap) {
-        String[] items = responseStatus.getMessage().split(",");
-        int warningCode = Integer.parseInt(items[0]);
-        String message = responseWarningMap.get(warningCode);
-        if (message == null) {
-            if (items.length > 1) {
-                message = items[1];
-            } else {
-                message = responseStatus.getMessage();
-            }
-        }
-        return message;
     }
 
 }
