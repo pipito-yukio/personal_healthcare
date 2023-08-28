@@ -3,7 +3,6 @@ package com.examples.android.healthcare.ui.main;
 import static com.examples.android.healthcare.functions.MyLogging.DEBUG_OUT;
 
 import android.content.SharedPreferences;
-import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
@@ -13,7 +12,6 @@ import androidx.annotation.Nullable;
 
 import android.os.Handler;
 import android.text.TextUtils;
-import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -37,16 +35,11 @@ import com.examples.android.healthcare.constants.RequestDevice;
 import com.examples.android.healthcare.data.BloodPressStatistics;
 import com.examples.android.healthcare.data.BloodPressure;
 import com.examples.android.healthcare.data.GetImageDataResult;
-import com.examples.android.healthcare.data.GetRegisterDaysResult;
 import com.examples.android.healthcare.data.RegisterData;
 import com.examples.android.healthcare.data.ResponseImageData;
-import com.examples.android.healthcare.data.ResponseRegisterDays;
 import com.examples.android.healthcare.data.ResponseStatus;
 import com.examples.android.healthcare.functions.AppImageFragUtil;
-import com.examples.android.healthcare.functions.FileManager;
 import com.examples.android.healthcare.tasks.GetBloodPressImageRepository;
-import com.examples.android.healthcare.tasks.GetRegisterDaysRepository;
-import com.examples.android.healthcare.tasks.HealthcareRepository;
 import com.examples.android.healthcare.tasks.NetworkUtil;
 import com.examples.android.healthcare.tasks.RequestParamBuilder;
 import com.examples.android.healthcare.tasks.Result;
@@ -62,8 +55,6 @@ import java.util.Map;
  */
 public class AppBloodPressFragment extends AppBaseFragment {
     private static final String TAG = AppBloodPressFragment.class.getSimpleName();
-    // 初期表示用イメージ
-    private static final String NO_IMAGE_FILE = "NoImage_500x700.png";
     // 当日データフォーマット: "測定日,AM最高血圧,AM最低血圧,AM脈拍"
     private static final String FMT_2W_TODAY = "%s,%d,%d,%d";
     // 統計情報の血圧平均値フォーマット (前空白の4桁)
@@ -87,11 +78,12 @@ public class AppBloodPressFragment extends AppBaseFragment {
 
     // 画像ファイル保存、プリファレンスコミット時に利用するハンドラー
     private final Handler mHandler = new Handler();
-    private Bitmap mNoImageBitmap;
     // プロット画像用ImageView
     private ImageView mImgView;
-    // ラジオグループ
+    // 検索期間(月間/２週間前) ラジオグループ
     private RadioGroup mRGrpDateRange;
+    // グラフタイプ選択 ラジオグループ
+    private RadioGroup mRGrpGraphType;
     // 最新取得ボタン
     private Button mBtnGetRequest;
     // 月間ラジオボタン
@@ -106,6 +98,8 @@ public class AppBloodPressFragment extends AppBaseFragment {
     private CheckBox mChkIncludeToday;
     // 年月選択スピナー
     private Spinner mSpinnerYM;
+    // 年月選択スピナーアダブター
+    private ArrayAdapter<String> mSpinnerAdapter;
     // 画像保存チェック
     private CheckBox mChkSaveImg;
     // 統計情報(平均値)用ウィジット
@@ -123,10 +117,6 @@ public class AppBloodPressFragment extends AppBaseFragment {
     private TextView mWarningStatus;
     // 血圧値初期値
     private String mInitMeanValue;
-
-    private DisplayMetrics mMetrics;
-    private int mImageWd;
-    private int mImageHt;
     // 年月スピナー選択値を保持するオブジェクト
     private AppImageFragUtil.SpinnerSelected mSpinnerSelected;
     // 画像の保存ファイル名配列
@@ -157,8 +147,17 @@ public class AppBloodPressFragment extends AppBaseFragment {
     }
 
     @Override
-    public String getFragmentTitle() {
-        return getString(R.string.imgfrag_bp_app_title);
+    public String getFragmentTitle() { return getString(R.string.imgfrag_bp_app_title); }
+
+    public ImageView getImageView() {
+        assert mImgView != null;
+        return mImgView;
+    }
+
+    @Override
+    public TextView getWaringView() {
+        assert mWarningStatus != null;
+        return mWarningStatus;
     }
     //** END implements abstract methods ****************************
 
@@ -209,6 +208,7 @@ public class AppBloodPressFragment extends AppBaseFragment {
                 return null;
             }
         }
+
         return null;
     }
 
@@ -224,8 +224,9 @@ public class AppBloodPressFragment extends AppBaseFragment {
         return new int[] {targetMax, targetMin};
     }
 
+    //** START request with repository *****************************
     /**
-     * 血圧測定データプロット画像取得用のリクエストパラメータ生成
+     * 画像取得用のリクエストパラメータ生成
      * @param emailAddress メールアドレス
      * @return リクエストパラメータ文字列
      */
@@ -257,7 +258,6 @@ public class AppBloodPressFragment extends AppBaseFragment {
         return builder.build();
     }
 
-    //** START request with repository *****************************
     /**
      * ウォーニングメッセージを取得
      * @param status レスポンスステータス
@@ -290,16 +290,18 @@ public class AppBloodPressFragment extends AppBaseFragment {
         }
 
         mBtnGetRequest.setEnabled(false);
-        // アクションバーのサブタイトルに取得中メッセージ表示
+        // リクエスト開始メッセージを設定する
         setRequestStart(getString(R.string.msg_gettting_graph));
 
         // アプリケーション取得
         HealthcareApplication app = (HealthcareApplication) requireActivity().getApplication();
         String requestUrl = app.getmRequestUrls().get(device.toString());
+        // 画像取得リクエスト用リポジトリ
         GetBloodPressImageRepository repos = new GetBloodPressImageRepository();
         // ImageViewサイズとDisplayMetrics.densityをリクエストヘッダに追加する
         Map<String, String> headers = app.getRequestHeaders();
-        AppImageFragUtil.appendImageSizeToHeaders(headers, mImageWd, mImageHt, mMetrics.density);
+        AppImageFragUtil.appendImageSizeToHeaders(headers,
+                mImgView.getWidth(), mImgView.getHeight(), getDisplayMetrics().density);
         // メールアドレス取得 ※画像取得フラグメントはメールアドレス必須のため、存在しない場合ここに来ない
         String emailAddress = SharedPrefUtil.getEmailAddressInSettings(requireContext());
         // プロット期間からURLパスインデックスを取得
@@ -312,8 +314,8 @@ public class AppBloodPressFragment extends AppBaseFragment {
                 app.mEexecutor, app.mHandler, (result) -> {
                     // ボタン復帰
                     mBtnGetRequest.setEnabled(true);
-                    // アクションバーのサブタイトル更新
-                    setRequestComplete(device);
+                    // リクエスト完了時にネットワーク種別を表示
+                    showRequestComplete(device);
 
                     if (result instanceof Result.Success) {
                         GetImageDataResult imageResult =
@@ -336,86 +338,22 @@ public class AppBloodPressFragment extends AppBaseFragment {
                             }
                         } else {
                             // レコード無しなら統計情報をリセットしNoImage画像を表示
-                            resetSuccessWidgets(urlPathIdx);
-                            // 統計情報をプリファレンスから削除
-                            removeStatisticsKey(urlPathIdx);
+                            resetWidgetsWithRemovePref(urlPathIdx);
                         }
                     } else if (result instanceof Result.Warning) {
                         ResponseStatus status =
                                 ((Result.Warning<?>) result).getResponseStatus();
                         DEBUG_OUT.accept(TAG, "WarningStatus: " + status);
                         showWarningInStatusView(mWarningStatus, getResponseWarning(status));
-                        resetSuccessWidgets(urlPathIdx);
-                        removeStatisticsKey(urlPathIdx);
+                        resetWidgetsWithRemovePref(urlPathIdx);
                     } else if (result instanceof Result.Error) {
                         // 例外メッセージをダイアログに表示
                         Exception exception = ((Result.Error<?>) result).getException();
                         Log.w(TAG, "Error:" + exception);
                         showDialogExceptionMessage(exception);
-                        resetSuccessWidgets(urlPathIdx);
-                        removeStatisticsKey(urlPathIdx);
+                        resetWidgetsWithRemovePref(urlPathIdx);
                     }
                 });
-    }
-
-    /**
-     * 初回登録日の存在チェックし、存在しない場合は暗黙的にリクエストする
-     */
-    private void requestFirstRegisterDayWithImplicitly() {
-        String firstRegisterDay = SharedPrefUtil.getFirstRegisterDay(requireContext());
-        DEBUG_OUT.accept(TAG, "firstRegisterDay: " + firstRegisterDay);
-        if (TextUtils.isEmpty(firstRegisterDay)) {
-            // 暗黙的にサーバーにリクエストする
-            RequestDevice device =  NetworkUtil.getActiveNetworkDevice(requireContext());
-            if (device == RequestDevice.NONE) {
-                showNetworkUnavailableInStatus(mWarningStatus);
-                return;
-            }
-
-            HealthcareApplication app = (HealthcareApplication) requireActivity().getApplication();
-            String requestUrl = app.getmRequestUrls().get(device.toString());
-            Map<String, String> headers = app.getRequestHeaders();
-            // ユーザの初回登録日取得
-            HealthcareRepository<GetRegisterDaysResult> repos = new GetRegisterDaysRepository();
-            // メールアドレス ※メールアドレスが未設定ならこの画面には遷移しない
-            String emailAddress = SharedPrefUtil.getEmailAddressInSettings(requireContext());
-            String reqParam = new RequestParamBuilder(emailAddress).build();
-            repos.makeGetRequest(0, requestUrl, reqParam, headers,
-                    app.mEexecutor, app.mHandler, (result) -> {
-                        if (result instanceof Result.Success) {
-                            GetRegisterDaysResult daysResult =
-                                    ((Result.Success<GetRegisterDaysResult>) result).get();
-                            ResponseRegisterDays days = daysResult.getData();
-                            DEBUG_OUT.accept(TAG, "ResponseRegisterDays: " + days);
-                            String firstDay = days.getFirstDay();
-                            if (firstDay != null) {
-                                // プリファレンスに保存する
-                                SharedPrefUtil.saveFirstRegisterDay(requireContext(),
-                                        firstDay);
-                                // スピナーに年月リストを設定する
-                                AppImageFragUtil.setYearMonthListToSpinnerAdapter(
-                                        (ArrayAdapter<String>) mSpinnerYM.getAdapter(),
-                                        firstDay);
-                                mBtnGetRequest.setEnabled(true);
-                            }
-                        } else if (result instanceof Result.Warning) {
-                            // ウォーニングメッセージをログに出力
-                            ResponseStatus status =
-                                    ((Result.Warning<?>) result).getResponseStatus();
-                            Log.w(TAG, "WarningStatus: " + status);
-                        } else if (result instanceof Result.Error) {
-                            // 例外メッセージをダイアログに表示
-                            Exception exception = ((Result.Error<?>) result).getException();
-                            Log.w(TAG, "Exception: " + exception);
-                        }
-                    });
-        } else {
-            // プリファレンスの初回登録日から生成する
-            AppImageFragUtil.setYearMonthListToSpinnerAdapter(
-                    (ArrayAdapter<String>) mSpinnerYM.getAdapter(),
-                    firstRegisterDay);
-            mBtnGetRequest.setEnabled(true);
-        }
     }
     //** END request with repository *****************************
 
@@ -424,11 +362,8 @@ public class AppBloodPressFragment extends AppBaseFragment {
      */
     private void updateCheckIncludeToday() {
         if (mRadioYM.isChecked()) {
-            // 月間がチェックされていたら当日のチェックを外す
+            // 月間: 当日のチェックは残す
             mChkIncludeToday.setEnabled(false);
-            if (mChkIncludeToday.isChecked()) {
-                mChkIncludeToday.setChecked(false);
-            }
         } else {
             // ２週間なら一時保存ファイルチェック
             String savedDate = SharedPrefUtil.getLastSavedDate(requireContext());
@@ -440,30 +375,11 @@ public class AppBloodPressFragment extends AppBaseFragment {
     }
 
     //** START Radio Buttons control *******************************************
-    /** 月間ラジオボタン選択時の他のラジオボタン制御  */
-    private void radioYMSelected() {
-        // スピナー有効
-        if (!mSpinnerYM.isEnabled()) {
-            mSpinnerYM.setEnabled(true);
-        }
-        // 棒グラフは無効
-        mRadioGraphBar.setEnabled(false);
-        // 棒グラフのチェックを外す
-        if (mRadioGraphBar.isChecked()) {
-            mRadioGraphBar.setChecked(false);
-        }
-        // 折線グラフをチェックにする
-        if (!mRadioGraphLine.isChecked()) {
-            mRadioGraphLine.setChecked(true);
-        }
-        // 本日含むは不可
-        if (mChkIncludeToday.isEnabled()) {
-            mChkIncludeToday.setEnabled(false);
-        }
-    }
-
-    /** 2週間ラジオボタン選択時の他のラジオボタン制御 */
-    private void radio2wSelected() {
+    /**
+     * 2週間ラジオボタン選択時の他のラジオボタン制御
+     * @param updateGraphTypeChecked チェック状態を更新するかどうか。復元時にはチェック状態を更新しない
+     */
+    private void radio2wSelected(boolean updateGraphTypeChecked) {
         // スピナー無効
         if (mSpinnerYM.isEnabled()) {
             mSpinnerYM.setEnabled(false);
@@ -472,13 +388,36 @@ public class AppBloodPressFragment extends AppBaseFragment {
         if (!mRadioGraphBar.isEnabled()) {
             mRadioGraphBar.setEnabled(true);
         }
-        // 折線グラフをチェックにする
-        if (!mRadioGraphLine.isChecked()) {
-            mRadioGraphLine.setChecked(true);
-        }
         // 本日含むは可
         if (!mChkIncludeToday.isEnabled()) {
             mChkIncludeToday.setEnabled(true);
+        }
+        if (updateGraphTypeChecked) {
+            // 折線グラフをチェックにする
+            mRadioGraphLine.setChecked(true);
+        }
+    }
+
+    /**
+     * 月間ラジオボタン選択時の他のラジオボタン制御
+     * @param updateGraphTypeChecked チェック状態を更新するかどうか。復元時にはチェック状態を更新しない
+     */
+    private void radioYMSelected(boolean updateGraphTypeChecked) {
+        // スピナー有効
+        if (!mSpinnerYM.isEnabled()) {
+            mSpinnerYM.setEnabled(true);
+        }
+        // 棒グラフは無効
+        mRadioGraphBar.setEnabled(false);
+        // 本日含むは不可
+        if (mChkIncludeToday.isEnabled()) {
+            mChkIncludeToday.setEnabled(false);
+        }
+        if (updateGraphTypeChecked) {
+            // 棒グラフのチェックを外す
+            mRadioGraphBar.setChecked(false);
+            // 折線グラフをチェックにする
+            mRadioGraphLine.setChecked(true);
         }
     }
     //** END Radio Buttons control *********************************************
@@ -488,25 +427,38 @@ public class AppBloodPressFragment extends AppBaseFragment {
     private final View.OnClickListener mButtonRequestListener = v -> getImageRequest();
 
     /**
-     * ラジオグループ切り替えリスナー
-     * <p>グループ内ウィジットの可・不可制御</p>
+     * 検索期間(月間/２週間前) ラジオグループの切り替えリスナー
+     * <ul>
+     *     <li>他のグループ内ラジオボタン等の可・不可制御</li>
+     *     <li>画像・統計情報の復元</li>
+     * </ul>
      */
-    private final RadioGroup.OnCheckedChangeListener mRGrpChangeListener =(group, checkedId) -> {
-        DEBUG_OUT.accept(TAG, "radioGroup: " + group.getId() + ",checkedId: " + checkedId);
-        if (group.getId() == mRGrpDateRange.getId()) {
+    private final RadioGroup.OnCheckedChangeListener mRGrpRangeChangeListener =(grp, checkedId) -> {
+        DEBUG_OUT.accept(TAG, "radioGroup: " + grp.getId() + ",checkedId: " + checkedId);
+        if (grp.getId() == mRGrpDateRange.getId()) {
             // 期間ラジオグループ
             if (checkedId == mRadio2w.getId()) {
                 // ２週間選択
-                radio2wSelected();
+                radio2wSelected(true/*グラフ型のチェック状態を更新*/);
             } else {
                 // 月間選択
-                radioYMSelected();
+                radioYMSelected(true);
             }
         }
-        // 切り替えごとに対応する画像ファイルが存在すれば復元する
-        restoreImageView();
-        // 対応する統計情報を該当するビューに復元
-        restoreStatisticsViews();
+        // 切り替えごとに対応する画像ファイルと統計情報を復元
+        restoreImageWithStatistics();
+    };
+
+    /**
+     * グラフ型ラジオグループの切り替えリスナー
+     * <ul>
+     *     <li>選択されたグラフ型ラジオに対応する画像・統計情報の復元</li>
+     * </ul>
+     */
+    private final RadioGroup.OnCheckedChangeListener mRGrpGraphChangeListener =(grp, checkedId) -> {
+        DEBUG_OUT.accept(TAG, "radioGroup: " + grp.getId() + ",checkedId: " + checkedId);
+        // 選択されたグラフ型ラジオに対応する画像・統計情報の復元
+        restoreImageWithStatistics();
     };
 
     /**
@@ -548,11 +500,10 @@ public class AppBloodPressFragment extends AppBaseFragment {
         // public ArrayAdapter(@NonNull Context context, @LayoutRes int resource)
         //  this(context, resource, 0, new ArrayList<>());
         // 選択した選択肢がスピナー コントロールでどのように表示されるかを定義するレイアウトリソース
-        ArrayAdapter<String> adapter= new ArrayAdapter<>(getContext(),
-                android.R.layout.simple_spinner_item);
+        mSpinnerAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_item);
         // アダプターがスピナー選択リストに表示するために使用するレイアウト
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        mSpinnerYM.setAdapter(adapter);
+        mSpinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        mSpinnerYM.setAdapter(mSpinnerAdapter);
         // 初期画面ではスピナー不可
         mSpinnerYM.setEnabled(false);
     }
@@ -560,9 +511,12 @@ public class AppBloodPressFragment extends AppBaseFragment {
     private void initWidget(View mainView) {
         // 検索期間(月間/２週間前) ラジオグループ
         mRGrpDateRange = mainView.findViewById(R.id.radioGroupBpDateRange);
+        // グラフ型選択 ラジオグループ
+        mRGrpGraphType = mainView.findViewById(R.id.radioGroupBpGraphType);
+        // 期間ラジオボタン
         mRadioYM = mainView.findViewById(R.id.radioBpYM);
         mRadio2w = mainView.findViewById(R.id.radioBP2w);
-        // グラフ型(折れ線/棒) ラジオグループはモニターしない
+        // グラフ型(折れ線/棒)
         mRadioGraphLine = mainView.findViewById(R.id.radioBpGraphLine);
         mRadioGraphBar = mainView.findViewById(R.id.radioBpGraphBar);
         // チェックボックス
@@ -591,13 +545,12 @@ public class AppBloodPressFragment extends AppBaseFragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         DEBUG_OUT.accept(TAG, "onCreateView()");
-        mMetrics = new DisplayMetrics();
-        requireActivity().getWindowManager().getDefaultDisplay().getMetrics(mMetrics);
-        DEBUG_OUT.accept(TAG, "" + mMetrics);
 
         View mainView = inflater.inflate(
                 R.layout.fragment_image_blood_press, container,false);
         initWidget(mainView);
+        // ラジオボタン類を２週間で初期化
+        radio2wSelected(false);
         // 画像の保存ファイル名配列の生成
         mSaveImageNames = new String[] {
             getString(R.string.file_name_bp_line_ym)/* 月間 折れ線グラフ */,
@@ -626,60 +579,27 @@ public class AppBloodPressFragment extends AppBaseFragment {
         super.onResume();
         DEBUG_OUT.accept(TAG, "onResume()");
 
-        // メールアドレス必須
-        String emailAddress = SharedPrefUtil.getEmailAddressInSettings(requireContext());
-        DEBUG_OUT.accept(TAG, "check EmailAddress: " + emailAddress);
-        if (TextUtils.isEmpty(emailAddress)) {
-            // メールアドレス入力確認ダイアログ
-            showConfirmRequireEmailAddress();
-            // ダイアログOKでメール入力した後、バックキーでこの画面に戻ってくる
-            // ダイアログOKでメール入力した後、アプリバーの←でトップ画面に戻る
-            // ダイアログCANCELならバックキー実行でトップ画面に遷移する
-            // 戻り必須 ※初回登録日チェックまで実行されNullPoで落ちる
-            return;
+        // 初回登録日をベークラスから取得する
+        String firstRegisterDay = getFirstRegisterDay();
+        if (firstRegisterDay != null) {
+            // スピナーに年月リストを設定する
+            AppImageFragUtil.setYearMonthListToSpinnerAdapter(
+                    (ArrayAdapter<String>) mSpinnerYM.getAdapter(),
+                    firstRegisterDay);
         }
+        mBtnGetRequest.setEnabled(firstRegisterDay != null);
 
-        // 初期イメージ設定
-        if (mNoImageBitmap == null) {
-            AssetManager am = requireContext().getAssets();
-            try {
-                mNoImageBitmap = BitmapFactory.decodeStream(am.open(NO_IMAGE_FILE));
-                Log.w(TAG, "mNoImageBitmap: " + mNoImageBitmap);
-                if (mNoImageBitmap != null) {
-                    mImgView.setImageBitmap(mNoImageBitmap);
-                    mImageWd = mImgView.getWidth();
-                    mImageHt = mImgView.getHeight();
-                    DEBUG_OUT.accept(TAG, "ImageView.width: " + mImageWd + ",height: " + mImageHt);
-                }
-            }catch (IOException iex) {
-                // 通常ここには来ない
-                Log.w(TAG, iex.getLocalizedMessage());
-            }
-        }
-
-        // 初回登録日チェックリクエストを暗黙的に実行
-        requestFirstRegisterDayWithImplicitly();
-        // DEBUG
-        String fileNames = FileManager.checkFileNamesInContextDir(requireContext());
-        DEBUG_OUT.accept(TAG, "Context.FilesDir in [ " + fileNames + "]");
-        // DEBUG
-        SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
-                requireContext()
-        );
-        Map<String, ?> prefAll = sharedPref.getAll();
-        DEBUG_OUT.accept(TAG, "prefAll: " + prefAll);
         // プリファレンスからラジオボタンの状態を復元する ※onPauseで実行する
         if (restoreRadioButtonsState()) {
             // 当日データチェックウィジットの更新
             updateCheckIncludeToday();
-            // 統計情報の復元
-            restoreStatisticsViews();
-            // 保存された画像ファイルがあれば復元する
-            restoreImageView();
+            // 画像ファイルと統計情報の復元
+            restoreImageWithStatistics();
         }
 
         // ラジオグループリスナー登録
-        mRGrpDateRange.setOnCheckedChangeListener(mRGrpChangeListener);
+        mRGrpDateRange.setOnCheckedChangeListener(mRGrpRangeChangeListener);
+        mRGrpGraphType.setOnCheckedChangeListener(mRGrpGraphChangeListener);
         // スピナーリスナー登録
         mSpinnerYM.setOnItemSelectedListener(mYmSpinnerListener);
     }
@@ -696,6 +616,7 @@ public class AppBloodPressFragment extends AppBaseFragment {
 
         // ラジオグループリスナー解除 ※null可
         mRGrpDateRange.setOnCheckedChangeListener(null);
+        mRGrpGraphType.setOnCheckedChangeListener(null);
         // スピナーリスナー解除 ※null可
         mSpinnerYM.setOnItemSelectedListener(null);
     }
@@ -761,12 +682,17 @@ public class AppBloodPressFragment extends AppBaseFragment {
      *     <li>ウォーニング時</li>
      *     <li>例外発生時</li>
      * </ul>
+     * @param pathIdx UrlPathIndex
      */
-    private void resetSuccessWidgets(UrlPathIndex pathIdx) {
+    private void resetWidgetsWithRemovePref(UrlPathIndex pathIdx) {
+        // NoImage画像を表示
+        mImgView.setImageBitmap(getNoImageBitmap());
+        // 統計情報表示ビューリセット
         resetStatisticsViews();
-        mImgView.setImageBitmap(mNoImageBitmap);
         // 対象画像ファイルとプリファレンスキー削除
         deleteSavedImage(pathIdx);
+        // 統計情報をプリファレンスから削除
+        removeStatisticsKey(pathIdx);
     }
 
     //** START shared preferences save/restore *****************************
@@ -801,14 +727,12 @@ public class AppBloodPressFragment extends AppBaseFragment {
         );
         SharedPreferences.Editor editor = sharedPref.edit();
         // ラジオボタン
-        editor.putBoolean(getString(R.string.pref_key_bp_radio_ym),
-                mRadioYM.isChecked());
-        editor.putBoolean(getString(R.string.pref_key_bp_radio_line),
-                mRadioGraphLine.isChecked());
+        editor.putBoolean(getString(R.string.pref_key_bp_radio_ym), mRadioYM.isChecked());
+        editor.putBoolean(getString(R.string.pref_key_bp_radio_line), mRadioGraphLine.isChecked());
         // ラジオボタン
         // 保存の事実自体の保存 ※復元時にキーを削除
         editor.putString(getString(R.string.pref_key_bp_stop_saved),
-                "saveRadioButtonsState");
+                getString(R.string.pref_value_stop_saved));
         editor.apply();
     }
 
@@ -830,7 +754,7 @@ public class AppBloodPressFragment extends AppBaseFragment {
             // 先にグラフ型のチェック復元
             boolean isLine = sharedPref.getBoolean(getString(R.string.pref_key_bp_radio_line),
                     false);
-            if (isLine && !mRadioGraphLine.isChecked()) {
+            if (isLine) {
                 mRadioGraphLine.setChecked(true);
             } else {
                 mRadioGraphBar.setChecked(true);
@@ -838,14 +762,16 @@ public class AppBloodPressFragment extends AppBaseFragment {
             // 月間チェック
             boolean isYmChecked = sharedPref.getBoolean(getString(R.string.pref_key_bp_radio_ym),
                     false);
-            if (isYmChecked && !mRadioYM.isChecked()) {
+            if (isYmChecked) {
                 mRadioYM.setChecked(true);
+            } else {
+                mRadio2w.setChecked(true);
             }
             // 関連するラジオボタンを一括更新
             if (mRadioYM.isChecked()) {
-                radioYMSelected();
+                radioYMSelected(false/*グラフ型のチェック状態を更新しない*/);
             } else {
-                radio2wSelected();
+                radio2wSelected(false);
             }
             // 年月スピナーの選択位置をプリファレンスから取得した年月文字列から復元
             String ymVal = sharedPref.getString(getString(R.string.pref_key_bp_spinner_selected),
@@ -858,8 +784,8 @@ public class AppBloodPressFragment extends AppBaseFragment {
             // 先頭位置以外なら更新 ※先頭(0)ならそのまま
             if (spinnerSize > 1) {
                 // 復元した文字列に対応する位置
-                ArrayAdapter<String> adapter = (ArrayAdapter<String>) mSpinnerYM.getAdapter();
-                int pos = adapter.getPosition(ymVal);
+                mSpinnerAdapter = (ArrayAdapter<String>) mSpinnerYM.getAdapter();
+                int pos = mSpinnerAdapter.getPosition(ymVal);
                 DEBUG_OUT.accept(TAG,"Spinner.pos: " + pos);
                 if (pos > 0) {
                     mSpinnerYM.setSelection(pos);
@@ -894,9 +820,9 @@ public class AppBloodPressFragment extends AppBaseFragment {
 
     /**
      * プリファレンスの統計情報から統計情報オブジェクトを復元する
+     * @param urlPathIdx UrlPathIndex
      */
-    private BloodPressStatistics restoreStatisticsObject() {
-        UrlPathIndex urlPathIdx = getUrlPathIndex();
+    private BloodPressStatistics restoreStatisticsObject(UrlPathIndex urlPathIdx) {
         String key = mPrefStatisticsKeys[urlPathIdx.getNum()];
         SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
                 requireContext()
@@ -990,9 +916,7 @@ public class AppBloodPressFragment extends AppBaseFragment {
      * 現在のラジオボタンの状態から保存した画像ファイルが存在すればBitmapオブジェクトを取得する
      * @return 保存した画像ファイルが存在すればBitmapオブジェクト
      */
-    private Bitmap restoreBitmapFromFile() {
-        // 現在選択されているラジオボタンからURLパスインデックス取得
-        UrlPathIndex pathIdx = getUrlPathIndex();
+    private Bitmap restoreBitmapFromFile(UrlPathIndex pathIdx) {
         // 画像ファイル名保存のプリファレンスキー
         String prefKey = mPrefSaveImageKeys[pathIdx.getNum()];
         SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
@@ -1011,21 +935,19 @@ public class AppBloodPressFragment extends AppBaseFragment {
     }
 
     /**
-     * 画像保存ファイルから血圧データ取得画像表示ビューに画像を復元する
+     * 現在選択されているラジオボタンから保存済みの画像と統計情報を対応するウィジットに復元する
      */
-    private void restoreImageView() {
-        Bitmap savedBitmap = restoreBitmapFromFile();
+    private void restoreImageWithStatistics() {
+        // URLパスインデックス取得
+        UrlPathIndex pathIdx = getUrlPathIndex();
+        // 画像復元
+        Bitmap savedBitmap = restoreBitmapFromFile(pathIdx);
         DEBUG_OUT.accept(TAG, "savedBitmap: " + savedBitmap);
         if (savedBitmap != null) {
             mImgView.setImageBitmap(savedBitmap);
         }
-    }
-
-    /**
-     * プリファレンスから統計情報オブジェクトを復元し対応するビューを更新
-     */
-    private void restoreStatisticsViews() {
-        BloodPressStatistics stat = restoreStatisticsObject();
+        // 統計情報復元
+        BloodPressStatistics stat = restoreStatisticsObject(pathIdx);
         if (stat != null) {
             showStatistics(stat);
         } else {

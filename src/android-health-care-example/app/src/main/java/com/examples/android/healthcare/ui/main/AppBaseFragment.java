@@ -1,10 +1,20 @@
 package com.examples.android.healthcare.ui.main;
 
+import static com.examples.android.healthcare.functions.MyLogging.DEBUG_OUT;
+
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.res.AssetManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.telephony.TelephonyManager;
+import android.text.TextUtils;
+import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -13,23 +23,44 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
 
+import com.examples.android.healthcare.HealthcareApplication;
 import com.examples.android.healthcare.R;
 import com.examples.android.healthcare.SettingsActivity;
+import com.examples.android.healthcare.SharedPrefUtil;
 import com.examples.android.healthcare.constants.RequestDevice;
+import com.examples.android.healthcare.data.GetRegisterDaysResult;
+import com.examples.android.healthcare.data.ResponseRegisterDays;
 import com.examples.android.healthcare.data.ResponseStatus;
 import com.examples.android.healthcare.dialogs.CustomDialogs;
 import com.examples.android.healthcare.dialogs.CustomDialogs.ConfirmDialogFragment.ConfirmOkCancelListener;
+import com.examples.android.healthcare.functions.FileManager;
+import com.examples.android.healthcare.tasks.GetRegisterDaysRepository;
+import com.examples.android.healthcare.tasks.HealthcareRepository;
+import com.examples.android.healthcare.tasks.NetworkUtil;
+import com.examples.android.healthcare.tasks.RequestParamBuilder;
+import com.examples.android.healthcare.tasks.Result;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * AppXXXXFragment共通フラグメント
  */
 public abstract class AppBaseFragment extends Fragment {
+    private static final String TAG = AppBaseFragment.class.getSimpleName();
 
     // フラグメント位置キー
     public static final String FRAGMENT_POS_KEY = "fragPos";
+    // 初期表示用イメージ画像ファイル名
+    private static final String NO_IMAGE_FILE = "NoImage_500x700.png";
+    // 初期画面ビットマップ
+    private Bitmap mNoImageBitmap;
+    // 画像取得リクエスト時のヘッダー用の表示デバイス情報
+    private DisplayMetrics mMetrics;
+    private String mFirstRegisterDay;
+
     // ウォーニングメッセージ用マップ
     private final Map<Integer, String> mResponseWarningMap = new HashMap<>();
 
@@ -40,10 +71,117 @@ public abstract class AppBaseFragment extends Fragment {
         initResponseWarningMap();
     }
 
+    /**
+     * 初回登録日の存在チェックし、存在しない場合は暗黙的にリクエストする
+     */
+    private String requestFirstRegisterDayImplicitly(String emailAddress) {
+        String firstRegisterDay = SharedPrefUtil.getFirstRegisterDay(requireContext());
+        DEBUG_OUT.accept(TAG, "firstRegisterDay: " + firstRegisterDay);
+        if (TextUtils.isEmpty(firstRegisterDay)) {
+            // 暗黙的にサーバーにリクエストする
+            RequestDevice device =  NetworkUtil.getActiveNetworkDevice(requireContext());
+            if (device == RequestDevice.NONE) {
+                // アクションバーのサブタイトルにメッセージを出力する
+                showNetworkUnavailableInStatus(getWaringView());
+                return null;
+            }
+
+            HealthcareApplication app = (HealthcareApplication) requireActivity().getApplication();
+            String requestUrl = app.getmRequestUrls().get(device.toString());
+            Map<String, String> headers = app.getRequestHeaders();
+            // ユーザの初回登録日取得
+            HealthcareRepository<GetRegisterDaysResult> repos = new GetRegisterDaysRepository();
+            String reqParam = new RequestParamBuilder(emailAddress).build();
+            // レスポンスから取得した初回登録日を返すオブジェクト
+            AtomicReference<String> getFirstDay = new AtomicReference<>();
+            repos.makeGetRequest(0, requestUrl, reqParam, headers,
+                    app.mEexecutor, app.mHandler, (result) -> {
+                        if (result instanceof Result.Success) {
+                            GetRegisterDaysResult daysResult =
+                                    ((Result.Success<GetRegisterDaysResult>) result).get();
+                            ResponseRegisterDays days = daysResult.getData();
+                            DEBUG_OUT.accept(TAG, "ResponseRegisterDays: " + days);
+                            String firstDay = days.getFirstDay();
+                            if (firstDay != null) {
+                                // プリファレンスに保存する
+                                SharedPrefUtil.saveFirstRegisterDay(requireContext(),
+                                        firstDay);
+                            }
+                            getFirstDay.set(firstDay);
+                        } else if (result instanceof Result.Warning) {
+                            // ウォーニングメッセージをログに出力
+                            ResponseStatus status =
+                                    ((Result.Warning<?>) result).getResponseStatus();
+                            Log.w(TAG, "WarningStatus: " + status);
+                            showWarningInStatusView(getWaringView(),
+                                    getWarningFromBadRequestStatus(status));
+                            getFirstDay.set(null);
+                        } else if (result instanceof Result.Error) {
+                            // 例外メッセージをダイアログに表示
+                            Exception exception = ((Result.Error<?>) result).getException();
+                            Log.w(TAG, "Exception: " + exception);
+                            showDialogExceptionMessage(exception);
+                            getFirstDay.set(null);
+                        }
+                    });
+            return getFirstDay.get();
+        } else {
+            return firstRegisterDay;
+        }
+    }
+
     @Override
     public void onResume() {
-        // サブクラスのフラグメントタイトル
+        DEBUG_OUT.accept(TAG, "onResume()");
+
+        // サブクラスのフラグメントタイトルをアクションバータイトルに設定
         setActionBarTitle(getFragmentTitle());
+
+        // 画像表示系フラグメントのみ初期イメージを取得する
+        if (getFragmentPosition() > 0) {
+            // 前回表示されたウォーニングビューを隠す
+            hideStatusView(getWaringView());
+            // メールアドレス ※メールアドレスが未設定ならこの画面には遷移しない
+            String emailAddress = SharedPrefUtil.getEmailAddressInSettings(requireContext());
+            if (emailAddress != null) {
+                mMetrics = new DisplayMetrics();
+                requireActivity().getWindowManager().getDefaultDisplay().getMetrics(mMetrics);
+                DEBUG_OUT.accept(TAG, "" + mMetrics);
+
+                // 初期画面ビットマップイメージ
+                if (mNoImageBitmap == null) {
+                    AssetManager am = requireContext().getAssets();
+                    try {
+                        mNoImageBitmap = BitmapFactory.decodeStream(am.open(NO_IMAGE_FILE));
+                        DEBUG_OUT.accept(TAG, "mNoImageBitmap: " + mNoImageBitmap);
+                        ImageView iv = getImageView();
+                        if (iv != null) {
+                            iv.setImageBitmap(mNoImageBitmap);
+                        }
+                    }catch (IOException iex) {
+                        // 通常ここには来ない
+                        Log.w(TAG, iex.getLocalizedMessage());
+                    }
+                }
+
+                // 暗黙的にユーザの初回登録日を取得する
+                mFirstRegisterDay = requestFirstRegisterDayImplicitly(emailAddress);
+
+                // DEBUG 保存されている画像ファイル
+                String fileNames = FileManager.checkFileNamesInContextDir(requireContext());
+                DEBUG_OUT.accept(TAG, "Context.FilesDir in [ " + fileNames + "]");
+                // DEBUG プリファレンスデータ
+                SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
+                        requireContext()
+                );
+                Map<String, ?> prefAll = sharedPref.getAll();
+                DEBUG_OUT.accept(TAG, "prefAll: " + prefAll);
+            } else {
+                showConfirmRequireEmailAddress();
+            }
+        }
+
+        // サブラクスのonResume()
         super.onResume();
     }
 
@@ -60,24 +198,69 @@ public abstract class AppBaseFragment extends Fragment {
     }
 
     /**
+     * デバイスのDisplayMetricsを取得する
+     * <ul>
+     *     <l>血圧測定データグラフ表示</l>
+     *     <l>睡眠管理データグラフ表示</l>
+     * </ul>
+     * @return デバイスのDisplayMetrics
+     */
+    public DisplayMetrics getDisplayMetrics() {
+        assert mMetrics != null;
+        return mMetrics;
+    }
+
+    /**
+     * ユーザの初回登録日を取得する
+     * @return 初回登録日
+     */
+    public String getFirstRegisterDay() {
+        return mFirstRegisterDay;
+    }
+
+    /**
+     * 初期画面ビットマップを取得する
+     * @return 初期画面ビットマップ
+     */
+    public Bitmap getNoImageBitmap() {
+        return mNoImageBitmap;
+    }
+
+    /**
      * ウォニング時のレスポンスステータスとメッセージ変換用マップからステータス用の文字列を取得する
-     * <pre>(例) Flaskアプリ側のBadRequest時の"message"の形式: errorCode + カンマ + エラー内容
+     * <pre>例 (1) Flaskアプリ側のBadRequest時の"message"の形式: errorCode + カンマ + エラー内容
      * {"status": { "code": 400, "message": "461,User is not found."}}
+     * </pre>
+     * <pre>例 (2) Flaskシステムがスローする例外の場合はメッセージのみとなる
+     * {"status": { "code": 404, "message": "he requested URL was not found on the server. ..."}}
      * </pre>
      * @param responseStatus ウォニング時のレスポンスステータス
      * @return ステータス用の文字列
      */
     public String getWarningFromBadRequestStatus(ResponseStatus responseStatus) {
         String[] items = responseStatus.getMessage().split(",");
-        int warningCode = Integer.parseInt(items[0]);
-        String message = mResponseWarningMap.get(warningCode);
-        if (message == null) {
-            if (items.length > 1) {
-                message = items[1];
-            } else {
-                message = responseStatus.getMessage();
+        String message;
+        if (items.length > 1) {
+            // コード付きメッセージ
+            try {
+                int warningCode = Integer.parseInt(items[0]);
+                message = mResponseWarningMap.get(warningCode);
+                if (message == null) {
+                    // マップに未定義なら2つ目の項目 ※Androidアプリ側のBUGの可能性
+                    message = items[1];
+                }
+            } catch (NumberFormatException e) {
+                // 先頭が数値以外ならFlaskアプリ側BUGの可能性
+                message = items[0];
             }
+        } else if (items.length == 1) {
+            // メッセージのみ ※Flask (404 URL Not found | 500 InternalError)
+            message = items[0];
+        } else {
+            // 想定しないエラーの場合
+            message = responseStatus.getMessage();
         }
+
         return message;
     }
 
@@ -126,7 +309,7 @@ public abstract class AppBaseFragment extends Fragment {
      * <p>ActionBarサブタイトルにネットワーク種別を表示</p>
      * @param device RequestDevice
      */
-    public void setRequestComplete(RequestDevice device) {
+    public void showRequestComplete(RequestDevice device) {
         String networkType;
         if (device == RequestDevice.MOBILE) {
             TelephonyManager manager =
@@ -263,15 +446,37 @@ public abstract class AppBaseFragment extends Fragment {
 
     //** サブクラスで実装しなければならないメソッド ******
     /**
+     * サブラクスのViewPager2用フラグメントインデックスを取得する
+     * <p>全てのサブクラスで必須</p>
+     * @return フラグメントインデックス
+     */
+    public abstract int getFragmentPosition();
+
+    /**
      * サブクラスのフラグメントタイトルを取得する
+     * <p>全てのサブクラスで必須</p>
      * @return フラグメントタイトル
      */
     public abstract String getFragmentTitle();
 
     /**
-     * サブラクスのViewPager2用フラグメントインデックスを取得する
-     * @return フラグメントインデックスを取得する
+     * 画像取得系サブクラスのImageViewの参照を取得する
+     * <ul>
+     *     <li>画像表示系フラグメントは必須</li>
+     *     <li>登録系フラグメントはnull</li>
+     * </ul>
+     * @return 画像表示用のImageView
      */
-    public abstract int getFragmentPosition();
+    public abstract ImageView getImageView();
+
+    /**
+     * 画像取得系サブクラスのウォーニングビューを取得する
+     * <ul>
+     *     <li>画像表示系フラグメントは必須</li>
+     *     <li>登録系フラグメントはnull</li>
+     * </ul>
+     * @return ウォーニングビュー
+     */
+    public abstract TextView getWaringView();
 
 }

@@ -44,6 +44,7 @@ public class AppImageFragUtil {
      * 年月スピナーから選択された値と選択位置を保持するクラス
      */
     public static class SpinnerSelected {
+        public static final int UNSELECTED = -1;
         private int position;
         private String value;
 

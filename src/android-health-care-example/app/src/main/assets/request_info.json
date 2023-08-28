@@ -1,6 +1,6 @@
 {
   "urls": {
-    "wifi": "http://hp-z820.local:5000/healthcare",
+    "wifi": "http://hp-z820.local:12920/healthcare",
     "mobile": "http://raspi.examples.com:12920/healthcare"
   },
   "headers": {

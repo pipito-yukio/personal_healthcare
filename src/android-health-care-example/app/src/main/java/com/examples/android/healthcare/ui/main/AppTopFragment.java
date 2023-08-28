@@ -19,6 +19,7 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
@@ -229,6 +230,16 @@ public class AppTopFragment extends AppBaseFragment {
     @Override
     public String getFragmentTitle() {
         return getString(R.string.app_top_frag_title);
+    }
+
+    public ImageView getImageView() {
+        // 登録画面では参照されない
+        return null;
+    }
+
+    public TextView getWaringView() {
+        // 登録画面では参照されない
+        return null;
     }
     //** END implements abstract methods ****************************
 
@@ -1943,7 +1954,7 @@ public class AppTopFragment extends AppBaseFragment {
                         app.mEexecutor, app.mHandler, (result) -> {
                             // ボタン復帰
                             mBtnSend.setEnabled(true);
-                            setRequestComplete(device);
+                            showRequestComplete(device);
 
                             if (result instanceof Result.Success) {
                                 // 更新前のプリファレンスから最新登録日付を取得する
@@ -2052,7 +2063,7 @@ public class AppTopFragment extends AppBaseFragment {
                     // ボタン復帰
                     mBtnSend.setEnabled(true);
                     // リクエスト完了時にネットワーク種別を表示
-                    setRequestComplete(device);
+                    showRequestComplete(device);
 
                     if (result instanceof Result.Success) {
                         GetCurrentDataResult dataResult =

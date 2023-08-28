@@ -1,0 +1,10 @@
+{
+  "urls": {
+    "wifi": "http://hp-z820.local:5000/healthcare",
+    "mobile": "http://raspi.examples.com:12920/healthcare"
+  },
+  "headers": {
+    "X-Request-Phone-Token": "KU6kblYHx.........FlaskApp.key.......LkvhJy2Bs",
+    "X-Request-Network-Type": "wifi"
+  }
+}

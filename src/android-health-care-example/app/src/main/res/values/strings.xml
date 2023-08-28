@@ -41,10 +41,8 @@
     <string name="chklbl_take_medicine">服薬有無</string>
     <string name="chklbl_bathing">入浴</string>
     <string name="chk_condition_memo_editable">編集可能にする</string>
-
     <string name="lbl_btn_save">保存</string>
     <string name="lbl_btn_registered">登録済み</string>
-
     <string name="alertdialogtitle_toiletvisits">回数入力</string>
     <string name="alertdialogtitle_sleepscore">スコア入力</string>
     <string name="alertdialogtitle_bloodpressure">血圧測定</string>
@@ -110,8 +108,14 @@
     <string name="last_saved_json_file">last_saved.json</string>
     <!-- 登録済みJSONファイル名 -->
     <string name="latest_registered_json_file">latest_registered.json</string>
-    <!-- 画像保存ファイル名 -->
+    <!-- 睡眠管理データ可視化フラグメントラベル -->
+    <string name="sp_lbl_spbtn_save">保存</string>
+
     <!-- 睡眠管理データ可視化プリファレンス -->
+    <!-- 期間(開始)が期間(終了)より大きい -->
+    <string name="title_imgfrag_sm_hist">ヒストグラムの期間設定</string>
+    <string name="warning_imgfrag_sm_hist_not_selected">未選択の期間が有ります。</string>
+    <string name="warning_imgfrag_sm_hist_range">選択された期間に誤りがあります。</string>
     <!-- 画像ファイル名 -->
     <string name="file_name_bp_line_ym">img_bp_line_ym.png</string>
     <string name="file_name_bp_line_2w">img_bp_line_2w.png</string>
@@ -134,16 +138,21 @@
     <string name="file_name_sm_bar_ym">img_sm_bar_ym.png</string>
     <string name="file_name_sm_bar_2w">img_sm_bar_2w.png</string>
     <string name="file_name_sm_hist_range">img_sm_hist_range.png</string>
+    <string name="pref_key_sm_stop_saved">frag_sm_stop_saved</string>
     <string name="pref_key_sm_bar_ym">img_sm_bar_ym</string>
     <string name="pref_key_sm_bar_2w">img_sm_bar_2w</string>
     <string name="pref_key_sm_hist_range">img_sm_hist_range</string>
-    <string name="pref_key_sm_stop_saved">frag_sm_stop_saved</string>
+    <string name="pref_key_sm_radio_2w">frag_sm_radio_2w</string>
     <string name="pref_key_sm_radio_ym">frag_sm_radio_ym</string>
-    <string name="pref_key_sm_radio_bar">frag_sm_radio_bar</string>
+    <string name="pref_key_sm_radio_range">frag_sm_radio_range</string>
     <string name="pref_stat_sm_bar_ym">frag_stat_sm_bar_ym</string>
     <string name="pref_stat_sm_bar_2w">frag_stat_sm_bar_2w</string>
     <string name="pref_stat_sm_hist_range">frag_stat_sm_hist_range</string>
-    <string name="pref_key_sm_spinner_selected">frag_sm_spinner_selected</string>
+    <string name="pref_key_sm_spinner_ym_selected">frag_sm_spinner_ym_selected</string>
+    <string name="pref_key_sm_spinner_from_selected">frag_sm_spinner_from_selected</string>
+    <string name="pref_key_sm_spinner_to_selected">frag_sm_spinner_to_selected</string>
+    <!-- 血圧測定データ可視化 / 睡眠管理データ可視化共通 -->
+    <string name="pref_value_stop_saved">saveRadioButtonsState</string>
 
     <!-- ウォーニングメッセージ -->
     <string name="warning_need_email_address">ユーザ設定でメールアドレスを入力してください</string>
@@ -188,16 +197,20 @@
     <string name="value_frag_sm_stat_sleeping_blank">--:--</string>
     <string name="value_frag_sm_stat_deep_blank">---</string>
     <!-- 画像取得Framgent共通-->
+    <!-- ラベル -->
+    <string name="imgfrag_lbl_ym">月間</string>
+    <string name="imgfrag_lbl_2w">２週間</string>
     <string name="img_content_description">Matplotlib output image</string>
-    <string name="imgfrag_radio_lbl_2w">２週間</string>
-    <string name="imgfrag_radio_lbl_ym">月間</string>
-    <string name="imgfrag_chk_lbl_today">本日含む</string>
-    <string name="imgfrag_radio_lbl_graph_line">折線グラフ</string>
-    <string name="imgfrag_radio_lbl_graph_bar">棒グラフ</string>
-    <string name="imgfrag_radio_lbl_graph_hist">ヒストグラム</string>
-    <string name="imgfrag_spiner_ym_prompt">年月選択</string>
-    <string name="imgfrag_btn_lbl_ima_request">最新取得</string>
+    <string name="imgfrag_lbl_today">本日含む</string>
+    <string name="imgfrag_lbl_graph_line">折線グラフ</string>
+    <string name="imgfrag_lbl_graph_bar">棒グラフ</string>
+    <string name="imgfrag_btn_lbl_get_request">最新取得</string>
     <string name="imgfrag_chk_lbl_save">画像保存</string>
+    <string name="imgfrag_spiner_ym_prompt">年月選択</string>
+    <!-- 睡眠管理画像取得Framgentのみ -->
+    <string name="imgfrag_sm_lbl_graph_hist">ヒストグラム</string>
+    <string name="imgfrag_sm_lbl_range_from">期間</string>
+    <string name="imgfrag_sm_lbl_range_to">〜</string>
 
     <!-- SettingsActivity preference Titles -->
     <string name="pref_app_top_frag_title">ユーザー設定</string>

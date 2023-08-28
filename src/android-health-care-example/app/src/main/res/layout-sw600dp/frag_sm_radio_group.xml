@@ -6,8 +6,8 @@
     android:layout_height="wrap_content"
     android:padding="@dimen/frag_top_radio_group_padding">
 
-    <!-- スマホサイズ -->
-    <!-- 上段ラジオ選択グループ -->
+    <!-- for 7inch/10inch tablet port -->
+    <!-- 上段ラジオ選択グループに実行ボタンをもってくる -->
     <RadioGroup
         android:id="@+id/radioGroupSmDateRange"
         android:layout_width="wrap_content"
@@ -45,11 +45,38 @@
             android:layout_marginStart="@dimen/radio_margin_start"
             android:text="@string/imgfrag_sm_lbl_graph_hist" />
     </RadioGroup>
-    <!-- ２段目 月間スピナー + 実行ボタン -->
+    <!-- 実行ボタン + チェックボックス -->
+    <Button
+        android:id="@+id/btnSmGetRequest"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/imgfrag_btn_margin_start"
+        android:layout_gravity="center"
+        android:text="@string/imgfrag_btn_lbl_get_request"
+        style="@android:style/Widget.Material.Button.Colored"
+        app:layout_constraintStart_toEndOf="@+id/radioGroupSmDateRange"
+        app:layout_constraintBottom_toBottomOf="@id/radioGroupSmDateRange"
+        app:layout_constraintTop_toTopOf="@id/radioGroupSmDateRange"
+        />
+    <!-- 右端 -->
+    <CheckBox
+        android:id="@+id/chkSmSaveImg"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/imgfrag_btn_margin_start"
+        android:layout_gravity="center"
+        android:checked="true"
+        android:text="@string/imgfrag_chk_lbl_save"
+        app:layout_constraintStart_toEndOf="@+id/btnSmGetRequest"
+        app:layout_constraintBottom_toBottomOf="@id/radioGroupSmDateRange"
+        app:layout_constraintTop_toTopOf="@id/radioGroupSmDateRange"
+        />
+    <!-- ２段目 スピナー群 -->
     <!-- 月間(ラベル) -->
     <TextView
         android:id="@+id/tvSmLblYm"
         style="@style/LavelStyleWithSpinner"
+        android:layout_gravity="center"
         android:text="@string/imgfrag_lbl_ym"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/radioGroupSmDateRange" />
@@ -61,73 +88,53 @@
         app:layout_constraintEnd_toStartOf="@id/guideFragSmStart1"
         app:layout_constraintStart_toEndOf="@id/tvSmLblYm"
         app:layout_constraintTop_toTopOf="@id/tvSmLblYm" />
-    <!-- 実行 -->
-    <Button
-        android:id="@+id/btnSmGetRequest"
-        style="@android:style/Widget.Material.Button.Colored"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginEnd="@dimen/imgfrag_right_parent_margin_end"
-        android:text="@string/imgfrag_btn_lbl_get_request"
-        app:layout_constraintBottom_toBottomOf="@id/tvSmLblYm"
-        app:layout_constraintEnd_toStartOf="@+id/chkSmSaveImg"
-        app:layout_constraintStart_toEndOf="@+id/spinnerSmYearMonth"
-        app:layout_constraintTop_toTopOf="@id/tvSmLblYm"
-        app:layout_constraintHorizontal_bias="0.5"
-        />
-
-    <CheckBox
-        android:id="@+id/chkSmSaveImg"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginEnd="@dimen/imgfrag_right_parent_margin_end"
-        android:checked="true"
-        android:scaleX="@dimen/check_small"
-        android:text="@string/imgfrag_chk_lbl_save"
-        app:layout_constraintBottom_toBottomOf="@id/tvSmLblYm"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/btnSmGetRequest"
-        app:layout_constraintTop_toTopOf="@id/tvSmLblYm"
-        app:layout_constraintHorizontal_bias="0.5"
-        />
-
-    <!-- ３段目 -->
     <!-- 期間(ラベル) -->
     <TextView
         android:id="@+id/tvSmLblRangeFrom"
         style="@style/LavelStyleWithSpinner"
+        android:layout_gravity="center"
         android:text="@string/imgfrag_sm_lbl_range_from"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btnSmGetRequest" />
+        app:layout_constraintBottom_toBottomOf="@id/tvSmLblYm"
+        app:layout_constraintStart_toEndOf="@id/guideFragSmStart1"
+        app:layout_constraintTop_toTopOf="@id/tvSmLblYm" />
     <!-- 期間(開始)スピナー -->
     <Spinner
         android:id="@+id/spinnerSmRangeFrom"
         style="@style/MultiSpinnersInLineStyle"
-        app:layout_constraintBottom_toBottomOf="@id/tvSmLblRangeFrom"
-        app:layout_constraintEnd_toStartOf="@id/guideFragSmStart1"
+        app:layout_constraintBottom_toBottomOf="@id/tvSmLblYm"
+        app:layout_constraintEnd_toStartOf="@id/guideFragSmStart2"
         app:layout_constraintStart_toEndOf="@id/tvSmLblRangeFrom"
-        app:layout_constraintTop_toTopOf="@id/tvSmLblRangeFrom" />
+        app:layout_constraintTop_toTopOf="@id/tvSmLblYm" />
     <!-- 〜(ラベル) -->
     <TextView
         android:id="@+id/tvSmLblRangeTo"
         style="@style/LavelStyleWithSpinner"
+        android:layout_gravity="center"
         android:text="@string/imgfrag_sm_lbl_range_to"
-        app:layout_constraintBottom_toBottomOf="@id/tvSmLblRangeFrom"
-        app:layout_constraintStart_toEndOf="@id/guideFragSmStart1"
-        app:layout_constraintTop_toTopOf="@id/tvSmLblRangeFrom" />
+        app:layout_constraintBottom_toBottomOf="@id/tvSmLblYm"
+        app:layout_constraintStart_toEndOf="@id/guideFragSmStart2"
+        app:layout_constraintTop_toTopOf="@id/tvSmLblYm" />
     <!-- 期間(終了)スピナー -->
     <Spinner
         android:id="@+id/spinnerSmRangeTo"
         style="@style/MultiSpinnersInLineStyle"
-        app:layout_constraintBottom_toBottomOf="@id/tvSmLblRangeFrom"
-        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@id/tvSmLblRangeTo"
-        app:layout_constraintTop_toTopOf="@id/tvSmLblRangeFrom" />
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="@id/tvSmLblYm"
+        app:layout_constraintTop_toTopOf="@id/tvSmLblYm"
+        />
 
     <androidx.constraintlayout.widget.Guideline
         android:id="@+id/guideFragSmStart1"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        app:layout_constraintGuide_percent=".52" />
+        app:layout_constraintGuide_percent=".34" />
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideFragSmStart2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent=".68" />
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -128,4 +128,20 @@
         <item name="android:layout_marginTop">3dp</item>
         <item name="android:background">?android:attr/listDivider</item>
     </style>
+    <!-- 画像取得系フラグメントスタイル -->
+    <!-- スピナー前後のラベルスタイル -->
+    <style name="LavelStyleWithSpinner" parent="@style/FramedTextView">
+        <item name="android:textSize">15sp</item>
+        <item name="android:layout_marginStart">@dimen/frag_stat_margin_start2</item>
+    </style>
+    <!-- 睡眠管理データグラフ表示画面用 (複数のスピナーを制約により幅を配分する) -->
+    <!-- スピナースタイル: 幅は前後のウィジットに制約を設けるため "0dp"を指定 -->
+    <style name="MultiSpinnersInLineStyle" parent="android:Widget.Material.Spinner.Underlined">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginStart">@dimen/imgfrg_spinner_margin_start</item>
+        <item name="android:layout_marginEnd">@dimen/imgfrg_spinner_margin_start</item>
+        <item name="android:layout_gravity">center</item>
+        <item name="android:drawSelectorOnTop">true</item>
+    </style>
 </resources>

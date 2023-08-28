@@ -3,13 +3,11 @@ package com.examples.android.healthcare.ui.main;
 import static com.examples.android.healthcare.functions.MyLogging.DEBUG_OUT;
 
 import android.content.SharedPreferences;
-import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.os.Handler;
 import android.text.TextUtils;
-import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -35,18 +33,13 @@ import com.examples.android.healthcare.SharedPrefUtil;
 import com.examples.android.healthcare.constants.RequestDevice;
 import com.examples.android.healthcare.data.SleepManStatistics;
 import com.examples.android.healthcare.data.GetImageDataResult;
-import com.examples.android.healthcare.data.GetRegisterDaysResult;
 import com.examples.android.healthcare.data.NocturiaFactors;
 import com.examples.android.healthcare.data.RegisterData;
 import com.examples.android.healthcare.data.ResponseImageData;
-import com.examples.android.healthcare.data.ResponseRegisterDays;
 import com.examples.android.healthcare.data.ResponseStatus;
 import com.examples.android.healthcare.data.SleepManagement;
 import com.examples.android.healthcare.functions.AppImageFragUtil;
-import com.examples.android.healthcare.functions.FileManager;
 import com.examples.android.healthcare.tasks.GetSleepManImageRepository;
-import com.examples.android.healthcare.tasks.GetRegisterDaysRepository;
-import com.examples.android.healthcare.tasks.HealthcareRepository;
 import com.examples.android.healthcare.tasks.NetworkUtil;
 import com.examples.android.healthcare.tasks.RequestParamBuilder;
 import com.examples.android.healthcare.tasks.Result;
@@ -62,8 +55,6 @@ import java.util.Map;
  */
 public class AppSleepManFragment extends AppBaseFragment {
     private static final String TAG = AppSleepManFragment.class.getSimpleName();
-    // 初期表示用イメージ
-    private static final String NO_IMAGE_FILE = "NoImage_500x700.png";
     // 当日データフォーマット: "測定日,起床時刻,夜間トイレ回数,睡眠スコア,睡眠時間,深い睡眠"
     private static final String FMT_2W_TODAY = "%s,%s,%d,%d,%s,%s";
     // 統計情報フォーマット (前空白の4桁)
@@ -73,7 +64,7 @@ public class AppSleepManFragment extends AppBaseFragment {
     enum UrlPathIndex {
         BAR_YM(0, "月間 棒グラフ"),
         BAR_2W(1, "２週間前 棒グラフ"),
-        HIST_YM(2, "期間 ヒストグラム");
+        HIST_RANGE(2, "期間 ヒストグラム");
 
         private final int num;
         private final String name;
@@ -87,10 +78,9 @@ public class AppSleepManFragment extends AppBaseFragment {
 
     // 画像ファイル保存、プリファレンスコミット時に利用するハンドラー
     private final Handler mHandler = new Handler();
-    private Bitmap mNoImageBitmap;
     // プロット画像用ImageView
     private ImageView mImgView;
-    // ラジオグループ
+    // 検索期間(月間/２週間前) ラジオグループ
     private RadioGroup mRGrpDateRange;
     // 最新取得ボタン
     private Button mBtnGetRequest;
@@ -98,14 +88,20 @@ public class AppSleepManFragment extends AppBaseFragment {
     private RadioButton mRadioYM;
     // ２週間前ラジオボタン
     private RadioButton mRadio2w;
-    // 棒グラフ
-    private RadioButton mRadioGraphBar;
-    // ヒストグラム
-    private RadioButton mRadioGraphHist;
+    // ヒストグラム(期間)
+    private RadioButton mRadioHistRange;
     // 当日データ含む
     private CheckBox mChkIncludeToday;
     // 年月選択スピナー
     private Spinner mSpinnerYM;
+    // 期間(開始)選択スピナー
+    private Spinner mSpinnerRangeFrom;
+    // 期間(終了)選択スピナー
+    private Spinner mSpinnerRangeTo;
+    // 全スピナー配列 ※まとめて設定する場合に使用
+    private Spinner[] mAllSpinners;
+    // 年月選択スピナーアダブター
+    private ArrayAdapter<String> mSpinnerAdapter;
     // 画像保存チェック
     private CheckBox mChkSaveImg;
     // 統計情報(平均値)用ウィジット
@@ -117,12 +113,12 @@ public class AppSleepManFragment extends AppBaseFragment {
     private TextView mTvDeepSleepingTime;
     // ウォーニング用ステータス
     private TextView mWarningStatus;
-
-    private DisplayMetrics mMetrics;
-    private int mImageWd;
-    private int mImageHt;
     // 年月スピナー選択値を保持するオブジェクト
-    private AppImageFragUtil.SpinnerSelected mSpinnerSelected;
+    private AppImageFragUtil.SpinnerSelected mSpinnerYMSelected;
+    // 期間(開始)スピナー選択値を保持するオブジェクト
+    private AppImageFragUtil.SpinnerSelected mSpinnerFromSelected;
+    // 期間(終了)スピナー選択値を保持するオブジェクト
+    private AppImageFragUtil.SpinnerSelected mSpinnerToSelected;
     // 画像の保存ファイル名配列
     private String[] mSaveImageNames;
     // 画像のプリファレンス保存ファイル名配列
@@ -154,6 +150,17 @@ public class AppSleepManFragment extends AppBaseFragment {
     public String getFragmentTitle() {
         return getString(R.string.imgfrag_sm_app_title);
     }
+
+    public ImageView getImageView() {
+        assert mImgView != null;
+        return mImgView;
+    }
+
+    @Override
+    public TextView getWaringView() {
+        assert mWarningStatus != null;
+        return mWarningStatus;
+    }
     //** END implements abstract methods ****************************
 
     /**
@@ -163,13 +170,10 @@ public class AppSleepManFragment extends AppBaseFragment {
     private UrlPathIndex getUrlPathIndex() {
         UrlPathIndex result;
         if (mRadioYM.isChecked()) {
-            // 月間
-            if (mRadioGraphBar.isChecked()) {
-                result = UrlPathIndex.BAR_YM;
-            } else {
-                // ヒストグラム
-                result = UrlPathIndex.HIST_YM;
-            }
+            result = UrlPathIndex.BAR_YM;
+        } else if (mRadioHistRange.isChecked()) {
+            // ヒストグラム
+            result = UrlPathIndex.HIST_RANGE;
         } else {
             // ２週間
             result = UrlPathIndex.BAR_2W;
@@ -224,8 +228,9 @@ public class AppSleepManFragment extends AppBaseFragment {
         return null;
     }
 
+    //** START request with repository *****************************
     /**
-     * リクエストパラメータ生成
+     * 画像取得用のリクエストパラメータ生成
      * @param emailAddress メールアドレス
      * @return リクエストパラメータ文字列
      */
@@ -233,18 +238,18 @@ public class AppSleepManFragment extends AppBaseFragment {
         RequestParamBuilder builder = new RequestParamBuilder(emailAddress);
         if (mRadioYM.isChecked()) {
             // 月間データ: 年月スピナーで選択されたオブジェクトから値を取得
-            String value = mSpinnerSelected.getValue();
+            String value = mSpinnerYMSelected.getValue();
             // リクエスト用に区切りをハイフンに置き換える
             String reqYearMonth = value.replace("/", "-");
-            if (mRadioGraphBar.isChecked()) {
-                builder.addYearMonth(reqYearMonth);
-            } else {
-                // ヒストグラムはスピナーの年月から開始日と終了日を生成する
-                String startDay = reqYearMonth + "-01";
-                String endDay = AppImageFragUtil.getLastDayInYearMonth(reqYearMonth);
-                builder.addStartDay(startDay)
-                        .addEndDay(endDay);
-            }
+            builder.addYearMonth(reqYearMonth);
+        } else if (mRadioHistRange.isChecked()) {
+            // ヒストグラム: 開始スピナーから開始日="年月/01",終了スピナーから終了日="年月/末日"
+            String fromYM = mSpinnerFromSelected.getValue();
+            String startDay = fromYM.replace("/", "-") + "-01";
+            String toYM = mSpinnerToSelected.getValue();
+            String reqToYm = toYM.replace("/", "-");
+            String endDay = AppImageFragUtil.getLastDayInYearMonth(reqToYm);
+            builder.addStartDay(startDay).addEndDay(endDay);
         } else {
             // ２週間は棒グラフのみ: 検索終了日に昨日を設定
             String yesterday = AppImageFragUtil.getYesterday();
@@ -260,11 +265,62 @@ public class AppSleepManFragment extends AppBaseFragment {
         return builder.build();
     }
 
-    //** START request with repository *****************************
+    /**
+     * ウォーニングメッセージを取得
+     * @param status レスポンスステータス
+     * @return ウォーニングメッセージ
+     */
+    private String getResponseWarning(ResponseStatus status) {
+        String message;
+        switch (status.getCode()) {
+            case 400: // BadRequest: リクエストパラメータなどの不備
+                message = getWarningFromBadRequestStatus(status);
+                break;
+            case 404: // NotFound: データ未登録
+                message = getString(R.string.warning_data_not_found);
+                break;
+            default: // 50x系エラー
+                message = status.getMessage();
+        }
+        return message;
+    }
+
+    /**
+     * 期間(終)は期間(始)以上であること
+     * @return エラーがある場合はエラーメッセージ、ない場合はnull
+     */
+    private String checkHistRangeSelections() {
+        String selectedFrom = mSpinnerFromSelected.getValue();
+        String selectedTo = mSpinnerToSelected.getValue();
+        if (!TextUtils.isEmpty(selectedFrom) && !TextUtils.isEmpty(selectedTo)) {
+            String sFrom = selectedFrom.replace("/", "");
+            String sTo = selectedTo.replace("/", "");
+            int fromVal = Integer.parseInt(sFrom);
+            int toVal = Integer.parseInt(sTo);
+            if (fromVal > toVal) {
+                return getString(R.string.warning_imgfrag_sm_hist_range);
+            }
+        } else {
+            return getString(R.string.warning_imgfrag_sm_hist_not_selected);
+        }
+
+        return null;
+    }
+
     /**
      * 画像取得リクエスト
      */
     private void getImageRequest() {
+        // 期間ラジオボタンによって必要な値が設定されているかチェックする
+        if (mRadioHistRange.isChecked()) {
+            String chkMsg = checkHistRangeSelections();
+            if (chkMsg != null) {
+                showMessageOkDialog(getString(R.string.title_imgfrag_sm_hist), chkMsg,
+                        "WaringDialog");
+                return;
+            }
+        }
+
         // ネットワークデバイスが無効なら送信しない
         RequestDevice device =  NetworkUtil.getActiveNetworkDevice(requireContext());
         if (device == RequestDevice.NONE) {
@@ -279,10 +335,12 @@ public class AppSleepManFragment extends AppBaseFragment {
         // アプリケーション取得
         HealthcareApplication app = (HealthcareApplication) requireActivity().getApplication();
         String requestUrl = app.getmRequestUrls().get(device.toString());
+        // 画像取得リクエスト用リポジトリ
         GetSleepManImageRepository repos = new GetSleepManImageRepository();
         // ImageViewサイズとDisplayMetrics.densityをリクエストヘッダに追加する
         Map<String, String> headers = app.getRequestHeaders();
-        AppImageFragUtil.appendImageSizeToHeaders(headers, mImageWd, mImageHt, mMetrics.density);
+        AppImageFragUtil.appendImageSizeToHeaders(headers,
+                mImgView.getWidth(), mImgView.getHeight(), getDisplayMetrics().density);
         // メールアドレス取得 ※画像取得フラグメントはメールアドレス必須のため、存在しない場合ここに来ない
         String emailAddress = SharedPrefUtil.getEmailAddressInSettings(requireContext());
         // プロット期間からURLパスインデックスを取得
@@ -296,7 +354,7 @@ public class AppSleepManFragment extends AppBaseFragment {
                     // ボタン復帰
                     mBtnGetRequest.setEnabled(true);
                     // リクエスト完了時にネットワーク種別を表示
-                    setRequestComplete(device);
+                    showRequestComplete(device);
 
                     if (result instanceof Result.Success) {
                         GetImageDataResult imageResult =
@@ -310,108 +368,50 @@ public class AppSleepManFragment extends AppBaseFragment {
                             showSuccess(urlPathIdx, data);
                             // 画像保存可否
                             if (mChkSaveImg.isChecked()) {
-                                // 月間なら選択日付をプリファレンスに保存
+                                // 選択日付をプリファレンスに保存
                                 if (mRadioYM.isChecked()) {
-                                    saveSelectedSpinnerValueInSharedPref();
+                                    // 月間
+                                    saveSelectedSpinnerValueInSharedPref(
+                                            getString(R.string.pref_key_sm_spinner_ym_selected),
+                                            mSpinnerYMSelected);
+                                } else if (mRadioHistRange.isChecked()) {
+                                    // 期間
+                                    saveSelectedSpinnerValueInSharedPref(
+                                            getString(R.string.pref_key_sm_spinner_from_selected),
+                                            mSpinnerFromSelected);
+                                    saveSelectedSpinnerValueInSharedPref(
+                                            getString(R.string.pref_key_sm_spinner_to_selected),
+                                            mSpinnerToSelected);
                                 }
                                 // 統計情報を保存
                                 saveStatisticsInSharedPref(urlPathIdx, stat);
                             }
                         } else {
                             // レコード無しなら統計情報をリセットしNoImage画像を表示
-                            resetSuccessWidgets(urlPathIdx);
-                            // 統計情報をプリファレンスから削除
-                            removeStatisticsKey(urlPathIdx);
+                            resetWidgetsWithRemovePref(urlPathIdx);
                         }
                     } else if (result instanceof Result.Warning) {
                         ResponseStatus status =
                                 ((Result.Warning<?>) result).getResponseStatus();
                         DEBUG_OUT.accept(TAG, "WarningStatus: " + status);
                         showWarningInStatusView(mWarningStatus, getResponseWarning(status));
-                        resetSuccessWidgets(urlPathIdx);
-                        removeStatisticsKey(urlPathIdx);
+                        resetWidgetsWithRemovePref(urlPathIdx);
                     } else if (result instanceof Result.Error) {
                         // 例外メッセージをダイアログに表示
                         Exception exception = ((Result.Error<?>) result).getException();
                         Log.w(TAG, "Error:" + exception);
                         showDialogExceptionMessage(exception);
-                        resetSuccessWidgets(urlPathIdx);
-                        removeStatisticsKey(urlPathIdx);
+                        resetWidgetsWithRemovePref(urlPathIdx);
                     }
                 });
     }
-
-    /**
-     * 初回登録日の存在チェックし、存在しない場合は暗黙的にリクエストする
-     */
-    private void requestFirstRegisterDayWithImplicitly() {
-        String firstRegisterDay = SharedPrefUtil.getFirstRegisterDay(requireContext());
-        DEBUG_OUT.accept(TAG, "firstRegisterDay: " + firstRegisterDay);
-        if (TextUtils.isEmpty(firstRegisterDay)) {
-            // 暗黙的にサーバーにリクエストする
-            RequestDevice device =  NetworkUtil.getActiveNetworkDevice(requireContext());
-            if (device == RequestDevice.NONE) {
-                showNetworkUnavailableInStatus(mWarningStatus);
-                return;
-            }
-
-            HealthcareApplication app = (HealthcareApplication) requireActivity().getApplication();
-            String requestUrl = app.getmRequestUrls().get(device.toString());
-            Map<String, String> headers = app.getRequestHeaders();
-            // ユーザの初回登録日取得
-            HealthcareRepository<GetRegisterDaysResult> repos = new GetRegisterDaysRepository();
-            // メールアドレス ※メールアドレスが未設定ならこの画面には遷移しない
-            String emailAddress = SharedPrefUtil.getEmailAddressInSettings(requireContext());
-            String reqParam = new RequestParamBuilder(emailAddress).build();
-            repos.makeGetRequest(0, requestUrl, reqParam, headers,
-                    app.mEexecutor, app.mHandler, (result) -> {
-                        if (result instanceof Result.Success) {
-                            GetRegisterDaysResult daysResult =
-                                    ((Result.Success<GetRegisterDaysResult>) result).get();
-                            ResponseRegisterDays days = daysResult.getData();
-                            DEBUG_OUT.accept(TAG, "ResponseRegisterDays: " + days);
-                            String firstDay = days.getFirstDay();
-                            if (firstDay != null) {
-                                // プリファレンスに保存する
-                                SharedPrefUtil.saveFirstRegisterDay(requireContext(),
-                                        firstDay);
-                                // スピナーに年月リストを設定する
-                                AppImageFragUtil.setYearMonthListToSpinnerAdapter(
-                                        (ArrayAdapter<String>) mSpinnerYM.getAdapter(),
-                                        firstDay);
-                                mBtnGetRequest.setEnabled(true);
-                            }
-                        } else if (result instanceof Result.Warning) {
-                            // ウォーニングメッセージをログに出力
-                            ResponseStatus status =
-                                    ((Result.Warning<?>) result).getResponseStatus();
-                            Log.w(TAG, "WarningStatus: " + status);
-                        } else if (result instanceof Result.Error) {
-                            // 例外メッセージをダイアログに表示
-                            Exception exception = ((Result.Error<?>) result).getException();
-                            Log.w(TAG, "Exception: " + exception);
-                        }
-                    });
-        } else {
-            // プリファレンスの初回登録日から生成する
-            AppImageFragUtil.setYearMonthListToSpinnerAdapter(
-                    (ArrayAdapter<String>) mSpinnerYM.getAdapter(),
-                    firstRegisterDay);
-            mBtnGetRequest.setEnabled(true);
-        }
-    }
     //** END request with repository *****************************
 
-    /**
-     * 当日データ含むチェックボックスウィジットの状態更新
-     */
+    /** 当日データ含むチェックボックスウィジットの状態更新 */
     private void updateCheckIncludeToday() {
-        if (mRadioYM.isChecked()) {
-            // 月間がチェックされていたら当日のチェックを外す
+        if (mRadioYM.isChecked() || mRadioHistRange.isChecked()) {
+            // 月間 or 期間: 当日不可
             mChkIncludeToday.setEnabled(false);
-            if (mChkIncludeToday.isChecked()) {
-                mChkIncludeToday.setChecked(false);
-            }
         } else {
             // ２週間なら一時保存ファイルチェック
             String savedDate = SharedPrefUtil.getLastSavedDate(requireContext());
@@ -422,48 +422,38 @@ public class AppSleepManFragment extends AppBaseFragment {
         }
     }
 
-    /** 月間ラジオボタン選択時の他のラジオボタン制御  */
+    //** START Radio Buttons control *******************************************
+    /** 2週間ラジオボタン選択時の他のラジオボタン制御 */
+    private void radio2wSelected() {
+        // 全スピナー無効
+        setAllSpinnersDisabled();
+        // 本日含むは可
+        if (!mChkIncludeToday.isEnabled()) {
+            mChkIncludeToday.setEnabled(true);
+        }
+    }
+
+    /** 月間ラジオボタン選択時の他のラジオボタン制御 */
     private void radioYMSelected() {
-        // スピナー有効
-        if (!mSpinnerYM.isEnabled()) {
-            mSpinnerYM.setEnabled(true);
-        }
-        // 棒グラフ/ヒストグラムの両方がチェックされていなかったら
-        if (!mRadioGraphBar.isChecked() && !mRadioGraphHist.isChecked()) {
-            // 棒グラフ優先
-            mRadioGraphBar.setChecked(true);
-        }
-        // ヒストグラム有効
-        if (!mRadioGraphHist.isEnabled()) {
-            mRadioGraphHist.setEnabled(true);
-        }
+        // 月間スピナー有効
+        mSpinnerYM.setEnabled(true);
+        // 期間範囲スピナー類無効
+        setRangeSpinnersEnable(false);
         // 本日含むは不可
         if (mChkIncludeToday.isEnabled()) {
             mChkIncludeToday.setEnabled(false);
         }
     }
 
-    /** 2週間ラジオボタン選択時の他のラジオボタン制御 */
-    private void radio2wSelected() {
-        // スピナー無効
-        if (mSpinnerYM.isEnabled()) {
-            mSpinnerYM.setEnabled(false);
-        }
-        // 棒グラフチェック
-        if (!mRadioGraphBar.isChecked()) {
-            mRadioGraphBar.setChecked(true);
-        }
-        // ヒストグラム無効
-        if (mRadioGraphHist.isEnabled()) {
-            mRadioGraphHist.setEnabled(false);
-        }
-        // ヒストグラムのチェックを外す
-        if (mRadioGraphHist.isChecked()) {
-            mRadioGraphHist.setChecked(false);
-        }
-        // 本日含むは可
-        if (!mChkIncludeToday.isEnabled()) {
-            mChkIncludeToday.setEnabled(true);
+    /** ヒストグラム(期間)ラジオボタン選択時の他のラジオボタン制御 */
+    private void radioHistRangeSelected() {
+        // 月間スピナー無効
+        mSpinnerYM.setEnabled(false);
+        // 期間範囲スピナー類有効
+        setRangeSpinnersEnable(true);
+        // 本日含むは不可
+        if (mChkIncludeToday.isEnabled()) {
+            mChkIncludeToday.setEnabled(false);
         }
     }
     //** END Radio Buttons control *********************************************
@@ -475,42 +465,80 @@ public class AppSleepManFragment extends AppBaseFragment {
     private final View.OnClickListener mButtonRequestListener = v -> getImageRequest();
 
     /**
-     * 期間ラジオグループ切り替えリスナー
-     * <p>グループ内ウィジットの可・不可制御</p>
+     * 検索期間(２週間/月間/期間) ラジオグループの切り替えリスナー
+     * <ul>
+     *     <li>他のグループ内ラジオボタン等の可・不可制御</li>
+     *     <li>画像・統計情報の復元</li>
+     * </ul>
      */
-    private final RadioGroup.OnCheckedChangeListener mRGrpChangeListener =(group, checkedId) -> {
-        DEBUG_OUT.accept(TAG, "radioGroup: " + group.getId() + ",checkedId: " + checkedId);
+    private final RadioGroup.OnCheckedChangeListener mRGrpRangeChangeListener =(grp, checkedId) -> {
+        DEBUG_OUT.accept(TAG, "radioGroup: " + grp.getId() + ",checkedId: " + checkedId);
         // 期間ラジオグループ
-        if (checkedId == mRadio2w.getId()) {
-            // ２週間選択
-            radio2wSelected();
-        } else {
+        if (checkedId == mRadioYM.getId()) {
             // 月間選択
             radioYMSelected();
+        } else if (checkedId == mRadioHistRange.getId()) {
+            // 範囲選択 (ヒストグラム)
+            radioHistRangeSelected();
+        } else {
+            // ２週間選択
+            radio2wSelected();
         }
-        // 切り替えごとに対応する画像ファイルが存在すれば復元する
-        restoreImageView();
-        // 対応する統計情報を該当するビューに復元
-        restoreStatisticsViews();
+        // 切り替えごとに対応する画像ファイルと統計情報を復元
+        restoreImageWithStatistics();
     };
 
-    /**
-     * 年月スピナー選択リスナー
-     */
-    private final AdapterView.OnItemSelectedListener mYmSpinnerListener =
+    /** 年月スピナー選択リスナー */
+    private final AdapterView.OnItemSelectedListener mSpinnerYMListener =
+        new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String value = (String) parent.getItemAtPosition(position);
+                mSpinnerYMSelected.setPosition(position);
+                mSpinnerYMSelected.setValue(value);
+                DEBUG_OUT.accept(TAG, "SpinnerYM.onItemSelected[" + mSpinnerYMSelected + "]");
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                mSpinnerYMSelected.setPosition(AppImageFragUtil.SpinnerSelected.UNSELECTED);
+                mSpinnerYMSelected.setValue(null);
+            }
+    };
+
+    /** 期間(開始)スピナー選択リスナー */
+    private final AdapterView.OnItemSelectedListener mSpinnerRangeFromListener =
+        new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String value = (String) parent.getItemAtPosition(position);
+                mSpinnerFromSelected.setPosition(position);
+                mSpinnerFromSelected.setValue(value);
+                DEBUG_OUT.accept(TAG,
+                        "SpinnerRangeFrom.onItemSelected[" + mSpinnerFromSelected + "]");
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                mSpinnerFromSelected.setPosition(-1);
+                mSpinnerFromSelected.setValue(null);
+            }
+    };
+
+    /** 期間(終了)スピナー選択リスナー */
+    private final AdapterView.OnItemSelectedListener mSpinnerRangeToListener =
             new AdapterView.OnItemSelectedListener() {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                     String value = (String) parent.getItemAtPosition(position);
-                    mSpinnerSelected.setPosition(position);
-                    mSpinnerSelected.setValue(value);
-                    DEBUG_OUT.accept(TAG, "onItemSelected[" + mSpinnerSelected + "]");
+                    mSpinnerToSelected.setPosition(position);
+                    mSpinnerToSelected.setValue(value);
+                    DEBUG_OUT.accept(TAG,
+                            "SpinnerRangeTo.onItemSelected[" + mSpinnerToSelected + "]");
                 }
 
                 @Override
                 public void onNothingSelected(AdapterView<?> parent) {
-                    mSpinnerSelected.setPosition(-1);
-                    mSpinnerSelected.setValue(null);
+                    mSpinnerToSelected.setPosition(-1);
+                    mSpinnerToSelected.setValue(null);
                 }
             };
     //** End define Listeners *********************************************
@@ -522,23 +550,46 @@ public class AppSleepManFragment extends AppBaseFragment {
         mTvDeepSleepingTime = mainView.findViewById(R.id.tvDeepSleepingTime);
     }
 
+    /**
+     * 期間選択スピナー(開始/終了)の可・不可設定
+     * @param enable 可・不可
+     */
+    private void setRangeSpinnersEnable(boolean enable) {
+        mSpinnerRangeFrom.setEnabled(enable);
+        mSpinnerRangeTo.setEnabled(enable);
+    }
+
+    /** 全ての選択スピナーを不可に設定 */
+    private void setAllSpinnersDisabled() {
+        for (Spinner item : mAllSpinners) {
+            item.setEnabled(false);
+        }
+    }
+
     private void initSpinner(View mainView) {
+        // アダブターは全てのスピナー共通
+        mSpinnerAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_item);
+        mSpinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        // 月間スピナー
         mSpinnerYM = mainView.findViewById(R.id.spinnerSmYearMonth);
-        ArrayAdapter<String> adapter= new ArrayAdapter<>(getContext(),
-                android.R.layout.simple_spinner_item);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        mSpinnerYM.setAdapter(adapter);
-        mSpinnerYM.setEnabled(false);
+        // 期間(開始)スピナー
+        mSpinnerRangeFrom = mainView.findViewById(R.id.spinnerSmRangeFrom);
+        // 期間(終了)スピナー
+        mSpinnerRangeTo = mainView.findViewById(R.id.spinnerSmRangeTo);
+        mAllSpinners = new Spinner[]{mSpinnerYM, mSpinnerRangeFrom, mSpinnerRangeTo};
+        for (Spinner item : mAllSpinners) {
+            item.setAdapter(mSpinnerAdapter);
+            item.setEnabled(false);
+        }
     }
 
     private void initWidget(View mainView) {
-        // 検索期間(月間/２週間前) ラジオグループ
+        // 検索期間(月間/２週間前/ヒストグラム[期間範囲]) ラジオグループ
         mRGrpDateRange = mainView.findViewById(R.id.radioGroupSmDateRange);
+        // 期間ラジオボタン
         mRadioYM = mainView.findViewById(R.id.radioSmYM);
         mRadio2w = mainView.findViewById(R.id.radioSm2w);
-        // グラフ型ラジオグループはリスナーに登録しない
-        mRadioGraphBar = mainView.findViewById(R.id.radioSmGraphBar);
-        mRadioGraphHist = mainView.findViewById(R.id.radioSmHist);
+        mRadioHistRange = mainView.findViewById(R.id.radioSmHistRange);
         // チェックボックス
         mChkIncludeToday = mainView.findViewById(R.id.chkIncludeSmToday);
         // プロット画像表示
@@ -550,7 +601,7 @@ public class AppSleepManFragment extends AppBaseFragment {
         mBtnGetRequest.setOnClickListener(mButtonRequestListener);
         // 初期画面生成時は不可
         mBtnGetRequest.setEnabled(false);
-        // 年月選択スピナー
+        // 選択スピナー
         initSpinner(mainView);
         // 画像保存チェック
         mChkSaveImg = mainView.findViewById(R.id.chkSmSaveImg);
@@ -566,13 +617,12 @@ public class AppSleepManFragment extends AppBaseFragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         DEBUG_OUT.accept(TAG, "onCreateView()");
-        mMetrics = new DisplayMetrics();
-        requireActivity().getWindowManager().getDefaultDisplay().getMetrics(mMetrics);
-        DEBUG_OUT.accept(TAG, "" + mMetrics);
 
         View mainView = inflater.inflate(
                 R.layout.fragment_image_sleep_man, container,false);
         initWidget(mainView);
+        // ラジオボタン類を２週間で初期化
+        radio2wSelected();
         // 画像の保存ファイル名配列の生成
         mSaveImageNames = new String[] {
                 getString(R.string.file_name_sm_bar_ym)/* 月間 棒グラフ */,
@@ -591,69 +641,46 @@ public class AppSleepManFragment extends AppBaseFragment {
                 getString(R.string.pref_stat_sm_bar_2w),
                 getString(R.string.pref_stat_sm_hist_range)
         };
-        // 空のオブジェクト生成
-        mSpinnerSelected = new AppImageFragUtil.SpinnerSelected();
+        // 空のスピナーすビナー選択オブジェクト生成
+        mSpinnerYMSelected = new AppImageFragUtil.SpinnerSelected();
+        mSpinnerFromSelected = new AppImageFragUtil.SpinnerSelected();
+        mSpinnerToSelected = new AppImageFragUtil.SpinnerSelected();
         return mainView;
     }
-
 
     @Override
     public void onResume() {
         super.onResume();
         DEBUG_OUT.accept(TAG, "onResume()");
 
-        // メールアドレス必須
-        String emailAddress = SharedPrefUtil.getEmailAddressInSettings(requireContext());
-        DEBUG_OUT.accept(TAG, "check EmailAddress: " + emailAddress);
-        if (TextUtils.isEmpty(emailAddress)) {
-            // メールアドレス入力確認ダイアログ
-            showConfirmRequireEmailAddress();
-            return;
+        // 初回登録日をベークラスから取得する
+        String firstRegisterDay = getFirstRegisterDay();
+        if (firstRegisterDay != null) {
+            // スピナーに年月リストを設定する
+            AppImageFragUtil.setYearMonthListToSpinnerAdapter(
+                    (ArrayAdapter<String>) mSpinnerYM.getAdapter(),
+                    firstRegisterDay);
+            // 先頭を選択状態に設定
+            mSpinnerYM.setSelection(0);
+            mSpinnerRangeFrom.setSelection(0);
+            mSpinnerRangeTo.setSelection(0);
         }
+        mBtnGetRequest.setEnabled(firstRegisterDay != null);
 
-        // 初期イメージ設定
-        if (mNoImageBitmap == null) {
-            AssetManager am = requireContext().getAssets();
-            try {
-                mNoImageBitmap = BitmapFactory.decodeStream(am.open(NO_IMAGE_FILE));
-                Log.w(TAG, "mNoImageBitmap: " + mNoImageBitmap);
-                if (mNoImageBitmap != null) {
-                    mImgView.setImageBitmap(mNoImageBitmap);
-                    mImageWd = mImgView.getWidth();
-                    mImageHt = mImgView.getHeight();
-                    DEBUG_OUT.accept(TAG, "ImageView.width: " + mImageWd + ",height: " + mImageHt);
-                }
-            }catch (IOException iex) {
-                // 通常ここには来ない
-                Log.w(TAG, iex.getLocalizedMessage());
-            }
-        }
-
-        // 初回登録日チェックリクエストを暗黙的に実行
-        requestFirstRegisterDayWithImplicitly();
-        // DEBUG
-        String fileNames = FileManager.checkFileNamesInContextDir(requireContext());
-        DEBUG_OUT.accept(TAG, "Context.FilesDir in [ " + fileNames + "]");
-        // DEBUG
-        SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
-                requireContext()
-        );
-        Map<String, ?> prefAll = sharedPref.getAll();
-        DEBUG_OUT.accept(TAG, "prefAll: " + prefAll);
         // プリファレンスからラジオボタンの状態を復元する ※onPauseで実行する
         if (restoreRadioButtonsState()) {
             // 当日データチェックウィジットの更新
             updateCheckIncludeToday();
-            // 統計情報の復元
-            restoreStatisticsViews();
-            // 保存された画像ファイルがあれば復元する
-            restoreImageView();
+            // 画像ファイルと統計情報の復元
+            restoreImageWithStatistics();
         }
 
         // ラジオグループリスナー登録
-        mRGrpDateRange.setOnCheckedChangeListener(mRGrpChangeListener);
+        mRGrpDateRange.setOnCheckedChangeListener(mRGrpRangeChangeListener);
         // スピナーリスナー登録
-        mSpinnerYM.setOnItemSelectedListener(mYmSpinnerListener);
+        mSpinnerYM.setOnItemSelectedListener(mSpinnerYMListener);
+        mSpinnerRangeFrom.setOnItemSelectedListener(mSpinnerRangeFromListener);
+        mSpinnerRangeTo.setOnItemSelectedListener(mSpinnerRangeToListener);
     }
 
     @Override
@@ -670,6 +697,8 @@ public class AppSleepManFragment extends AppBaseFragment {
         mRGrpDateRange.setOnCheckedChangeListener(null);
         // スピナーリスナー解除 ※null可
         mSpinnerYM.setOnItemSelectedListener(null);
+        mSpinnerRangeFrom.setOnItemSelectedListener(null);
+        mSpinnerRangeTo.setOnItemSelectedListener(null);
     }
 
     @Override
@@ -737,56 +766,43 @@ public class AppSleepManFragment extends AppBaseFragment {
      *     <li>例外発生時</li>
      * </ul>
      */
-    private void resetSuccessWidgets(UrlPathIndex pathIdx) {
+    private void resetWidgetsWithRemovePref(UrlPathIndex pathIdx) {
+        // NoImage画像を表示
+        mImgView.setImageBitmap(getNoImageBitmap());
+        // 統計情報表示ビューリセット
         resetStatisticsViews();
-        mImgView.setImageBitmap(mNoImageBitmap);
         // 対象画像ファイルとプリファレンスキー削除
         deleteSavedImage(pathIdx);
-    }
-
-    /**
-     * ウォーニングメッセージを取得
-     * @param status レスポンスステータス
-     * @return ウォーニングメッセージ
-     */
-    private String getResponseWarning(ResponseStatus status) {
-        String message;
-        switch (status.getCode()) {
-            case 400: // BadRequest: リクエストパラメータなどの不備
-                message = getWarningFromBadRequestStatus(status);
-                break;
-            case 404: // NotFound: データ未登録
-                message = getString(R.string.warning_data_not_found);
-                break;
-            default: // 50x系エラー
-                message = status.getMessage();
-        }
-        return message;
+        // 統計情報をプリファレンスから削除
+        removeStatisticsKey(pathIdx);
     }
 
     //** START shared preferences save/restore *****************************
     /**
-     * 年月スピナーで選択された位置の年月をプリファレンスに保存する
+     * スピナーで選択された位置の年月をプリファレンスに保存する
      * <ul>
-     *     <li>[保存タイミング] リクエストが月間でかつ正常終了時</li>
+     *     <li>[保存タイミング] リクエストが月間/期間でかつ正常終了時</li>
      *     <li>位置を保持すると当日が次の月に変わると位置も1つずれてしまうため文字列を保持する</li>
      * </ul>
+     * @param prefKey プリファレンスキー
+     * @param spinnerSelected スピナー選択オブジェクト
      */
-    private void saveSelectedSpinnerValueInSharedPref() {
+    private void saveSelectedSpinnerValueInSharedPref(
+            String prefKey, AppImageFragUtil.SpinnerSelected spinnerSelected) {
         SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
                 requireContext()
         );
         SharedPreferences.Editor editor = sharedPref.edit();
-        String ym = mSpinnerSelected.getValue();
-        editor.putString(getString(R.string.pref_key_sm_spinner_selected), ym);
+        editor.putString(prefKey,spinnerSelected.getValue());
         editor.apply();
     }
 
     /**
-     * ラジオボタンの状態をプリファレンスに保存
+     * 全ての期間ラジオボタンの状態をプリファレンスに保存
      * <ul>
-     *     <li>上段ラジオグループ: 月間ラジオのチェック状態</li>
-     *     <li>下段ラジオグループ: 棒グラフラジオのチェック状態</li>
+     *     <li>２週間</li>
+     *     <li>月間</li>
+     *     <li>期間(ヒストグラム)</li>
      * </ul>
      * <p>実行タイミング: onStop()</p>
      */
@@ -795,16 +811,27 @@ public class AppSleepManFragment extends AppBaseFragment {
                 requireContext()
         );
         SharedPreferences.Editor editor = sharedPref.edit();
-        // ラジオボタン
-        editor.putBoolean(getString(R.string.pref_key_sm_radio_ym),
-                mRadioYM.isChecked());
-        editor.putBoolean(getString(R.string.pref_key_sm_radio_bar),
-                mRadioGraphBar.isChecked());
-        // ラジオボタン
+        // 全てのラジオボタンの状態を保存
+        editor.putBoolean(getString(R.string.pref_key_sm_radio_2w), mRadio2w.isChecked());
+        editor.putBoolean(getString(R.string.pref_key_sm_radio_ym), mRadioYM.isChecked());
+        editor.putBoolean(getString(R.string.pref_key_sm_radio_range), mRadioHistRange.isChecked());
         // 保存の事実自体の保存 ※復元時にキーを削除
         editor.putString(getString(R.string.pref_key_sm_stop_saved),
-                "saveRadioButtonsState");
+                getString(R.string.pref_value_stop_saved));
         editor.apply();
+    }
+
+    /**
+     * プリファレンスから復元した選択値がnull以外なら該当するスピナーに適用
+     * @param restoreVal 復元した選択値
+     * @param spinner スピナー
+     */
+    private void restoreSpinnerSelection(String restoreVal, Spinner spinner) {
+        int pos = mSpinnerAdapter.getPosition(restoreVal);
+        DEBUG_OUT.accept(TAG, "Spinner.id: " + spinner.getId() + ",pos: " + pos);
+        if (pos > 0) {
+            spinner.setSelection(pos);
+        }
     }
 
     /**
@@ -822,42 +849,48 @@ public class AppSleepManFragment extends AppBaseFragment {
         String saved = sharedPref.getString(getString(R.string.pref_key_sm_stop_saved), null);
         DEBUG_OUT.accept(TAG, "restoreRadioButtonsState.saved: " + saved);
         if (saved != null) {
-            // 先にグラフ型のチェック復元
-            boolean isBar = sharedPref.getBoolean(getString(R.string.pref_key_sm_radio_bar),
+            // ２週間チェック
+            boolean is2w = sharedPref.getBoolean(getString(R.string.pref_key_sm_radio_2w),
                     false);
-            if (isBar && !mRadioGraphBar.isChecked()) {
-                mRadioGraphBar.setChecked(true);
-            } else {
-                mRadioGraphHist.setChecked(true);
-            }
+            mRadio2w.setChecked(is2w);
             // 月間チェック
-            boolean isYmChecked = sharedPref.getBoolean(getString(R.string.pref_key_sm_radio_ym),
+            boolean isYm = sharedPref.getBoolean(getString(R.string.pref_key_sm_radio_ym),
                     false);
-            if (isYmChecked && !mRadioYM.isChecked()) {
-                mRadioYM.setChecked(true);
-            }
+            mRadioYM.setChecked(isYm);
+            // 期間チェック
+            boolean isRange = sharedPref.getBoolean(getString(R.string.pref_key_sm_radio_range),
+                    false);
+            mRadioHistRange.setChecked(isRange);
+            DEBUG_OUT.accept(TAG,"is2w: " + is2w + ",isYM: " + isYm + ",isRange: " + isRange);
             // 関連するラジオボタンを一括更新
             if (mRadioYM.isChecked()) {
                 radioYMSelected();
+            } else if (mRadioHistRange.isChecked()) {
+                radioHistRangeSelected();
             } else {
                 radio2wSelected();
             }
             // 年月スピナーの選択位置をプリファレンスから取得した年月文字列から復元
-            String ymVal = sharedPref.getString(getString(R.string.pref_key_sm_spinner_selected),
-                    null);
+            String ymVal = sharedPref.getString
+                    (getString(R.string.pref_key_sm_spinner_ym_selected),null);
+            String fromVal = sharedPref.getString(
+                    getString(R.string.pref_key_sm_spinner_from_selected),null);
+            String toVal = sharedPref.getString(
+                    getString(R.string.pref_key_sm_spinner_to_selected),null);
+            DEBUG_OUT.accept(TAG,"ym: " + ymVal + ",from: " + isYm + ",to: " + isRange);
             // 年月スピナーが生成されていないケースを考慮 ※メールアドレス未設定
+            // スピナーサイズは全スピナーで共通
             int spinnerSize = mSpinnerYM.getAdapter().getCount();
-            DEBUG_OUT.accept(TAG,
-                    "isYM: " + isYmChecked + ",isBar: " + isBar
-                            + ",ym: " + ymVal + ",spinnerSize: " + spinnerSize);
             // 先頭位置以外なら更新 ※先頭(0)ならそのまま
             if (spinnerSize > 1) {
-                // 復元した文字列に対応する位置
-                ArrayAdapter<String> adapter = (ArrayAdapter<String>) mSpinnerYM.getAdapter();
-                int pos = adapter.getPosition(ymVal);
-                DEBUG_OUT.accept(TAG, "Spinner.pos: " + pos);
-                if (pos > 0) {
-                    mSpinnerYM.setSelection(pos);
+                if (ymVal != null) {
+                    restoreSpinnerSelection(ymVal, mSpinnerYM);
+                }
+                if (fromVal != null) {
+                    restoreSpinnerSelection(fromVal, mSpinnerRangeFrom);
+                }
+                if (toVal != null) {
+                    restoreSpinnerSelection(toVal, mSpinnerRangeTo);
                 }
             }
             // 復元完了でキーを削除する
@@ -890,8 +923,7 @@ public class AppSleepManFragment extends AppBaseFragment {
     /**
      * プリファレンスの統計情報から統計情報オブジェクトを復元する
      */
-    private SleepManStatistics restoreStatisticsObject() {
-        UrlPathIndex urlPathIdx = getUrlPathIndex();
+    private SleepManStatistics restoreStatisticsObject(UrlPathIndex urlPathIdx) {
         String key = mPrefStatisticsKeys[urlPathIdx.getNum()];
         SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
                 requireContext()
@@ -985,9 +1017,7 @@ public class AppSleepManFragment extends AppBaseFragment {
      * 現在のラジオボタンの状態から保存した画像ファイルが存在すればBitmapオブジェクトを取得する
      * @return 保存した画像ファイルが存在すればBitmapオブジェクト
      */
-    private Bitmap restoreBitmapFromFile() {
-        // 現在選択されているラジオボタンからURLパスインデックス取得
-        UrlPathIndex pathIdx = getUrlPathIndex();
+    private Bitmap restoreBitmapFromFile(UrlPathIndex pathIdx) {
         // 画像ファイル名保存のプリファレンスキー
         String prefKey = mPrefSaveImageKeys[pathIdx.getNum()];
         SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
@@ -1006,21 +1036,19 @@ public class AppSleepManFragment extends AppBaseFragment {
     }
 
     /**
-     * 画像保存ファイルから血圧データ取得画像表示ビューに画像を復元する
+     * 現在選択されているラジオボタンから保存済みの画像と統計情報を対応するウィジットに復元する
      */
-    private void restoreImageView() {
-        Bitmap savedBitmap = restoreBitmapFromFile();
+    private void restoreImageWithStatistics() {
+        // URLパスインデックス取得
+        UrlPathIndex pathIdx = getUrlPathIndex();
+        // 画像復元
+        Bitmap savedBitmap = restoreBitmapFromFile(pathIdx);
         DEBUG_OUT.accept(TAG, "savedBitmap: " + savedBitmap);
         if (savedBitmap != null) {
             mImgView.setImageBitmap(savedBitmap);
         }
-    }
-
-    /**
-     * プリファレンスから統計情報オブジェクトを復元し対応するビューを更新
-     */
-    private void restoreStatisticsViews() {
-        SleepManStatistics stat = restoreStatisticsObject();
+        // 統計情報復元
+        SleepManStatistics stat = restoreStatisticsObject(pathIdx);
         if (stat != null) {
             showStatistics(stat);
         } else {

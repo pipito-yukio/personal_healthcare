@@ -19,7 +19,16 @@
     <dimen name="unit_margin_start">5dp</dimen>
     <!-- 数値ピッカーダイアログ用TextView上端マージン -->
     <dimen name="inptextview_margin_top">8dp</dimen>
-    <!-- 画像表示フラグメントの統計情報用 -->
+    <!-- 画像取得系フラグメント -->
+    <dimen name="imgfrag_btn_margin_start">10dp</dimen>
+    <dimen name="imgfrag_right_parent_margin_end">4dp</dimen>
+    <!-- 年月スピナーマージン -->
+    <dimen name="imgfrg_spinner_margin_start">5dp</dimen>
+    <!-- RadioButton small size -->
+    <dimen name="radio_small">0.90</dimen>
+    <!-- CheckBox size -->
+    <dimen name="check_small">0.90</dimen>
+    <!-- 統計情報用 -->
     <dimen name="frag_top_radio_group_padding">2dp</dimen>
     <dimen name="frag_stat_padding">4dp</dimen>
     <dimen name="frag_stat_margin_rec_size">6dp</dimen>
@@ -42,8 +51,4 @@
     <dimen name="guideline_begin">90dp</dimen>
     <!-- EditText area -->
     <dimen name="edit_area_height">90sp</dimen>
-    <!-- RadioButton small size -->
-    <dimen name="radio_small">0.90</dimen>
-    <!-- CheckBox size -->
-    <dimen name="check_small">0.90</dimen>
 </resources>
