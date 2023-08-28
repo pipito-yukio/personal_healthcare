@@ -1167,14 +1167,23 @@ def _make_respose(resp_obj: Dict, resp_code) -> Response:
     return response
 
 
+# Flask自体が404をトラップする場合エラーになり、InternalServerErrorとなってしまう
+# error_type:<class 'werkzeug.exceptions.InternalServerError'>, 500 Internal Server Error    
 @app.errorhandler(BadRequest.code)
 @app.errorhandler(Forbidden.code)
 @app.errorhandler(NotFound.code)
 @app.errorhandler(Conflict.code) # IntegrityError (登録済み)
 @app.errorhandler(InternalServerError.code)
-def error_handler(error: HTTPException) -> Response:
+def error_handler(error: Union[HTTPException, Dict]) -> Response:
     app_logger.warning(f"error_type:{type(error)}, {error}")
+    err_msg: str
+    if isinstance(error.description, dict):
+        # アプリが呼び出すabort()の場合は辞書オブジェクト
+        err_msg = error.description["error_message"]
+    else:
+        # Flaskが出す場合は HTTPException)
+        err_msg = error.description
     resp_obj: Dict[str, Dict[str, Union[int, str]]] = {
-        "status": {"code": error.code, "message": error.description["error_message"]}
+        "status": {"code": error.code, "message": err_msg}
     }
     return _make_respose(resp_obj, error.code)
