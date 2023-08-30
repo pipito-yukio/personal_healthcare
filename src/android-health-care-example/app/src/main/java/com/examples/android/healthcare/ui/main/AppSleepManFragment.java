@@ -6,7 +6,6 @@ import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
-import android.os.Handler;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -76,8 +75,6 @@ public class AppSleepManFragment extends AppBaseFragment {
         public String getName() {return name; }
     }
 
-    // 画像ファイル保存、プリファレンスコミット時に利用するハンドラー
-    private final Handler mHandler = new Handler();
     // プロット画像用ImageView
     private ImageView mImgView;
     // 検索期間(月間/２週間前) ラジオグループ
@@ -407,19 +404,16 @@ public class AppSleepManFragment extends AppBaseFragment {
     }
     //** END request with repository *****************************
 
-    /** 当日データ含むチェックボックスウィジットの状態更新 */
+    /**
+     * 当日データ含むチェックボックスの状態更新
+     * <p>一時保存ファイルが存在すればラジオボタンの状態に関わらずチェックする</p>
+     */
     private void updateCheckIncludeToday() {
-        if (mRadioYM.isChecked() || mRadioHistRange.isChecked()) {
-            // 月間 or 期間: 当日不可
-            mChkIncludeToday.setEnabled(false);
-        } else {
-            // ２週間なら一時保存ファイルチェック
-            String savedDate = SharedPrefUtil.getLastSavedDate(requireContext());
-            // 一時保存ファイルがなければ当日データチェック不可
-            boolean fileNone = TextUtils.isEmpty(savedDate);
-            mChkIncludeToday.setEnabled(!fileNone);
-            mChkIncludeToday.setChecked(!fileNone);
-        }
+        String savedDate = SharedPrefUtil.getLastSavedDate(requireContext());
+        DEBUG_OUT.accept(TAG, "savedDate: " + savedDate);
+        boolean fileNone = TextUtils.isEmpty(savedDate);
+        mChkIncludeToday.setEnabled(!fileNone);
+        mChkIncludeToday.setChecked(!fileNone);
     }
 
     //** START Radio Buttons control *******************************************
@@ -653,27 +647,25 @@ public class AppSleepManFragment extends AppBaseFragment {
         super.onResume();
         DEBUG_OUT.accept(TAG, "onResume()");
 
-        // 初回登録日をベークラスから取得する
-        String firstRegisterDay = getFirstRegisterDay();
+        // 初回登録日をプリファレンスから取得する
+        String firstRegisterDay = SharedPrefUtil.getFirstRegisterDay(requireContext());
+        DEBUG_OUT.accept(TAG, "firstRegisterDay: " + firstRegisterDay);
         if (firstRegisterDay != null) {
             // スピナーに年月リストを設定する
             AppImageFragUtil.setYearMonthListToSpinnerAdapter(
                     (ArrayAdapter<String>) mSpinnerYM.getAdapter(),
                     firstRegisterDay);
-            // 先頭を選択状態に設定
-            mSpinnerYM.setSelection(0);
-            mSpinnerRangeFrom.setSelection(0);
-            mSpinnerRangeTo.setSelection(0);
         }
         mBtnGetRequest.setEnabled(firstRegisterDay != null);
 
         // プリファレンスからラジオボタンの状態を復元する ※onPauseで実行する
         if (restoreRadioButtonsState()) {
-            // 当日データチェックウィジットの更新
-            updateCheckIncludeToday();
             // 画像ファイルと統計情報の復元
             restoreImageWithStatistics();
         }
+        // ラジオボタンの復元が終わってから当日データ含むチェックボックスの更新
+        // 登録画面で一時保存した場合は無条件でチェックされる
+        updateCheckIncludeToday();
 
         // ラジオグループリスナー登録
         mRGrpDateRange.setOnCheckedChangeListener(mRGrpRangeChangeListener);
@@ -793,7 +785,7 @@ public class AppSleepManFragment extends AppBaseFragment {
                 requireContext()
         );
         SharedPreferences.Editor editor = sharedPref.edit();
-        editor.putString(prefKey,spinnerSelected.getValue());
+        editor.putString(prefKey, spinnerSelected.getValue());
         editor.apply();
     }
 
@@ -904,7 +896,7 @@ public class AppSleepManFragment extends AppBaseFragment {
 
     /**
      * 統計情報をプリファレンスに保存する
-     * @param urlPathIdx URLパスインデックス
+     * @param urlPathIdx UrlPathIndex
      * @param stat 統計情報オブジェクト
      */
     private void saveStatisticsInSharedPref(UrlPathIndex urlPathIdx, SleepManStatistics stat) {
@@ -922,6 +914,7 @@ public class AppSleepManFragment extends AppBaseFragment {
 
     /**
      * プリファレンスの統計情報から統計情報オブジェクトを復元する
+     * @param urlPathIdx UrlPathIndex
      */
     private SleepManStatistics restoreStatisticsObject(UrlPathIndex urlPathIdx) {
         String key = mPrefStatisticsKeys[urlPathIdx.getNum()];
@@ -942,7 +935,7 @@ public class AppSleepManFragment extends AppBaseFragment {
 
     /**
      * 統計情報のキーと値を削除する
-     * @param urlPathIdx URLパスインデックス
+     * @param urlPathIdx UrlPathIndex
      */
     private void removeStatisticsKey(UrlPathIndex urlPathIdx) {
         String key = mPrefStatisticsKeys[urlPathIdx.getNum()];
@@ -958,12 +951,12 @@ public class AppSleepManFragment extends AppBaseFragment {
     //** START imageView: to save file/ restore from file *****************************
     /**
      * 取得した画像のBitmapをファイル保存
-     * @param pathIdx リクエストパスインデックス
+     * @param urlPathIdx UrlPathIndex
      * @param bitmap 画像のBitmap
      */
-    private void saveBitmapToFile(UrlPathIndex pathIdx, Bitmap bitmap) {
-        String saveName = mSaveImageNames[pathIdx.getNum()];
-        mHandler.post(() -> {
+    private void saveBitmapToFile(UrlPathIndex urlPathIdx, Bitmap bitmap) {
+        String saveName = mSaveImageNames[urlPathIdx.getNum()];
+        getHandler().post(() -> {
             try {
                 String absSavePath = AppImageFragUtil.saveBitmapToPng(requireContext(),
                         bitmap, saveName);
@@ -974,7 +967,7 @@ public class AppSleepManFragment extends AppBaseFragment {
                             requireContext()
                     );
                     // 画像ファイル名保存のプリファレンスキー
-                    String prefKey = mPrefSaveImageKeys[pathIdx.getNum()];
+                    String prefKey = mPrefSaveImageKeys[urlPathIdx.getNum()];
                     SharedPreferences.Editor editor = sharedPref.edit();
                     editor.putString(prefKey, absSavePath);
                     editor.apply();
@@ -988,18 +981,18 @@ public class AppSleepManFragment extends AppBaseFragment {
     /**
      * 前回保存した画像とプリファレンスキー削除する
      * <p>[実行タイミング] 画像取得エラー時(レコードなしも同様)</p>
-     * @param pathIdx リクエストパスインデックス
+     * @param urlPathIdx UrlPathIndex
      */
-    private void deleteSavedImage(UrlPathIndex pathIdx) {
+    private void deleteSavedImage(UrlPathIndex urlPathIdx) {
         SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
                 requireContext()
         );
-        String prefKey = mPrefSaveImageKeys[pathIdx.getNum()];
+        String prefKey = mPrefSaveImageKeys[urlPathIdx.getNum()];
         String savedPath = sharedPref.getString(prefKey, null);
         DEBUG_OUT.accept(TAG, "delete.prefKey: " + prefKey + ",path: " + savedPath);
         // 対象画像とプリファレンスキーを削除
         if (savedPath != null) {
-            mHandler.post(() -> {
+            getHandler().post(() -> {
                 File file = new File(savedPath);
                 if (file.exists()) {
                     if (file.delete()) {
@@ -1015,11 +1008,12 @@ public class AppSleepManFragment extends AppBaseFragment {
 
     /**
      * 現在のラジオボタンの状態から保存した画像ファイルが存在すればBitmapオブジェクトを取得する
+     * @param urlPathIdx UrlPathIndex
      * @return 保存した画像ファイルが存在すればBitmapオブジェクト
      */
-    private Bitmap restoreBitmapFromFile(UrlPathIndex pathIdx) {
+    private Bitmap restoreBitmapFromFile(UrlPathIndex urlPathIdx) {
         // 画像ファイル名保存のプリファレンスキー
-        String prefKey = mPrefSaveImageKeys[pathIdx.getNum()];
+        String prefKey = mPrefSaveImageKeys[urlPathIdx.getNum()];
         SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
                 requireContext()
         );
@@ -1046,6 +1040,9 @@ public class AppSleepManFragment extends AppBaseFragment {
         DEBUG_OUT.accept(TAG, "savedBitmap: " + savedBitmap);
         if (savedBitmap != null) {
             mImgView.setImageBitmap(savedBitmap);
+        } else {
+            // 保存された画像がなければNoImage画像
+            mImgView.setImageBitmap(getNoImageBitmap());
         }
         // 統計情報復元
         SleepManStatistics stat = restoreStatisticsObject(pathIdx);

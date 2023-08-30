@@ -10,7 +10,6 @@ import android.os.Bundle;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import android.os.Handler;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -76,8 +75,6 @@ public class AppBloodPressFragment extends AppBaseFragment {
         public String getName() {return name; }
     }
 
-    // 画像ファイル保存、プリファレンスコミット時に利用するハンドラー
-    private final Handler mHandler = new Handler();
     // プロット画像用ImageView
     private ImageView mImgView;
     // 検索期間(月間/２週間前) ラジオグループ
@@ -358,20 +355,15 @@ public class AppBloodPressFragment extends AppBaseFragment {
     //** END request with repository *****************************
 
     /**
-     * 当日データ含むチェックボックスウィジットの状態更新
+     * 当日データ含むチェックボックスの状態更新
+     * <p>一時保存ファイルが存在すればラジオボタンの状態に関わらずチェックする</p>
      */
     private void updateCheckIncludeToday() {
-        if (mRadioYM.isChecked()) {
-            // 月間: 当日のチェックは残す
-            mChkIncludeToday.setEnabled(false);
-        } else {
-            // ２週間なら一時保存ファイルチェック
-            String savedDate = SharedPrefUtil.getLastSavedDate(requireContext());
-            // 一時保存ファイルがなければ当日データチェック不可
-            boolean fileNone = TextUtils.isEmpty(savedDate);
-            mChkIncludeToday.setEnabled(!fileNone);
-            mChkIncludeToday.setChecked(!fileNone);
-        }
+        String savedDate = SharedPrefUtil.getLastSavedDate(requireContext());
+        DEBUG_OUT.accept(TAG, "savedDate: " + savedDate);
+        boolean fileNone = TextUtils.isEmpty(savedDate);
+        mChkIncludeToday.setEnabled(!fileNone);
+        mChkIncludeToday.setChecked(!fileNone);
     }
 
     //** START Radio Buttons control *******************************************
@@ -579,8 +571,9 @@ public class AppBloodPressFragment extends AppBaseFragment {
         super.onResume();
         DEBUG_OUT.accept(TAG, "onResume()");
 
-        // 初回登録日をベークラスから取得する
-        String firstRegisterDay = getFirstRegisterDay();
+        // 初回登録日をプリファレンスから取得する
+        String firstRegisterDay = SharedPrefUtil.getFirstRegisterDay(requireContext());
+        DEBUG_OUT.accept(TAG, "firstRegisterDay: " + firstRegisterDay);
         if (firstRegisterDay != null) {
             // スピナーに年月リストを設定する
             AppImageFragUtil.setYearMonthListToSpinnerAdapter(
@@ -591,11 +584,12 @@ public class AppBloodPressFragment extends AppBaseFragment {
 
         // プリファレンスからラジオボタンの状態を復元する ※onPauseで実行する
         if (restoreRadioButtonsState()) {
-            // 当日データチェックウィジットの更新
-            updateCheckIncludeToday();
             // 画像ファイルと統計情報の復元
             restoreImageWithStatistics();
         }
+        // ラジオボタンの復元が終わってから当日データ含むチェックボックスの更新
+        // 登録画面で一時保存した場合は無条件でチェックされる
+        updateCheckIncludeToday();
 
         // ラジオグループリスナー登録
         mRGrpDateRange.setOnCheckedChangeListener(mRGrpRangeChangeListener);
@@ -737,6 +731,19 @@ public class AppBloodPressFragment extends AppBaseFragment {
     }
 
     /**
+     * プリファレンスから復元した選択値がnull以外なら該当するスピナーに適用
+     * @param restoreVal 復元した選択値
+     * @param spinner スピナー
+     */
+    private void restoreSpinnerSelection(String restoreVal, Spinner spinner) {
+        int pos = mSpinnerAdapter.getPosition(restoreVal);
+        DEBUG_OUT.accept(TAG, "Spinner.id: " + spinner.getId() + ",pos: " + pos);
+        if (pos > 0) {
+            spinner.setSelection(pos);
+        }
+    }
+
+    /**
      * 前回の値が保持されていればラジオボタンの状態をプリファレンスから復元
      * <ul>
      *    <li>onResume()に実行 ※onStopの対onStart()だとスピナーの年月リストが未設定</li>
@@ -783,12 +790,9 @@ public class AppBloodPressFragment extends AppBaseFragment {
                             + ",ym: " + ymVal + ",spinnerSize: " + spinnerSize);
             // 先頭位置以外なら更新 ※先頭(0)ならそのまま
             if (spinnerSize > 1) {
-                // 復元した文字列に対応する位置
-                mSpinnerAdapter = (ArrayAdapter<String>) mSpinnerYM.getAdapter();
-                int pos = mSpinnerAdapter.getPosition(ymVal);
-                DEBUG_OUT.accept(TAG,"Spinner.pos: " + pos);
-                if (pos > 0) {
-                    mSpinnerYM.setSelection(pos);
+                if (ymVal != null) {
+                    // スピナーの位置を復元
+                    restoreSpinnerSelection(ymVal, mSpinnerYM);
                 }
             }
             // 復元完了でキーを削除する
@@ -841,7 +845,7 @@ public class AppBloodPressFragment extends AppBaseFragment {
 
     /**
      * 統計情報のキーと値を削除する
-     * @param urlPathIdx URLパスインデックス
+     * @param urlPathIdx UrlPathIndex
      */
     private void removeStatisticsKey(UrlPathIndex urlPathIdx) {
         String key = mPrefStatisticsKeys[urlPathIdx.getNum()];
@@ -857,12 +861,12 @@ public class AppBloodPressFragment extends AppBaseFragment {
     //** START imageView: to save file/ restore from file *****************************
     /**
      * 取得した画像のBitmapをファイル保存
-     * @param pathIdx リクエストパスインデックス
+     * @param urlPathIdx UrlPathIndex
      * @param bitmap 画像のBitmap
      */
-    private void saveBitmapToFile(UrlPathIndex pathIdx, Bitmap bitmap) {
-        String saveName = mSaveImageNames[pathIdx.getNum()];
-        mHandler.post(() -> {
+    private void saveBitmapToFile(UrlPathIndex urlPathIdx, Bitmap bitmap) {
+        String saveName = mSaveImageNames[urlPathIdx.getNum()];
+        getHandler().post(() -> {
             try {
                 String absSavePath = AppImageFragUtil.saveBitmapToPng(requireContext(),
                         bitmap, saveName);
@@ -873,7 +877,7 @@ public class AppBloodPressFragment extends AppBaseFragment {
                             requireContext()
                     );
                     // 画像ファイル名保存のプリファレンスキー
-                    String prefKey = mPrefSaveImageKeys[pathIdx.getNum()];
+                    String prefKey = mPrefSaveImageKeys[urlPathIdx.getNum()];
                     SharedPreferences.Editor editor = sharedPref.edit();
                     editor.putString(prefKey, absSavePath);
                     editor.apply();
@@ -887,18 +891,18 @@ public class AppBloodPressFragment extends AppBaseFragment {
     /**
      * 前回保存した画像とプリファレンスキー削除する
      * <p>[実行タイミング] 画像取得エラー時(レコードなしも同様)</p>
-     * @param pathIdx リクエストパスインデックス
+     * @param urlPathIdx UrlPathIndex
      */
-    private void deleteSavedImage(UrlPathIndex pathIdx) {
+    private void deleteSavedImage(UrlPathIndex urlPathIdx) {
         SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
                 requireContext()
         );
-        String prefKey = mPrefSaveImageKeys[pathIdx.getNum()];
+        String prefKey = mPrefSaveImageKeys[urlPathIdx.getNum()];
         String savedPath = sharedPref.getString(prefKey, null);
         DEBUG_OUT.accept(TAG, "delete.prefKey: " + prefKey + ",path: " + savedPath);
         // 対象画像とプリファレンスキーを削除
         if (savedPath != null) {
-            mHandler.post(() -> {
+            getHandler().post(() -> {
                 File file = new File(savedPath);
                 if (file.exists()) {
                     if (file.delete()) {
@@ -914,11 +918,12 @@ public class AppBloodPressFragment extends AppBaseFragment {
 
     /**
      * 現在のラジオボタンの状態から保存した画像ファイルが存在すればBitmapオブジェクトを取得する
+     * @param urlPathIdx UrlPathIndex
      * @return 保存した画像ファイルが存在すればBitmapオブジェクト
      */
-    private Bitmap restoreBitmapFromFile(UrlPathIndex pathIdx) {
+    private Bitmap restoreBitmapFromFile(UrlPathIndex urlPathIdx) {
         // 画像ファイル名保存のプリファレンスキー
-        String prefKey = mPrefSaveImageKeys[pathIdx.getNum()];
+        String prefKey = mPrefSaveImageKeys[urlPathIdx.getNum()];
         SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
                 requireContext()
         );
@@ -945,6 +950,9 @@ public class AppBloodPressFragment extends AppBaseFragment {
         DEBUG_OUT.accept(TAG, "savedBitmap: " + savedBitmap);
         if (savedBitmap != null) {
             mImgView.setImageBitmap(savedBitmap);
+        } else {
+            // 保存された画像がなければNoImage画像
+            mImgView.setImageBitmap(getNoImageBitmap());
         }
         // 統計情報復元
         BloodPressStatistics stat = restoreStatisticsObject(pathIdx);

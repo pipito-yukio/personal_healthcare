@@ -9,6 +9,7 @@ import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.os.Handler;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.DisplayMetrics;
@@ -43,7 +44,6 @@ import com.examples.android.healthcare.tasks.Result;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * AppXXXXFragment共通フラグメント
@@ -57,9 +57,10 @@ public abstract class AppBaseFragment extends Fragment {
     private static final String NO_IMAGE_FILE = "NoImage_500x700.png";
     // 初期画面ビットマップ
     private Bitmap mNoImageBitmap;
+    // ファイル保存、プリファレンスコミット時に利用するハンドラー
+    private final Handler mHandler = new Handler();
     // 画像取得リクエスト時のヘッダー用の表示デバイス情報
     private DisplayMetrics mMetrics;
-    private String mFirstRegisterDay;
 
     // ウォーニングメッセージ用マップ
     private final Map<Integer, String> mResponseWarningMap = new HashMap<>();
@@ -73,8 +74,9 @@ public abstract class AppBaseFragment extends Fragment {
 
     /**
      * 初回登録日の存在チェックし、存在しない場合は暗黙的にリクエストする
+     * <p>非同期で実行されるためタイミングによってはサブクラスが取得できない場合がある</p>
      */
-    private String requestFirstRegisterDayImplicitly(String emailAddress) {
+    private void requestFirstRegisterDayImplicitly(String emailAddress) {
         String firstRegisterDay = SharedPrefUtil.getFirstRegisterDay(requireContext());
         DEBUG_OUT.accept(TAG, "firstRegisterDay: " + firstRegisterDay);
         if (TextUtils.isEmpty(firstRegisterDay)) {
@@ -83,7 +85,7 @@ public abstract class AppBaseFragment extends Fragment {
             if (device == RequestDevice.NONE) {
                 // アクションバーのサブタイトルにメッセージを出力する
                 showNetworkUnavailableInStatus(getWaringView());
-                return null;
+                return;
             }
 
             HealthcareApplication app = (HealthcareApplication) requireActivity().getApplication();
@@ -92,8 +94,6 @@ public abstract class AppBaseFragment extends Fragment {
             // ユーザの初回登録日取得
             HealthcareRepository<GetRegisterDaysResult> repos = new GetRegisterDaysRepository();
             String reqParam = new RequestParamBuilder(emailAddress).build();
-            // レスポンスから取得した初回登録日を返すオブジェクト
-            AtomicReference<String> getFirstDay = new AtomicReference<>();
             repos.makeGetRequest(0, requestUrl, reqParam, headers,
                     app.mEexecutor, app.mHandler, (result) -> {
                         if (result instanceof Result.Success) {
@@ -104,10 +104,8 @@ public abstract class AppBaseFragment extends Fragment {
                             String firstDay = days.getFirstDay();
                             if (firstDay != null) {
                                 // プリファレンスに保存する
-                                SharedPrefUtil.saveFirstRegisterDay(requireContext(),
-                                        firstDay);
+                                SharedPrefUtil.saveFirstRegisterDay(requireContext(), firstDay);
                             }
-                            getFirstDay.set(firstDay);
                         } else if (result instanceof Result.Warning) {
                             // ウォーニングメッセージをログに出力
                             ResponseStatus status =
@@ -115,18 +113,13 @@ public abstract class AppBaseFragment extends Fragment {
                             Log.w(TAG, "WarningStatus: " + status);
                             showWarningInStatusView(getWaringView(),
                                     getWarningFromBadRequestStatus(status));
-                            getFirstDay.set(null);
                         } else if (result instanceof Result.Error) {
                             // 例外メッセージをダイアログに表示
                             Exception exception = ((Result.Error<?>) result).getException();
                             Log.w(TAG, "Exception: " + exception);
                             showDialogExceptionMessage(exception);
-                            getFirstDay.set(null);
                         }
                     });
-            return getFirstDay.get();
-        } else {
-            return firstRegisterDay;
         }
     }
 
@@ -137,13 +130,22 @@ public abstract class AppBaseFragment extends Fragment {
         // サブクラスのフラグメントタイトルをアクションバータイトルに設定
         setActionBarTitle(getFragmentTitle());
 
+        // メールアドレスチェック
+        String emailAddress = SharedPrefUtil.getEmailAddressInSettings(requireContext());
+        if (TextUtils.isEmpty(emailAddress)) {
+            // メールアドレス登録ダイアログへ
+            showConfirmRequireEmailAddress();
+            // サブラクスのonResume()
+            super.onResume();
+            return;
+        }
+
+        // 暗黙的にユーザの初回登録日を取得する
+        requestFirstRegisterDayImplicitly(emailAddress);
         // 画像表示系フラグメントのみ初期イメージを取得する
         if (getFragmentPosition() > 0) {
             // 前回表示されたウォーニングビューを隠す
             hideStatusView(getWaringView());
-            // メールアドレス ※メールアドレスが未設定ならこの画面には遷移しない
-            String emailAddress = SharedPrefUtil.getEmailAddressInSettings(requireContext());
-            if (emailAddress != null) {
                 mMetrics = new DisplayMetrics();
                 requireActivity().getWindowManager().getDefaultDisplay().getMetrics(mMetrics);
                 DEBUG_OUT.accept(TAG, "" + mMetrics);
@@ -164,9 +166,6 @@ public abstract class AppBaseFragment extends Fragment {
                     }
                 }
 
-                // 暗黙的にユーザの初回登録日を取得する
-                mFirstRegisterDay = requestFirstRegisterDayImplicitly(emailAddress);
-
                 // DEBUG 保存されている画像ファイル
                 String fileNames = FileManager.checkFileNamesInContextDir(requireContext());
                 DEBUG_OUT.accept(TAG, "Context.FilesDir in [ " + fileNames + "]");
@@ -176,9 +175,6 @@ public abstract class AppBaseFragment extends Fragment {
                 );
                 Map<String, ?> prefAll = sharedPref.getAll();
                 DEBUG_OUT.accept(TAG, "prefAll: " + prefAll);
-            } else {
-                showConfirmRequireEmailAddress();
-            }
         }
 
         // サブラクスのonResume()
@@ -198,6 +194,14 @@ public abstract class AppBaseFragment extends Fragment {
     }
 
     /**
+     * ファイル保存時、プリファレンスcommit()呼び出し時のHandler取得
+     * @return Handler
+     */
+    public Handler getHandler() {
+        return mHandler;
+    }
+
+    /**
      * デバイスのDisplayMetricsを取得する
      * <ul>
      *     <l>血圧測定データグラフ表示</l>
@@ -208,14 +212,6 @@ public abstract class AppBaseFragment extends Fragment {
     public DisplayMetrics getDisplayMetrics() {
         assert mMetrics != null;
         return mMetrics;
-    }
-
-    /**
-     * ユーザの初回登録日を取得する
-     * @return 初回登録日
-     */
-    public String getFirstRegisterDay() {
-        return mFirstRegisterDay;
     }
 
     /**
