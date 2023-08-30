@@ -8,7 +8,6 @@ import static com.examples.android.healthcare.functions.AppTopUtil.UPD_KEY_NOCT_
 
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.os.Handler;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -201,9 +200,6 @@ public class AppTopFragment extends AppBaseFragment {
     private final Map<String, Map<Integer, Boolean>> mUpdateCheckMap = new HashMap<>();
     // カレントのPostRequestオブジェクト: 登録か更新
     private PostRequest mCurrentPostRequest;
-
-    // JSONファイル保存、プリファレンスコミット時に利用するハンドラー
-    private final Handler mHandler = new Handler();
 
     // https://developer.android.com/guide/components/fragments?hl=ja
     //  フラグメント
@@ -1326,8 +1322,6 @@ public class AppTopFragment extends AppBaseFragment {
         // 体温測定時刻
         mInpBodyTemperTime = mainView.findViewById(R.id.inpBodyTemperTime);
         mInpBodyTemperTime.setOnClickListener(mTimePickerViewClickListener);
-        // BLEインポート
-//        mBtnBleImport = mainView.findViewById(R.id.btnBleImport);
     }
 
     /**
@@ -1658,7 +1652,7 @@ public class AppTopFragment extends AppBaseFragment {
             fileName = getString(R.string.last_saved_json_file);
             message = getString(R.string.message_save_success);
         }
-        mHandler.post(()-> {
+        getHandler().post(()-> {
             String json = generateJsonTextForRegist();
             DEBUG_OUT.accept(TAG, "saved(" + fileName + "):\n"  + json);
             try {
@@ -1670,7 +1664,8 @@ public class AppTopFragment extends AppBaseFragment {
                 );
                 SharedPreferences.Editor editor = sharedPref.edit();
                 editor.putString(prefKey, dateValue);
-                editor.commit();
+                boolean commited = editor.commit();
+                DEBUG_OUT.accept(TAG, "saved.commited: " + commited);
                 // ステータスに表示
                 showStatus(message);
             } catch (IOException e) {
@@ -1908,12 +1903,6 @@ public class AppTopFragment extends AppBaseFragment {
             return;
         }
 
-        // メールアドレスチェック
-        if (TextUtils.isEmpty(SharedPrefUtil.getEmailAddressInSettings(requireContext()))) {
-            showConfirmRequireEmailAddress();
-            return;
-        }
-
         // 必須入力項目チェック
         List<String> warnings = checkRequiredInputs(false);
         if (!warnings.isEmpty()) {
@@ -2112,7 +2101,7 @@ public class AppTopFragment extends AppBaseFragment {
      * @param jsonFileName JSONファイル名
      */
     private void loadJsonFromFile(JsonFileSaveTiming jsonFileType, String jsonFileName) {
-        mHandler.post(() -> {
+        getHandler().post(() -> {
             try {
                 String json = FileManager.readText(requireContext(), jsonFileName);
                 DEBUG_OUT.accept(TAG, "restore.json: " + json);
@@ -2565,7 +2554,7 @@ public class AppTopFragment extends AppBaseFragment {
         );
         DEBUG_OUT.accept(TAG, "fileNames: " + fileNames);
         // ファイルがあれば削除する
-        mHandler.post(() -> {
+        getHandler().post(() -> {
             File jsonFile= new File(savedDir, fileName);
             if (jsonFile.delete()) {
                 DEBUG_OUT.accept(TAG, "Deleted fileName: " + jsonFile);
