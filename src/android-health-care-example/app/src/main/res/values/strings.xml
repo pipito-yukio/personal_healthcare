@@ -58,8 +58,8 @@
     <string name="init_tag_time_value">00:00</string>
     <string name="init_midnight_toilet_visits">1</string>
     <string name="init_sleep_score">80</string>
-    <string name="init_bloodpressure_max">130</string>
-    <string name="init_bloodpressure_min">85</string>
+    <string name="init_bloodpressure_max">125</string>
+    <string name="init_bloodpressure_min">75</string>
     <string name="init_pulse_rate">75</string>
     <!-- AM / PM 初期値 -->
     <string name="time_class_am">06:00</string>
