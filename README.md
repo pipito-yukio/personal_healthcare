@@ -16,6 +16,41 @@
 </div>
 <br/>
 
+### 1-1.可視化機能(Flask / Androidアプリ)の実装完了
+
++ Flaskアプリ側では、pandas + matplotlib で画像を生成しJSONでレスポンスをAndroidアプリに返却
++ Androidアプリ側ではデバイスサイズに応じてレイアウトを変更  
+
+■ 血圧測定データグラフ表示
+<div>
+<img src="images/HealthcareBpImages.png">
+</div>
+<br/>
+
+■2. 睡眠管理データグラフ表示
+<div>
+<img src="images/HealthcareSmImages.png">
+</div>
+<br/>
+
+### 1-2.スマホ/タブレット対応
+
++ 手持ちのスマホは5.8インチのPixel4aですが、上記画面の通り月単位のグラフでは血圧の目標値を超えた文字(赤)の識別は厳しいものがありますが、10.1インチのタブレットはさすがに可視化画像の視認性は抜群です。
+
+#### 1-2 (1) 血圧測定データグラフ表示の比較
+<div>
+<img src="images/HealthcareImgBpCompDevices.png">
+</div>
+<br/>
+
+#### 1-2 (2) 睡眠管理データグラフ表示の比較
++ スマホとタブレットで上部ラジオボタンのレイアウトを変えています。
+<div>
+<img src="images/HealthcareImgSmCompDevices.png">
+</div>
+<br/>
+
+
 既存システムについてのWebアプリケーシについては下記リポジトリをご覧ください  
 https://github.com/pipito-yukio/raspi4_apps
 
