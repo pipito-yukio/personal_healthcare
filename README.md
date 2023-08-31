@@ -16,7 +16,7 @@
 </div>
 <br/>
 
-### 1-1.可視化機能(Flask / Androidアプリ)の実装完了
+### 1-1.可視化機能(Flask / Androidアプリ)の実装完了 (2023-08-30)
 
 + Flaskアプリ側では、pandas + matplotlib で画像を生成しJSONでレスポンスをAndroidアプリに返却
 + Androidアプリ側ではデバイスサイズに応じてレイアウトを変更  
