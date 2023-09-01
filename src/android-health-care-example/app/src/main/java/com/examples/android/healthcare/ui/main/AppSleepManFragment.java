@@ -28,7 +28,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.examples.android.healthcare.HealthcareApplication;
 import com.examples.android.healthcare.R;
-import com.examples.android.healthcare.SharedPrefUtil;
 import com.examples.android.healthcare.constants.RequestDevice;
 import com.examples.android.healthcare.data.SleepManStatistics;
 import com.examples.android.healthcare.data.GetImageDataResult;
@@ -248,16 +247,30 @@ public class AppSleepManFragment extends AppBaseFragment {
             String endDay = AppImageFragUtil.getLastDayInYearMonth(reqToYm);
             builder.addStartDay(startDay).addEndDay(endDay);
         } else {
-            // ２週間は棒グラフのみ: 検索終了日に昨日を設定
+            // ２週間: 登録済み日付(null可)と昨日の比較
+            String endDay;
+            String regDate = getLatestRegisteredDate();
             String yesterday = AppImageFragUtil.getYesterday();
-            builder.addEndDay(yesterday);
-            // 当日データがあれば追加する
-            if (mChkIncludeToday.isChecked()) {
-                String todayData = getTodayData();
-                if (todayData != null) {
-                    builder.addTodayData(todayData);
+            DEBUG_OUT.accept(TAG, "registeredDate: " + regDate + ",yesterday: " + yesterday);
+            // 検索終了日の決定
+            if (compareISO8601DateStr(regDate, yesterday) == CompareISO8601Date.GT) {
+                // 登録済み日付がnullでなくかつ昨日より大きい場合、登録済み日付を検索終了日に設定
+                endDay = regDate;
+            } else {
+                endDay = yesterday;
+                // 当日AMデータ
+                if (mChkIncludeToday.isChecked()) {
+                    String todayData = getTodayData();
+                    if (todayData != null) {
+                        // 一時保存日付が検索終了日(昨日)より大きい日付なら追加
+                        String[] items = todayData.split(",");
+                        if (compareISO8601DateStr(items[0], yesterday) == CompareISO8601Date.GT) {
+                            builder.addTodayData(todayData);
+                        }
+                    }
                 }
             }
+            builder.addEndDay(endDay);
         }
         return builder.build();
     }
@@ -339,7 +352,7 @@ public class AppSleepManFragment extends AppBaseFragment {
         AppImageFragUtil.appendImageSizeToHeaders(headers,
                 mImgView.getWidth(), mImgView.getHeight(), getDisplayMetrics().density);
         // メールアドレス取得 ※画像取得フラグメントはメールアドレス必須のため、存在しない場合ここに来ない
-        String emailAddress = SharedPrefUtil.getEmailAddressInSettings(requireContext());
+        String emailAddress = getEmailAddress();
         // プロット期間からURLパスインデックスを取得
         UrlPathIndex urlPathIdx = getUrlPathIndex();
         // 選択されたラジオボタンからリクエストパラメータを生成する
@@ -409,7 +422,7 @@ public class AppSleepManFragment extends AppBaseFragment {
      * <p>一時保存ファイルが存在すればラジオボタンの状態に関わらずチェックする</p>
      */
     private void updateCheckIncludeToday() {
-        String savedDate = SharedPrefUtil.getLastSavedDate(requireContext());
+        String savedDate = getLastSavedDate();
         DEBUG_OUT.accept(TAG, "savedDate: " + savedDate);
         boolean fileNone = TextUtils.isEmpty(savedDate);
         mChkIncludeToday.setEnabled(!fileNone);
@@ -604,7 +617,6 @@ public class AppSleepManFragment extends AppBaseFragment {
     }
     //** End init widgets ***********************************************
 
-
     //** START life cycle events *****************************
     @NonNull
     @Override
@@ -648,7 +660,7 @@ public class AppSleepManFragment extends AppBaseFragment {
         DEBUG_OUT.accept(TAG, "onResume()");
 
         // 初回登録日をプリファレンスから取得する
-        String firstRegisterDay = SharedPrefUtil.getFirstRegisterDay(requireContext());
+        String firstRegisterDay = getFirstRegisterDay();
         DEBUG_OUT.accept(TAG, "firstRegisterDay: " + firstRegisterDay);
         if (firstRegisterDay != null) {
             // スピナーに年月リストを設定する
@@ -658,14 +670,13 @@ public class AppSleepManFragment extends AppBaseFragment {
         }
         mBtnGetRequest.setEnabled(firstRegisterDay != null);
 
+        // 当日データ含むチェックボックスの更新 ※登録画面で一時保存した場合は無条件でチェック
+        updateCheckIncludeToday();
         // プリファレンスからラジオボタンの状態を復元する ※onPauseで実行する
         if (restoreRadioButtonsState()) {
             // 画像ファイルと統計情報の復元
             restoreImageWithStatistics();
         }
-        // ラジオボタンの復元が終わってから当日データ含むチェックボックスの更新
-        // 登録画面で一時保存した場合は無条件でチェックされる
-        updateCheckIncludeToday();
 
         // ラジオグループリスナー登録
         mRGrpDateRange.setOnCheckedChangeListener(mRGrpRangeChangeListener);
@@ -781,9 +792,7 @@ public class AppSleepManFragment extends AppBaseFragment {
      */
     private void saveSelectedSpinnerValueInSharedPref(
             String prefKey, AppImageFragUtil.SpinnerSelected spinnerSelected) {
-        SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
-                requireContext()
-        );
+        SharedPreferences sharedPref = getSharedPreferences();
         SharedPreferences.Editor editor = sharedPref.edit();
         editor.putString(prefKey, spinnerSelected.getValue());
         editor.apply();
@@ -799,9 +808,7 @@ public class AppSleepManFragment extends AppBaseFragment {
      * <p>実行タイミング: onStop()</p>
      */
     private void saveRadioButtonsState() {
-        SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
-                requireContext()
-        );
+        SharedPreferences sharedPref = getSharedPreferences();
         SharedPreferences.Editor editor = sharedPref.edit();
         // 全てのラジオボタンの状態を保存
         editor.putBoolean(getString(R.string.pref_key_sm_radio_2w), mRadio2w.isChecked());
@@ -834,9 +841,7 @@ public class AppSleepManFragment extends AppBaseFragment {
      * </ul>
      */
     private boolean restoreRadioButtonsState() {
-        SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
-                requireContext()
-        );
+        SharedPreferences sharedPref = getSharedPreferences();
         // onStop時の保存キーの存在チェック
         String saved = sharedPref.getString(getString(R.string.pref_key_sm_stop_saved), null);
         DEBUG_OUT.accept(TAG, "restoreRadioButtonsState.saved: " + saved);
@@ -904,9 +909,7 @@ public class AppSleepManFragment extends AppBaseFragment {
         String json = gson.toJson(stat);
         String key = mPrefStatisticsKeys[urlPathIdx.getNum()];
         DEBUG_OUT.accept(TAG, "saveStat[" + key + "]: " + json);
-        SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
-                requireContext()
-        );
+        SharedPreferences sharedPref = getSharedPreferences();
         SharedPreferences.Editor editor = sharedPref.edit();
         editor.putString(key, json);
         editor.apply();
@@ -918,9 +921,7 @@ public class AppSleepManFragment extends AppBaseFragment {
      */
     private SleepManStatistics restoreStatisticsObject(UrlPathIndex urlPathIdx) {
         String key = mPrefStatisticsKeys[urlPathIdx.getNum()];
-        SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
-                requireContext()
-        );
+        SharedPreferences sharedPref = getSharedPreferences();
         String json = sharedPref.getString(key, null);
         if (!TextUtils.isEmpty(json)) {
             Gson gson = new Gson();
@@ -939,9 +940,7 @@ public class AppSleepManFragment extends AppBaseFragment {
      */
     private void removeStatisticsKey(UrlPathIndex urlPathIdx) {
         String key = mPrefStatisticsKeys[urlPathIdx.getNum()];
-        SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
-                requireContext()
-        );
+        SharedPreferences sharedPref = getSharedPreferences();
         SharedPreferences.Editor editor = sharedPref.edit();
         editor.remove(key);
         editor.apply();
@@ -963,9 +962,7 @@ public class AppSleepManFragment extends AppBaseFragment {
                 DEBUG_OUT.accept(TAG, "absSavePath: " + absSavePath);
                 if (absSavePath != null) {
                     // ファイル名をプリファレンスに保存する
-                    SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
-                            requireContext()
-                    );
+                    SharedPreferences sharedPref = getSharedPreferences();
                     // 画像ファイル名保存のプリファレンスキー
                     String prefKey = mPrefSaveImageKeys[urlPathIdx.getNum()];
                     SharedPreferences.Editor editor = sharedPref.edit();
@@ -984,9 +981,7 @@ public class AppSleepManFragment extends AppBaseFragment {
      * @param urlPathIdx UrlPathIndex
      */
     private void deleteSavedImage(UrlPathIndex urlPathIdx) {
-        SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
-                requireContext()
-        );
+        SharedPreferences sharedPref = getSharedPreferences();
         String prefKey = mPrefSaveImageKeys[urlPathIdx.getNum()];
         String savedPath = sharedPref.getString(prefKey, null);
         DEBUG_OUT.accept(TAG, "delete.prefKey: " + prefKey + ",path: " + savedPath);
@@ -1012,11 +1007,9 @@ public class AppSleepManFragment extends AppBaseFragment {
      * @return 保存した画像ファイルが存在すればBitmapオブジェクト
      */
     private Bitmap restoreBitmapFromFile(UrlPathIndex urlPathIdx) {
+        SharedPreferences sharedPref = getSharedPreferences();
         // 画像ファイル名保存のプリファレンスキー
         String prefKey = mPrefSaveImageKeys[urlPathIdx.getNum()];
-        SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
-                requireContext()
-        );
         String savedFileName = sharedPref.getString(prefKey, null);
         DEBUG_OUT.accept(TAG, "savedFileName: " + savedFileName);
         if (savedFileName != null) {

@@ -51,6 +51,11 @@ import java.util.Map;
 public abstract class AppBaseFragment extends Fragment {
     private static final String TAG = AppBaseFragment.class.getSimpleName();
 
+    /** ISO8601形式日付文字列比較結果 */
+    public enum CompareISO8601Date {
+        NONE/*比較不能(比較対象にnullが含まれる場合) */, GT, EQ, LT
+    }
+
     // フラグメント位置キー
     public static final String FRAGMENT_POS_KEY = "fragPos";
     // 初期表示用イメージ画像ファイル名
@@ -212,6 +217,67 @@ public abstract class AppBaseFragment extends Fragment {
     public DisplayMetrics getDisplayMetrics() {
         assert mMetrics != null;
         return mMetrics;
+    }
+
+    /**
+     * このフラグメントが所属するアクティビィティのプリファレンスオブジェクトを取得する
+     * @return アクティビィティのプリファレンスオブジェクト
+     */
+    public SharedPreferences getSharedPreferences () {
+        return SharedPrefUtil.getSharedPrefInMainActivity(requireContext());
+    }
+
+    /**
+     * メールアドレスをSettingsから取得する
+     * @return メールアドレス、プリファレンスに存在しなければnull
+     */
+    public String getEmailAddress() {
+        return SharedPrefUtil.getEmailAddressInSettings(requireContext());
+    }
+
+    /**
+     * 初回登録日を取得する
+     * @return 初回登録日、プリファレンスに存在しなければnull
+     */
+    public String getFirstRegisterDay() {
+        return SharedPrefUtil.getFirstRegisterDay(requireContext());
+    }
+
+    /**
+     * 最後に一時保存した日付を取得する
+     * @return 一時保存した日付、プリファレンスに存在しなければnull
+     */
+    public String getLastSavedDate() {
+        return SharedPrefUtil.getLastSavedDate(requireContext());
+    }
+
+    /**
+     * 最新の登録済み日付を取得する
+     * @return 最新の登録済み日付、プリファレンスに存在しなければnull
+     */
+    public String getLatestRegisteredDate() {
+        return SharedPrefUtil.getLatestRegisteredDate(requireContext());
+    }
+
+    /**
+     * ２つのISO8601形式日付を比較する
+     * @param iso8601Date1 日付1
+     * @param iso8601Date2 日付2
+     * @return CompareISO8601Date
+     */
+    public CompareISO8601Date compareISO8601DateStr(String iso8601Date1, String iso8601Date2) {
+        if (iso8601Date1 != null && iso8601Date2 != null) {
+            int compDate1 = Integer.parseInt(iso8601Date1.replace("-", ""));
+            int compDate2 = Integer.parseInt(iso8601Date2.replace("-", ""));
+            if (compDate1 > compDate2) {
+                return CompareISO8601Date.GT;
+            } else if (compDate1 == compDate2) {
+                return CompareISO8601Date.EQ;
+            } else {
+                return CompareISO8601Date.LT;
+            }
+        }
+        return CompareISO8601Date.NONE;
     }
 
     /**
