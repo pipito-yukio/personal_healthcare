@@ -51,4 +51,7 @@
     <dimen name="guideline_begin">90dp</dimen>
     <!-- EditText area -->
     <dimen name="edit_area_height">90sp</dimen>
+    <!-- Custom ActionBar Title/Subtitle small textSize -->
+    <dimen name="action_bar_title_text_size">17sp</dimen>
+    <dimen name="action_bar_subtitle_text_size">13sp</dimen>
 </resources>
