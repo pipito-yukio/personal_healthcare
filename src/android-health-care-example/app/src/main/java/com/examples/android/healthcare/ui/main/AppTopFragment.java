@@ -1459,12 +1459,12 @@ public class AppTopFragment extends AppBaseFragment {
                 // 過去日の場合はプリファレンスから登録済み日付を取得する (未登録ならnull)
                 // https://developer.android.com/kotlin/common-patterns?hl=ja
                 // Android APIの変更
-                String regDate = SharedPrefUtil.getLatestRegisteredDate(requireContext());
+                String regDate = getLatestRegisteredDate();
                 DEBUG_OUT.accept(TAG, String.format("Compare: %s =< %s", selectedLocal, regDate));
                 // カレンダー選択日が最新の登録済み日付以下ならリクエストする
                 // 過去日で登録済み日付を超える選択日は未登録日付なのでリクエストしない
                 if (AppTopUtil.isLessRegisteredDate(selectedLocal, regDate)) {
-                    String email = SharedPrefUtil.getEmailAddressInSettings(requireContext());
+                    String email = getEmailAddress();
                     if (!TextUtils.isEmpty(email)) {
                         // 過去日は保存不可
                         mBtnSave.setEnabled(false);
@@ -1659,9 +1659,7 @@ public class AppTopFragment extends AppBaseFragment {
                 // Jsonデータをファイル保存
                 FileManager.saveText(requireContext(), fileName, json);
                 // 日付をプリファレンスに保存する
-                SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(
-                        requireContext()
-                );
+                SharedPreferences sharedPref = getSharedPreferences();
                 SharedPreferences.Editor editor = sharedPref.edit();
                 editor.putString(prefKey, dateValue);
                 boolean commited = editor.commit();
@@ -1721,7 +1719,7 @@ public class AppTopFragment extends AppBaseFragment {
      */
     private String generateJsonTextForUpdate() {
         // メールアドレス(必須)
-        String email = SharedPrefUtil.getEmailAddressInSettings(requireContext());
+        String email = getEmailAddress();
         // 測定日付(必須)
         String iso8601DateValue = toStringOfTextViewBySelfTag(mInpMeasurementDate);
         // JSON整形なし
@@ -1947,8 +1945,7 @@ public class AppTopFragment extends AppBaseFragment {
 
                             if (result instanceof Result.Success) {
                                 // 更新前のプリファレンスから最新登録日付を取得する
-                                String before = SharedPrefUtil.getLatestRegisteredDate(
-                                        requireContext());
+                                String before = getLatestRegisteredDate();
                                 // 測定日付から登録日付を取得
                                 String after = toStringOfTextViewBySelfTag(mInpMeasurementDate);
                                 // 登録済みプリファレンスの上書き保存
@@ -2135,7 +2132,7 @@ public class AppTopFragment extends AppBaseFragment {
      */
     private void restoreWidgetsFromJson() {
         // 一時保存日を取得
-        String savedDate = SharedPrefUtil.getLastSavedDate(requireContext());
+        String savedDate = getLastSavedDate();
         DEBUG_OUT.accept(TAG, "restore.lastSavedDate: " + savedDate);
         if (!TextUtils.isEmpty(savedDate)) {
             // JSONファイルから復元
@@ -2146,7 +2143,7 @@ public class AppTopFragment extends AppBaseFragment {
         }
 
         // 最新登録日を取得
-        String latestDate = SharedPrefUtil.getLatestRegisteredDate(requireContext());
+        String latestDate = getLatestRegisteredDate();
         if (!TextUtils.isEmpty(latestDate)) {
             LocalDate latestLocal = LocalDate.parse(latestDate, DateTimeFormatter.ISO_LOCAL_DATE);
             DEBUG_OUT.accept(TAG, "latestDateLocal: " + latestLocal);
@@ -2169,7 +2166,7 @@ public class AppTopFragment extends AppBaseFragment {
      */
     private RegisterData generateRegisterData(){
         // メールアドレス(必須) ※健康管理アプリ設定のメールアドレス
-        String email = SharedPrefUtil.getEmailAddressInSettings(requireContext());
+        String email = getEmailAddress();
         // 測定日付(必須)
         String iso8601DateValue = toStringOfTextViewBySelfTag(mInpMeasurementDate);
         // 睡眠管理
@@ -2533,7 +2530,7 @@ public class AppTopFragment extends AppBaseFragment {
      * 一時JSONファイルを削除する
      */
     private void deleteSavedFile() {
-        String lastDate = SharedPrefUtil.getLastSavedDate(requireContext());
+        String lastDate = getLastSavedDate();
         String fileName =getString(R.string.last_saved_json_file);
         DEBUG_OUT.accept(TAG, "delete.lastDate: " + lastDate);
         if (TextUtils.isEmpty(lastDate)) {
@@ -2562,7 +2559,7 @@ public class AppTopFragment extends AppBaseFragment {
                 DEBUG_OUT.accept(TAG, "Not delete: " + jsonFile);
             }
             // プリファレンス取得
-            SharedPreferences sharedPref = SharedPrefUtil.getSharedPrefInMainActivity(requireContext());
+            SharedPreferences sharedPref = getSharedPreferences();
             SharedPreferences.Editor editor = sharedPref.edit();
             // キーを削除
             editor.remove(getString(R.string.pref_saved_key));

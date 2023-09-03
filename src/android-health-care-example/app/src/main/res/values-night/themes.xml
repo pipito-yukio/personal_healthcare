@@ -20,5 +20,14 @@
         <!-- Warning TextView on Dark -->
         <item name="warningBgDrawable">@drawable/warning_textview_frame_dark</item>
         <item name="warningFgColor">@color/solid_red</item>
+        <!-- Customize your theme here. -->
+        <!-- Custom ActionBarStyle -->
+        <!-- Support library compatibility -->
+        <item name="actionBarStyle">@style/HealthcareNightActionBar</item>
+    </style>
+    <!-- backgroud=@null -->
+    <style name="HealthcareNightActionBar" parent="@style/Widget.AppCompat.ActionBar">
+        <item name="titleTextStyle">@style/HealthcareActionBar.TitleTextStyle</item>
+        <item name="subtitleTextColor">@style/HealthcareActionBar.SubtitleTextStyle</item>
     </style>
 </resources>

@@ -75,9 +75,7 @@ public class SharedPrefUtil {
     public static void saveFirstRegisterDay(Context context, String value) {
         SharedPreferences sharedPref = getSharedPrefInMainActivity(context);
         SharedPreferences.Editor editor = sharedPref.edit();
-        // 特に急がないので commitしない
-        editor.putString(context.getString(R.string.pref_first_register_day_key),
-                value);
+        editor.putString(context.getString(R.string.pref_first_register_day_key), value);
         editor.apply();
     }
 
