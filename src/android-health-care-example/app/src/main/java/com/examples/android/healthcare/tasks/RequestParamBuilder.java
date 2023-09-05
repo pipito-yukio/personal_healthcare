@@ -70,7 +70,7 @@ public class RequestParamBuilder {
     /**
      * 測定日を追加: 登録・更新, 登録データ取得時 (必須)
      * @param measurementDay 測定日
-     * @return GetImageParamBuilder
+     * @return RequestParamBuilder
      */
     public RequestParamBuilder addMeasurementDay(String measurementDay) {
         String encoded = urlEncoded(measurementDay);
@@ -82,7 +82,7 @@ public class RequestParamBuilder {
     /**
      * 検索対象年月を追加: 月間データの場合 (必須)
      * @param yearMonth 検索対象年月文字列
-     * @return GetImageParamBuilder
+     * @return RequestParamBuilder
      */
     public RequestParamBuilder addYearMonth(String yearMonth) {
         String encoded = urlEncoded(yearMonth);
@@ -94,7 +94,7 @@ public class RequestParamBuilder {
     /**
      * 検索開始日を追加
      * @param iso8601Date 検索開始日 ※ISO8601形式
-     * @return GetImageParamBuilder
+     * @return RequestParamBuilder
      */
     public RequestParamBuilder addStartDay(String iso8601Date) {
         String encoded = urlEncoded(iso8601Date);
@@ -106,7 +106,7 @@ public class RequestParamBuilder {
     /**
      * 検索終了日を追加
      * @param iso8601Date 検索終了日 ※ISO8601形式
-     * @return GetImageParamBuilder
+     * @return RequestParamBuilder
      */
     public RequestParamBuilder addEndDay(String iso8601Date) {
         String encoded = urlEncoded(iso8601Date);
@@ -119,7 +119,7 @@ public class RequestParamBuilder {
      * 血圧測定ユーザ目標値を追加
      * @param max 最高血圧値
      * @param min 最低血圧値
-     * @return GetImageParamBuilder
+     * @return RequestParamBuilder
      */
     public RequestParamBuilder addBloodPressUserTarget(int max, int min) {
         String encoded = urlEncoded(String.format("%d,%d", max, min));
@@ -131,7 +131,7 @@ public class RequestParamBuilder {
     /**
      * 当日データbase&4エンコードしてクエリーパラメータに追加する
      * @param rowData 当日データ(カンマ区切り文字列)
-     * @return GetImageParamBuilder
+     * @return RequestParamBuilder
      */
     public RequestParamBuilder addTodayData(String rowData) {
         String encoded = Base64.getEncoder().encodeToString(
